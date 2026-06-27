@@ -10,7 +10,7 @@ This project is dual-purpose:
 1. **Build a meaningful app** — CapyBee helps kids adapt to a new country
 2. **Master AI-assisted development** — practice every phase of modern software delivery using AI tools
 
-The goal is not just to ship CapyBee — it's to learn **how to build software in 2025 the new way**: where AI is a co-pilot at every single stage.
+The goal is not just to ship CapyBee — it's to learn **how to build software in 2026 the new way**: where AI is a co-pilot at every single stage.
 
 ---
 
