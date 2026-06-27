@@ -1,10 +1,40 @@
 # Compiled class file
 *.class
-
-# Log file
 *.log
 
-# BlueJ files
+# Java build output
+target/
+build/
+.mvn/wrapper/maven-wrapper.jar
+
+# Node build output
+node_modules/
+dist/
+coverage/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+
+# Keep repository metadata/config folders trackable even if excluded globally
+!.github/
+!.github/**
+
+# Fly.io and Docker artifacts
+.fly/
+.docker/
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Log file
 *.ctxt
 
 # Mobile Tools for Java (J2ME)
