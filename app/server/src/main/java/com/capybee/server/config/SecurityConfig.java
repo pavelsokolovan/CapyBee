@@ -21,7 +21,7 @@ public class SecurityConfig {
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOriginPatterns(List.of("http://localhost:*", "https://*.fly.dev"));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
@@ -35,11 +35,11 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
                 .cors(Customizer.withDefaults())
-                .csrf(AbstractHttpConfigurer::disable)
+            .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/", "/index.html", "/assets/**", "/favicon.ico", "/health", "/actuator/health", "/error", "/oauth2/**", "/login/**")
                         .permitAll()
-                        .requestMatchers("/api/public/**", "/api/auth-status")
+                        .requestMatchers("/api/public/**", "/api/auth-status", "/api/health")
                         .permitAll()
                         .anyRequest()
                         .authenticated())

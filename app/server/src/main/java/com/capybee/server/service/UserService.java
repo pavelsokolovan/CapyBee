@@ -1,7 +1,6 @@
 package com.capybee.server.service;
 
 import java.util.Optional;
-import java.util.UUID;
 
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.stereotype.Service;

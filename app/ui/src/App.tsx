@@ -5,19 +5,19 @@ import { AuthenticatedHome, UserProfile } from './AuthenticatedHome';
 const highlights = [
   {
     title: 'Google sign-in',
-    description: 'Simple account entry with Google OAuth so the app can keep a secure identity from day one.'
+    description: 'Parent login starts with Google OAuth and opens a private family space.'
   },
   {
-    title: 'First page',
-    description: 'A calm landing screen that explains the app and gives one clear way to begin.'
+    title: 'Child profile setup',
+    description: 'Create one child profile with nickname and language preference in a few taps.'
   },
   {
-    title: 'Data storage',
-    description: 'User profile data, check-ins, and mission history stored in PostgreSQL tables.'
+    title: 'Daily support loop',
+    description: 'Check-ins, missions, friendship notes, and memories are all stored safely for one family.'
   },
   {
-    title: 'Fly.io ready',
-    description: 'One container, one deployment target, and environment-driven configuration.'
+    title: 'Mobile-first experience',
+    description: 'Core flows are optimized for phones so children can use CapyBee in short, calm sessions.'
   }
 ];
 
@@ -65,8 +65,8 @@ function App() {
           <span className="eyebrow">CapyBee concept scaffold</span>
           <h1>Gentle software for a harder transition.</h1>
           <p className="lead">
-            CapyBee gives children a calm place to sign in with Google, land on a welcoming first page,
-            and begin storing useful personal data in the app.
+            CapyBee helps children settle into a new country with gentle daily check-ins,
+            tiny real-world missions, and private spaces for old and new memories.
           </p>
           <div className="hero-actions">
             <a className="primary-button" href="/oauth2/authorization/google">
@@ -87,8 +87,7 @@ function App() {
           <div className="hero-card-badge">First screen</div>
           <h2>Welcome to your hive.</h2>
           <p>
-            The landing page introduces the mood of the app, then hands the user off to sign-in without
-            extra clutter.
+            A safe first release for families: simple setup, warm tone, and one small step at a time.
           </p>
           <div className="hero-card-grid">
             {stats.map((stat) => (
@@ -125,21 +124,21 @@ function App() {
 
       <section className="roadmap">
         <div className="section-heading compact">
-          <span>Next tables and screens</span>
-          <h2>Where the app can grow from here</h2>
+          <span>First release shape</span>
+          <h2>What happens after sign-in</h2>
         </div>
         <div className="roadmap-list">
           <div>
-            <strong>Auth bootstrap</strong>
-            <p>Create a user record on first Google sign-in and link it to the external identity.</p>
+            <strong>Profile setup</strong>
+            <p>Parent creates one child profile using nickname and language preference.</p>
           </div>
           <div>
-            <strong>Personal data</strong>
-            <p>Store check-ins, mission progress, and lightweight profile data in PostgreSQL.</p>
+            <strong>Daily flow</strong>
+            <p>Child can check in, finish a mission, and track tiny social progress privately.</p>
           </div>
           <div>
-            <strong>Deployment</strong>
-            <p>Build the UI into the backend image so Fly.io can run the full app as one service.</p>
+            <strong>Two worlds</strong>
+            <p>Old World and New World memories are stored side-by-side, never replacing each other.</p>
           </div>
         </div>
       </section>
