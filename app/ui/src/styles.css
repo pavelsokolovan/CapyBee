@@ -60,6 +60,70 @@ a:hover {
   padding: 48px 0 64px;
 }
 
+.auth-loading {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+}
+
+.hero-capybee {
+  margin-bottom: 10px;
+}
+
+.capybee-avatar {
+  user-select: none;
+  object-fit: contain;
+}
+
+.capybee-bubble {
+  margin: 0;
+  position: relative;
+  background: #fdf6e3;
+  border: 1px solid #e8c97a;
+  border-radius: 16px;
+  padding: 10px 16px;
+  font-size: 14px;
+  color: #5c3d00;
+  max-width: 260px;
+  text-align: center;
+}
+
+.capybee-bubble::before,
+.capybee-bubble::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+}
+
+.capybee-bubble::before {
+  top: -8px;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 8px solid #e8c97a;
+}
+
+.capybee-bubble::after {
+  top: -7px;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 7px solid #fdf6e3;
+}
+
+.capybee-center-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
 .hero {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
@@ -459,6 +523,69 @@ a:hover {
   font-size: 0.82rem;
 }
 
+.checkin-row {
+  align-items: center;
+}
+
+.checkin-headline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.title-with-avatar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.title-with-avatar h2 {
+  margin: 0;
+}
+
+.empty-copy {
+  margin: 0;
+  color: var(--muted);
+}
+
+.suggestion-card {
+  margin-top: 12px;
+  width: 100%;
+  border: 1px solid rgba(139, 107, 42, 0.2);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.82);
+  min-height: 64px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.capybee-toast {
+  position: fixed;
+  left: 10px;
+  right: 10px;
+  bottom: 92px;
+  border: 1px solid rgba(139, 107, 42, 0.26);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 40;
+}
+
+.mission-toast {
+  background: #fdf0c0;
+  border: 1px solid #e8c97a;
+}
+
 .status-line {
   color: var(--accent-strong);
   margin-top: 12px;
@@ -598,6 +725,10 @@ a:hover {
   align-items: center;
   gap: 8px;
   transition: all 160ms ease;
+}
+
+.mood-avatar {
+  border-radius: 10px;
 }
 
 .mood-option input {

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { AuthenticatedHome, UserProfile } from './AuthenticatedHome';
+import { AuthenticatedHome } from './AuthenticatedHome';
+import type { UserProfile } from './AuthenticatedHome';
+import { CapyBeeAvatar, CapyBeeBubble, capyBeeAvatar } from './capybee';
 
 const highlights = [
   {
@@ -31,6 +33,9 @@ const stats = [
 function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionExpired, setSessionExpired] = useState(false);
+
+  const locale = navigator.language.toLowerCase().startsWith('pl') ? 'pl' : 'en';
 
   useEffect(() => {
     checkAuthStatus();
@@ -42,6 +47,9 @@ function App() {
       if (res.ok) {
         const data = await res.json();
         setUser(data);
+        setSessionExpired(false);
+      } else if (res.status === 401) {
+        setSessionExpired(true);
       }
     } catch (err) {
       console.error('Failed to check auth status:', err);
@@ -51,17 +59,37 @@ function App() {
   };
 
   if (loading) {
-    return <div style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>;
+    return (
+      <main className="auth-loading">
+        <CapyBeeAvatar src={capyBeeAvatar.default} size={120} />
+        <p>{locale === 'pl' ? 'Chwileczke...' : 'One moment...'}</p>
+      </main>
+    );
   }
 
   if (user?.authenticated) {
     return <AuthenticatedHome user={user} />;
   }
 
+  if (sessionExpired) {
+    return (
+      <main className="auth-loading">
+        <CapyBeeAvatar src={capyBeeAvatar.waving} size={120} />
+        <CapyBeeBubble
+          text={locale === 'pl' ? 'Hej, wrociles! Zaloguj sie znowu.' : "Hey, you're back! Sign in again."}
+        />
+        <a className="primary-button" href="/oauth2/authorization/google">
+          {locale === 'pl' ? 'Zaloguj sie' : 'Sign in'}
+        </a>
+      </main>
+    );
+  }
+
   return (
     <main className="page-shell">
       <section className="hero">
         <div className="hero-copy">
+          <CapyBeeAvatar src={capyBeeAvatar.waving} size={200} alt="CapyBee" className="hero-capybee" />
           <span className="eyebrow">CapyBee concept scaffold</span>
           <h1>Gentle software for a harder transition.</h1>
           <p className="lead">

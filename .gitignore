@@ -12,6 +12,11 @@ node_modules/
 dist/
 coverage/
 
+# Spring Boot static folder is populated at build time (Dockerfile copies Vite dist)
+# Only .gitkeep is tracked to preserve the empty directory
+app/server/src/main/resources/static/assets/
+app/server/src/main/resources/static/index.html
+
 # Environment files
 .env
 .env.*

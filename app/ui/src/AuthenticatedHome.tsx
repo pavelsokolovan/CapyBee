@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
+import { CapyBeeAvatar, CapyBeeBubble, capyBeeAvatar, sameCalendarDay } from './capybee';
 
 export interface UserProfile {
   authenticated: boolean;
@@ -65,20 +66,14 @@ interface MemoryEntry {
   updatedAt: string;
 }
 
-const moodEmoji: Record<string, string> = {
-  heavy: '😔',
-  okay: '😐',
-  good: '😊'
-};
+type Mood = 'heavy' | 'okay' | 'good';
+type TabKey = 'home' | 'missions' | 'friendships' | 'memories' | 'profile';
 
 const stageOptions = ['noticed', 'was_nice', 'talked', 'want_to_know_better'];
 
-type TabKey = 'home' | 'missions' | 'friendships' | 'memories' | 'profile';
-
 const copy = {
   en: {
-    homeTitle: 'How was today?',
-    checkInSaved: 'Thanks for sharing. One small step is enough for today.',
+    homeTitle: "How's today?",
     profileSetupTitle: 'Create child profile',
     profileSetupHint: 'Use a nickname. Real names are optional and not required.',
     save: 'Save',
@@ -93,28 +88,105 @@ const copy = {
     oldWorld: 'Old World',
     newWorld: 'New World',
     language: 'Language',
-    noItems: 'Nothing here yet.'
+    noItems: 'Nothing here yet.',
+    greetingFirstVisit: 'Hey! How was today?',
+    greetingReturning: 'Good to see you again.',
+    reactionHeavy: "That sounds hard. I'm here.",
+    reactionOkay: 'Okay is something. Good job showing up.',
+    reactionGood: "That's great! I'm happy with you.",
+    missionSuggestion: 'I have a small mission for you today ->',
+    missionEmpty: 'No missions right now - check back tomorrow!',
+    missionDone: 'Mission done! A new cell in your hive',
+    missionHistoryEmpty: 'No missions yet.',
+    friendshipEmpty: 'Who did you notice today?',
+    friendshipToast: 'Got it! Every step counts.',
+    memoryOldEmpty: 'Your old home is safe here.',
+    memoryNewEmpty: 'Start building your new hive.',
+    memorySavedOld: 'Saved. This will always be yours.',
+    memorySavedNew: 'A new moment in the hive!',
+    askName: 'What should I call you?',
+    completionNote: 'Completion note',
+    person: 'Person',
+    stage: 'Stage',
+    note: 'Note',
+    addEntry: 'Add entry',
+    title: 'Title',
+    story: 'Story',
+    favoriteMemory: 'Favorite memory',
+    addMemory: 'Add memory',
+    profileActive: 'Profile active',
+    markComplete: 'Mark complete',
+    honeycombProgress: 'Honeycomb progress',
+    recentCheckins: 'Recent check-ins',
+    completionHistory: 'Completion history'
   },
   pl: {
-    homeTitle: 'Jak dziś było?',
-    checkInSaved: 'Dzięki, że to zapisałeś. Jeden mały krok na dziś wystarczy.',
-    profileSetupTitle: 'Utwórz profil dziecka',
-    profileSetupHint: 'Użyj ksywki. Prawdziwe imię nie jest wymagane.',
+    homeTitle: 'Jak dzis bylo?',
+    profileSetupTitle: 'Utworz profil dziecka',
+    profileSetupHint: 'Uzyj ksywki. Prawdziwe imie nie jest wymagane.',
     save: 'Zapisz',
     saving: 'Zapisywanie...',
-    setUp: 'Utwórz profil',
+    setUp: 'Utworz profil',
     checkInPlaceholder: 'Opcjonalna notatka',
     missions: 'Misje',
     friendships: 'Relacje',
     memories: 'Wspomnienia',
     profile: 'Profil',
     home: 'Start',
-    oldWorld: 'Stary świat',
-    newWorld: 'Nowy świat',
-    language: 'Język',
-    noItems: 'Na razie nic tu nie ma.'
+    oldWorld: 'Stary swiat',
+    newWorld: 'Nowy swiat',
+    language: 'Jezyk',
+    noItems: 'Na razie nic tu nie ma.',
+    greetingFirstVisit: 'Hej! Jak dzis bylo?',
+    greetingReturning: 'Milo cie znowu widziec.',
+    reactionHeavy: 'To brzmi ciezko. Jestem tu.',
+    reactionOkay: 'Okej to tez jest cos. Dobra robota.',
+    reactionGood: 'To swietnie! Ciesze sie razem z toba.',
+    missionSuggestion: 'Mam dla ciebie mala misje na dzis ->',
+    missionEmpty: 'Nie ma teraz misji - wroc jutro!',
+    missionDone: 'Misja wykonana! Nowa komorka w ulu',
+    missionHistoryEmpty: 'Nie ma jeszcze zadnych misji.',
+    friendshipEmpty: 'Kogo dzis zauwazyles?',
+    friendshipToast: 'Zapamietalem! Kazdy krok sie liczy.',
+    memoryOldEmpty: 'Twoj stary dom jest tutaj bezpieczny.',
+    memoryNewEmpty: 'Zacznij budowac swoj nowy ul.',
+    memorySavedOld: 'Zapamietane. To zawsze bedzie twoje.',
+    memorySavedNew: 'Nowa chwila w ulu!',
+    askName: 'Jak mam sie do ciebie zwracac?',
+    completionNote: 'Notatka do ukonczenia',
+    person: 'Osoba',
+    stage: 'Etap',
+    note: 'Notatka',
+    addEntry: 'Dodaj wpis',
+    title: 'Tytul',
+    story: 'Historia',
+    favoriteMemory: 'Ulubione wspomnienie',
+    addMemory: 'Dodaj wspomnienie',
+    profileActive: 'Profil aktywny',
+    markComplete: 'Oznacz jako ukonczone',
+    honeycombProgress: 'Postep ula',
+    recentCheckins: 'Ostatnie check-iny',
+    completionHistory: 'Historia ukonczen'
   }
 };
+
+function moodPickerAvatar(mood: Mood) {
+  if (mood === 'heavy') return capyBeeAvatar.faceSad;
+  if (mood === 'okay') return capyBeeAvatar.faceOkay;
+  return capyBeeAvatar.faceHappy;
+}
+
+function moodReactionAvatar(mood: Mood) {
+  if (mood === 'heavy') return capyBeeAvatar.empathetic;
+  if (mood === 'okay') return capyBeeAvatar.faceOkay;
+  return capyBeeAvatar.celebrating;
+}
+
+function checkInListFace(mood: string) {
+  if (mood === 'heavy') return capyBeeAvatar.faceSad;
+  if (mood === 'okay') return capyBeeAvatar.faceOkay;
+  return capyBeeAvatar.faceHappy;
+}
 
 export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const [activeTab, setActiveTab] = useState<TabKey>('home');
@@ -122,27 +194,31 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const [profileMissing, setProfileMissing] = useState(false);
   const [locale, setLocale] = useState<'en' | 'pl'>('en');
 
-  const [mood, setMood] = useState('okay');
+  const [mood, setMood] = useState<Mood>('okay');
   const [note, setNote] = useState('');
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
-  const [checkInFeedback, setCheckInFeedback] = useState('');
   const [checkInLoading, setCheckInLoading] = useState(false);
+  const [reactionMood, setReactionMood] = useState<Mood | null>(null);
+  const [missionSuggestionVisible, setMissionSuggestionVisible] = useState(false);
 
   const [missions, setMissions] = useState<Mission[]>([]);
   const [missionCompletions, setMissionCompletions] = useState<MissionCompletion[]>([]);
   const [missionNote, setMissionNote] = useState('');
   const [completingMissionId, setCompletingMissionId] = useState<string | null>(null);
+  const [showMissionBanner, setShowMissionBanner] = useState(false);
 
   const [friendships, setFriendships] = useState<FriendshipEntry[]>([]);
   const [friendLabel, setFriendLabel] = useState('');
   const [friendStage, setFriendStage] = useState(stageOptions[0]);
   const [friendNote, setFriendNote] = useState('');
+  const [showFriendshipToast, setShowFriendshipToast] = useState(false);
 
   const [worldType, setWorldType] = useState<'old_world' | 'new_world'>('old_world');
   const [memories, setMemories] = useState<MemoryEntry[]>([]);
   const [memoryTitle, setMemoryTitle] = useState('');
   const [memoryText, setMemoryText] = useState('');
   const [memoryFavorite, setMemoryFavorite] = useState(false);
+  const [memoryToast, setMemoryToast] = useState('');
 
   const [setupNickname, setSetupNickname] = useState('');
   const [setupBirthYear, setSetupBirthYear] = useState('');
@@ -150,10 +226,24 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const [setupAvatarSeed, setSetupAvatarSeed] = useState('sunny-bee');
   const [setupLoading, setSetupLoading] = useState(false);
 
+  const reactionTimer = useRef<number | null>(null);
+  const missionBannerTimer = useRef<number | null>(null);
+  const friendshipToastTimer = useRef<number | null>(null);
+  const memoryToastTimer = useRef<number | null>(null);
+
   const text = copy[locale];
 
   useEffect(() => {
     initialize();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (reactionTimer.current) window.clearTimeout(reactionTimer.current);
+      if (missionBannerTimer.current) window.clearTimeout(missionBannerTimer.current);
+      if (friendshipToastTimer.current) window.clearTimeout(friendshipToastTimer.current);
+      if (memoryToastTimer.current) window.clearTimeout(memoryToastTimer.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -163,9 +253,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   }, [profile]);
 
   useEffect(() => {
-    if (profileMissing) {
-      return;
-    }
+    if (profileMissing) return;
     fetchCheckIns();
     fetchMissions();
     fetchMissionCompletions();
@@ -178,6 +266,33 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       fetchMemories(worldType);
     }
   }, [worldType]);
+
+  useEffect(() => {
+    if (activeTab !== 'home') {
+      setMissionSuggestionVisible(false);
+    }
+  }, [activeTab]);
+
+  const hasCheckInToday = useMemo(
+    () => checkIns.some((entry) => sameCalendarDay(new Date(entry.createdAt), new Date())),
+    [checkIns]
+  );
+
+  const homeAvatar = reactionMood
+    ? moodReactionAvatar(reactionMood)
+    : hasCheckInToday
+      ? capyBeeAvatar.default
+      : capyBeeAvatar.waving;
+
+  const homeAvatarBubble = reactionMood
+    ? reactionMood === 'heavy'
+      ? text.reactionHeavy
+      : reactionMood === 'okay'
+        ? text.reactionOkay
+        : text.reactionGood
+    : hasCheckInToday
+      ? text.greetingReturning
+      : text.greetingFirstVisit;
 
   const redirectToLogin = () => {
     window.location.href = '/oauth2/authorization/google';
@@ -277,7 +392,6 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const submitCheckIn = async (event: React.FormEvent) => {
     event.preventDefault();
     setCheckInLoading(true);
-    setCheckInFeedback('');
 
     try {
       await request<CheckIn>('/api/check-ins', {
@@ -286,21 +400,12 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       });
       setNote('');
       await fetchCheckIns();
-      const responses = {
-        heavy: {
-          en: "That sounds hard. I'm here with you.",
-          pl: 'To brzmi ciężko. Jestem obok.'
-        },
-        okay: {
-          en: 'Thanks for checking in. Small steps are enough.',
-          pl: 'Dzięki za check-in. Małe kroki wystarczą.'
-        },
-        good: {
-          en: 'I am glad there was a lighter moment today.',
-          pl: 'Fajnie, że dziś był lżejszy moment.'
-        }
-      } as const;
-      setCheckInFeedback(responses[mood as 'heavy' | 'okay' | 'good'][locale]);
+      setReactionMood(mood);
+      setMissionSuggestionVisible(true);
+      if (reactionTimer.current) window.clearTimeout(reactionTimer.current);
+      reactionTimer.current = window.setTimeout(() => {
+        setReactionMood(null);
+      }, 10000);
     } catch (error) {
       console.error(error);
     } finally {
@@ -367,6 +472,9 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       });
       setMissionNote('');
       await fetchMissionCompletions();
+      setShowMissionBanner(true);
+      if (missionBannerTimer.current) window.clearTimeout(missionBannerTimer.current);
+      missionBannerTimer.current = window.setTimeout(() => setShowMissionBanner(false), 10000);
     } catch (error) {
       console.error(error);
     } finally {
@@ -384,6 +492,9 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       setFriendLabel('');
       setFriendNote('');
       await fetchFriendships();
+      setShowFriendshipToast(true);
+      if (friendshipToastTimer.current) window.clearTimeout(friendshipToastTimer.current);
+      friendshipToastTimer.current = window.setTimeout(() => setShowFriendshipToast(false), 10000);
     } catch (error) {
       console.error(error);
     }
@@ -414,6 +525,9 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       setMemoryText('');
       setMemoryFavorite(false);
       await fetchMemories(worldType);
+      setMemoryToast(worldType === 'old_world' ? text.memorySavedOld : text.memorySavedNew);
+      if (memoryToastTimer.current) window.clearTimeout(memoryToastTimer.current);
+      memoryToastTimer.current = window.setTimeout(() => setMemoryToast(''), 10000);
     } catch (error) {
       console.error(error);
     }
@@ -446,6 +560,10 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     return (
       <main className="app-shell">
         <section className="panel profile-setup-panel">
+          <div className="capybee-center-block">
+            <CapyBeeAvatar src={capyBeeAvatar.default} size={120} />
+            <CapyBeeBubble text={text.askName} />
+          </div>
           <h1>{text.profileSetupTitle}</h1>
           <p>{text.profileSetupHint}</p>
 
@@ -524,20 +642,25 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       <section className="content-area">
         {activeTab === 'home' ? (
           <>
+            <section className="panel capybee-center-block">
+              <CapyBeeAvatar src={homeAvatar} size={160} />
+              <CapyBeeBubble text={homeAvatarBubble} />
+            </section>
+
             <section className="panel">
               <h2>{text.homeTitle}</h2>
               <form className="stack-form" onSubmit={submitCheckIn}>
                 <div className="mood-selector compact">
-                  {Object.entries(moodEmoji).map(([value, emoji]) => (
+                  {(['heavy', 'okay', 'good'] as Mood[]).map((value) => (
                     <label key={value} className={`mood-option ${mood === value ? 'active' : ''}`}>
                       <input
                         type="radio"
                         name="mood"
                         value={value}
                         checked={mood === value}
-                        onChange={(event) => setMood(event.target.value)}
+                        onChange={(event) => setMood(event.target.value as Mood)}
                       />
-                      <span className="mood-emoji">{emoji}</span>
+                      <CapyBeeAvatar src={moodPickerAvatar(value)} size={72} className="mood-avatar" />
                       <span className="mood-label">{value}</span>
                     </label>
                   ))}
@@ -553,11 +676,17 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                   {checkInLoading ? text.saving : text.save}
                 </button>
               </form>
-              {checkInFeedback ? <p className="status-line">{checkInFeedback}</p> : null}
+
+              {missionSuggestionVisible ? (
+                <button className="suggestion-card" onClick={() => setActiveTab('missions')}>
+                  <CapyBeeAvatar src={capyBeeAvatar.suggesting} size={96} />
+                  <span>{text.missionSuggestion}</span>
+                </button>
+              ) : null}
             </section>
 
             <section className="panel">
-              <h3>Honeycomb progress</h3>
+              <h3>{text.honeycombProgress}</h3>
               <div className="honeycomb-grid" aria-label="Progress map">
                 {Array.from({ length: 18 }).map((_, index) => (
                   <span
@@ -570,7 +699,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
             </section>
 
             <section className="panel">
-              <h3>Recent check-ins</h3>
+              <h3>{text.recentCheckins}</h3>
               {checkIns.length === 0 ? <p>{text.noItems}</p> : (
                 <div className="list-stack">
                   {checkIns.map((entry, index) => (
@@ -581,8 +710,11 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.04 }}
                     >
-                      <div className="line-between">
-                        <strong>{moodEmoji[entry.mood] ?? '🙂'} {entry.mood}</strong>
+                      <div className="line-between checkin-row">
+                        <div className="checkin-headline">
+                          <CapyBeeAvatar src={checkInListFace(entry.mood)} size={32} />
+                          <strong>{entry.mood}</strong>
+                        </div>
                         <span>{new Date(entry.createdAt).toLocaleDateString(locale)}</span>
                       </div>
                       {entry.note ? <p>{entry.note}</p> : null}
@@ -597,36 +729,56 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
         {activeTab === 'missions' ? (
           <>
             <section className="panel">
-              <h2>{text.missions}</h2>
+              <div className="title-with-avatar">
+                <CapyBeeAvatar src={capyBeeAvatar.waving} size={96} />
+                <h2>{text.missions}</h2>
+              </div>
+
               <label>
-                Completion note
+                {text.completionNote}
                 <input value={missionNote} onChange={(event) => setMissionNote(event.target.value)} />
               </label>
-              <div className="list-stack">
-                {missions.map((mission) => (
-                  <article key={mission.id} className="list-card">
-                    <h3>{mission.title}</h3>
-                    <p>{mission.description}</p>
-                    <button
-                      className="primary-button"
-                      onClick={() => completeMission(mission.id)}
-                      disabled={completingMissionId === mission.id}
-                    >
-                      {completingMissionId === mission.id ? text.saving : 'Mark complete'}
-                    </button>
-                  </article>
-                ))}
-              </div>
+
+              {missions.length === 0 ? (
+                <div className="capybee-center-block">
+                  <CapyBeeAvatar src={capyBeeAvatar.default} size={120} />
+                  <CapyBeeBubble text={text.missionEmpty} />
+                </div>
+              ) : (
+                <div className="list-stack">
+                  {missions.map((mission) => (
+                    <article key={mission.id} className="list-card">
+                      <h3>{mission.title}</h3>
+                      <p>{mission.description}</p>
+                      <button
+                        className="primary-button"
+                        onClick={() => completeMission(mission.id)}
+                        disabled={completingMissionId === mission.id}
+                      >
+                        {completingMissionId === mission.id ? text.saving : text.markComplete}
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              )}
             </section>
 
             <section className="panel">
-              <h3>Completion history</h3>
-              {missionCompletions.length === 0 ? <p>{text.noItems}</p> : (
+              <h3>{text.completionHistory}</h3>
+              {missionCompletions.length === 0 ? (
+                <div className="capybee-center-block">
+                  <CapyBeeAvatar src={capyBeeAvatar.default} size={120} />
+                  <p className="empty-copy">{text.missionHistoryEmpty}</p>
+                </div>
+              ) : (
                 <div className="list-stack">
                   {missionCompletions.map((entry) => (
                     <article key={entry.id} className="list-card">
-                      <div className="line-between">
-                        <strong>{entry.title}</strong>
+                      <div className="line-between checkin-row">
+                        <div className="checkin-headline">
+                          <CapyBeeAvatar src={capyBeeAvatar.faceHappy} size={32} />
+                          <strong>{entry.title}</strong>
+                        </div>
                         <span>{new Date(entry.completedAt).toLocaleDateString(locale)}</span>
                       </div>
                       {entry.note ? <p>{entry.note}</p> : null}
@@ -641,14 +793,17 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
         {activeTab === 'friendships' ? (
           <>
             <section className="panel">
-              <h2>{text.friendships}</h2>
+              <div className="title-with-avatar">
+                <CapyBeeAvatar src={capyBeeAvatar.waving} size={96} />
+                <h2>{text.friendships}</h2>
+              </div>
               <form className="stack-form" onSubmit={addFriendship}>
                 <label>
-                  Person
+                  {text.person}
                   <input value={friendLabel} onChange={(event) => setFriendLabel(event.target.value)} required />
                 </label>
                 <label>
-                  Stage
+                  {text.stage}
                   <select value={friendStage} onChange={(event) => setFriendStage(event.target.value)}>
                     {stageOptions.map((stage) => (
                       <option key={stage} value={stage}>{stage}</option>
@@ -656,15 +811,20 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                   </select>
                 </label>
                 <label>
-                  Note
+                  {text.note}
                   <input value={friendNote} onChange={(event) => setFriendNote(event.target.value)} />
                 </label>
-                <button className="primary-button" type="submit">Add entry</button>
+                <button className="primary-button" type="submit">{text.addEntry}</button>
               </form>
             </section>
 
             <section className="panel">
-              {friendships.length === 0 ? <p>{text.noItems}</p> : (
+              {friendships.length === 0 ? (
+                <div className="capybee-center-block">
+                  <CapyBeeAvatar src={capyBeeAvatar.default} size={120} />
+                  <CapyBeeBubble text={text.friendshipEmpty} />
+                </div>
+              ) : (
                 <div className="list-stack">
                   {friendships.map((entry) => (
                     <article key={entry.id} className="list-card">
@@ -685,7 +845,10 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
         {activeTab === 'memories' ? (
           <>
             <section className="panel">
-              <h2>{text.memories}</h2>
+              <div className="title-with-avatar">
+                <CapyBeeAvatar src={capyBeeAvatar.waving} size={96} />
+                <h2>{text.memories}</h2>
+              </div>
               <div className="segment-control">
                 <button
                   className={worldType === 'old_world' ? 'segment active' : 'segment'}
@@ -702,11 +865,11 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
               </div>
               <form className="stack-form" onSubmit={addMemory}>
                 <label>
-                  Title
+                  {text.title}
                   <input value={memoryTitle} onChange={(event) => setMemoryTitle(event.target.value)} />
                 </label>
                 <label>
-                  Story
+                  {text.story}
                   <textarea
                     rows={3}
                     className="check-in-note"
@@ -721,14 +884,22 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                     checked={memoryFavorite}
                     onChange={(event) => setMemoryFavorite(event.target.checked)}
                   />
-                  Favorite memory
+                  {text.favoriteMemory}
                 </label>
-                <button className="primary-button" type="submit">Add memory</button>
+                <button className="primary-button" type="submit">{text.addMemory}</button>
               </form>
             </section>
 
             <section className="panel">
-              {memories.length === 0 ? <p>{text.noItems}</p> : (
+              {memories.length === 0 ? (
+                <div className="capybee-center-block">
+                  <CapyBeeAvatar
+                    src={worldType === 'old_world' ? capyBeeAvatar.empathetic : capyBeeAvatar.default}
+                    size={120}
+                  />
+                  <CapyBeeBubble text={worldType === 'old_world' ? text.memoryOldEmpty : text.memoryNewEmpty} />
+                </div>
+              ) : (
                 <div className="list-stack">
                   {memories.map((entry) => (
                     <article key={entry.id} className="list-card">
@@ -750,7 +921,10 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
 
         {activeTab === 'profile' && profile ? (
           <section className="panel">
-            <h2>{text.profile}</h2>
+            <div className="title-with-avatar">
+              <CapyBeeAvatar src={capyBeeAvatar.default} size={80} />
+              <h2>{text.profile}</h2>
+            </div>
             <form
               className="stack-form"
               onSubmit={(event) => {
@@ -803,7 +977,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                   checked={profile.active}
                   onChange={(event) => setProfile({ ...profile, active: event.target.checked })}
                 />
-                Profile active
+                {text.profileActive}
               </label>
 
               <button className="primary-button" type="submit">{text.save}</button>
@@ -811,6 +985,27 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
           </section>
         ) : null}
       </section>
+
+      {showMissionBanner ? (
+        <aside className="capybee-toast mission-toast">
+          <CapyBeeAvatar src={capyBeeAvatar.celebrating} size={96} />
+          <span>{text.missionDone} 🍯</span>
+        </aside>
+      ) : null}
+
+      {showFriendshipToast ? (
+        <aside className="capybee-toast mission-toast">
+          <CapyBeeAvatar src={capyBeeAvatar.celebrating} size={96} />
+          <span>{text.friendshipToast}</span>
+        </aside>
+      ) : null}
+
+      {memoryToast ? (
+        <aside className="capybee-toast mission-toast">
+          <CapyBeeAvatar src={capyBeeAvatar.celebrating} size={96} />
+          <span>{memoryToast}</span>
+        </aside>
+      ) : null}
 
       <nav className="bottom-nav">
         {([
