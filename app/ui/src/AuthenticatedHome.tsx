@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { CapyBeeAvatar, CapyBeeBubble, capyBeeAvatar, sameCalendarDay } from './capybee';
+import { useCapyBeePhrase } from './hooks/useCapyBeePhrase';
+import type { CapyBeePhrasePoolKey } from './data/capybeePhrases';
 
 export interface UserProfile {
   authenticated: boolean;
@@ -68,6 +70,13 @@ interface MemoryEntry {
 
 type Mood = 'heavy' | 'okay' | 'good';
 type TabKey = 'home' | 'missions' | 'friendships' | 'memories' | 'profile';
+type FeedbackKind = 'checkin' | 'mission' | 'friendship' | 'memory';
+
+interface ActiveFeedback {
+  kind: FeedbackKind;
+  phrase: string;
+  avatar: string;
+}
 
 const stageOptions = ['noticed', 'was_nice', 'talked', 'want_to_know_better'];
 
@@ -193,32 +202,31 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const [profile, setProfile] = useState<ChildProfile | null>(null);
   const [profileMissing, setProfileMissing] = useState(false);
   const [locale, setLocale] = useState<'en' | 'pl'>('en');
+  const pickPhrase = useCapyBeePhrase(locale);
 
   const [mood, setMood] = useState<Mood>('okay');
   const [note, setNote] = useState('');
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [checkInLoading, setCheckInLoading] = useState(false);
-  const [reactionMood, setReactionMood] = useState<Mood | null>(null);
   const [missionSuggestionVisible, setMissionSuggestionVisible] = useState(false);
 
   const [missions, setMissions] = useState<Mission[]>([]);
   const [missionCompletions, setMissionCompletions] = useState<MissionCompletion[]>([]);
   const [missionNote, setMissionNote] = useState('');
   const [completingMissionId, setCompletingMissionId] = useState<string | null>(null);
-  const [showMissionBanner, setShowMissionBanner] = useState(false);
+  const [activeFeedback, setActiveFeedback] = useState<ActiveFeedback | null>(null);
+  const [feedbackFadeOut, setFeedbackFadeOut] = useState(false);
 
   const [friendships, setFriendships] = useState<FriendshipEntry[]>([]);
   const [friendLabel, setFriendLabel] = useState('');
   const [friendStage, setFriendStage] = useState(stageOptions[0]);
   const [friendNote, setFriendNote] = useState('');
-  const [showFriendshipToast, setShowFriendshipToast] = useState(false);
 
   const [worldType, setWorldType] = useState<'old_world' | 'new_world'>('old_world');
   const [memories, setMemories] = useState<MemoryEntry[]>([]);
   const [memoryTitle, setMemoryTitle] = useState('');
   const [memoryText, setMemoryText] = useState('');
   const [memoryFavorite, setMemoryFavorite] = useState(false);
-  const [memoryToast, setMemoryToast] = useState('');
 
   const [setupNickname, setSetupNickname] = useState('');
   const [setupBirthYear, setSetupBirthYear] = useState('');
@@ -226,12 +234,33 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const [setupAvatarSeed, setSetupAvatarSeed] = useState('sunny-bee');
   const [setupLoading, setSetupLoading] = useState(false);
 
-  const reactionTimer = useRef<number | null>(null);
-  const missionBannerTimer = useRef<number | null>(null);
-  const friendshipToastTimer = useRef<number | null>(null);
-  const memoryToastTimer = useRef<number | null>(null);
+  const feedbackFadeOutTimer = useRef<number | null>(null);
+  const feedbackCleanupTimer = useRef<number | null>(null);
 
   const text = copy[locale];
+
+  const triggerFeedback = (nextFeedback: ActiveFeedback) => {
+    if (feedbackFadeOutTimer.current) window.clearTimeout(feedbackFadeOutTimer.current);
+    if (feedbackCleanupTimer.current) window.clearTimeout(feedbackCleanupTimer.current);
+
+    setFeedbackFadeOut(false);
+    setActiveFeedback(nextFeedback);
+
+    feedbackFadeOutTimer.current = window.setTimeout(() => {
+      setFeedbackFadeOut(true);
+    }, 4000);
+
+    feedbackCleanupTimer.current = window.setTimeout(() => {
+      setActiveFeedback(null);
+      setFeedbackFadeOut(false);
+    }, 4300);
+  };
+
+  const moodPoolKey = (value: Mood): CapyBeePhrasePoolKey => {
+    if (value === 'heavy') return 'moodHeavy';
+    if (value === 'okay') return 'moodOkay';
+    return 'moodGood';
+  };
 
   useEffect(() => {
     initialize();
@@ -239,10 +268,8 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
 
   useEffect(() => {
     return () => {
-      if (reactionTimer.current) window.clearTimeout(reactionTimer.current);
-      if (missionBannerTimer.current) window.clearTimeout(missionBannerTimer.current);
-      if (friendshipToastTimer.current) window.clearTimeout(friendshipToastTimer.current);
-      if (memoryToastTimer.current) window.clearTimeout(memoryToastTimer.current);
+      if (feedbackFadeOutTimer.current) window.clearTimeout(feedbackFadeOutTimer.current);
+      if (feedbackCleanupTimer.current) window.clearTimeout(feedbackCleanupTimer.current);
     };
   }, []);
 
@@ -278,21 +305,8 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     [checkIns]
   );
 
-  const homeAvatar = reactionMood
-    ? moodReactionAvatar(reactionMood)
-    : hasCheckInToday
-      ? capyBeeAvatar.default
-      : capyBeeAvatar.waving;
-
-  const homeAvatarBubble = reactionMood
-    ? reactionMood === 'heavy'
-      ? text.reactionHeavy
-      : reactionMood === 'okay'
-        ? text.reactionOkay
-        : text.reactionGood
-    : hasCheckInToday
-      ? text.greetingReturning
-      : text.greetingFirstVisit;
+  const homeAvatar = hasCheckInToday ? capyBeeAvatar.default : capyBeeAvatar.waving;
+  const homeAvatarBubble = hasCheckInToday ? text.greetingReturning : text.greetingFirstVisit;
 
   const redirectToLogin = () => {
     window.location.href = '/oauth2/authorization/google';
@@ -392,20 +406,21 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const submitCheckIn = async (event: React.FormEvent) => {
     event.preventDefault();
     setCheckInLoading(true);
+    const submittedMood = mood;
 
     try {
       await request<CheckIn>('/api/check-ins', {
         method: 'POST',
-        body: JSON.stringify({ mood, note })
+        body: JSON.stringify({ mood: submittedMood, note })
       });
       setNote('');
       await fetchCheckIns();
-      setReactionMood(mood);
       setMissionSuggestionVisible(true);
-      if (reactionTimer.current) window.clearTimeout(reactionTimer.current);
-      reactionTimer.current = window.setTimeout(() => {
-        setReactionMood(null);
-      }, 10000);
+      triggerFeedback({
+        kind: 'checkin',
+        phrase: pickPhrase(moodPoolKey(submittedMood)),
+        avatar: moodReactionAvatar(submittedMood)
+      });
     } catch (error) {
       console.error(error);
     } finally {
@@ -472,9 +487,11 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       });
       setMissionNote('');
       await fetchMissionCompletions();
-      setShowMissionBanner(true);
-      if (missionBannerTimer.current) window.clearTimeout(missionBannerTimer.current);
-      missionBannerTimer.current = window.setTimeout(() => setShowMissionBanner(false), 10000);
+      triggerFeedback({
+        kind: 'mission',
+        phrase: pickPhrase('missionComplete'),
+        avatar: capyBeeAvatar.celebrating
+      });
     } catch (error) {
       console.error(error);
     } finally {
@@ -492,9 +509,11 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       setFriendLabel('');
       setFriendNote('');
       await fetchFriendships();
-      setShowFriendshipToast(true);
-      if (friendshipToastTimer.current) window.clearTimeout(friendshipToastTimer.current);
-      friendshipToastTimer.current = window.setTimeout(() => setShowFriendshipToast(false), 10000);
+      triggerFeedback({
+        kind: 'friendship',
+        phrase: pickPhrase('friendshipAdded'),
+        avatar: capyBeeAvatar.celebrating
+      });
     } catch (error) {
       console.error(error);
     }
@@ -525,9 +544,11 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       setMemoryText('');
       setMemoryFavorite(false);
       await fetchMemories(worldType);
-      setMemoryToast(worldType === 'old_world' ? text.memorySavedOld : text.memorySavedNew);
-      if (memoryToastTimer.current) window.clearTimeout(memoryToastTimer.current);
-      memoryToastTimer.current = window.setTimeout(() => setMemoryToast(''), 10000);
+      triggerFeedback({
+        kind: 'memory',
+        phrase: pickPhrase(worldType === 'old_world' ? 'memoryOldWorld' : 'memoryNewWorld'),
+        avatar: capyBeeAvatar.celebrating
+      });
     } catch (error) {
       console.error(error);
     }
@@ -986,24 +1007,16 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
         ) : null}
       </section>
 
-      {showMissionBanner ? (
-        <aside className="capybee-toast mission-toast">
-          <CapyBeeAvatar src={capyBeeAvatar.celebrating} size={96} />
-          <span>{text.missionDone} 🍯</span>
-        </aside>
-      ) : null}
-
-      {showFriendshipToast ? (
-        <aside className="capybee-toast mission-toast">
-          <CapyBeeAvatar src={capyBeeAvatar.celebrating} size={96} />
-          <span>{text.friendshipToast}</span>
-        </aside>
-      ) : null}
-
-      {memoryToast ? (
-        <aside className="capybee-toast mission-toast">
-          <CapyBeeAvatar src={capyBeeAvatar.celebrating} size={96} />
-          <span>{memoryToast}</span>
+      {activeFeedback ? (
+        <aside
+          className={[
+            'capybee-toast',
+            'mission-toast',
+            feedbackFadeOut ? 'feedback-fade-out' : 'feedback-fade-in'
+          ].join(' ').trim()}
+        >
+          <CapyBeeAvatar src={activeFeedback.avatar} size={48} />
+          <span>{activeFeedback.phrase}</span>
         </aside>
       ) : null}
 
