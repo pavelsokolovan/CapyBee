@@ -10,7 +10,7 @@ import com.capybee.server.domain.friendship.FriendshipEntry;
 
 public interface FriendshipEntryRepository extends JpaRepository<FriendshipEntry, UUID> {
 
-    List<FriendshipEntry> findTop20ByProfile_IdOrderByCreatedAtDesc(UUID profileId);
+    List<FriendshipEntry> findAllByProfile_IdOrderByCreatedAtAsc(UUID profileId);
 
     Optional<FriendshipEntry> findByIdAndProfile_Id(UUID id, UUID profileId);
 }

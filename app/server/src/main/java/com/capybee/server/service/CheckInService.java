@@ -39,7 +39,7 @@ public class CheckInService {
     @Transactional(readOnly = true)
     public List<CheckInResponse> getMyRecentCheckIns(OAuth2AuthenticationToken oauth2Token) {
         UserAccount user = userService.getCurrentUser(oauth2Token);
-        return checkInEntryRepository.findTop10ByUserAccount_IdOrderByCreatedAtDesc(user.getId())
+        return checkInEntryRepository.findAllByUserAccount_IdOrderByCreatedAtAsc(user.getId())
                 .stream()
                 .map(this::toResponse)
                 .toList();

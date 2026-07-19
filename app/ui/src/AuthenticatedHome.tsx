@@ -3,6 +3,11 @@ import { motion } from 'framer-motion';
 import { CapyBeeAvatar, CapyBeeBubble, capyBeeAvatar, sameCalendarDay } from './capybee';
 import { useCapyBeePhrase } from './hooks/useCapyBeePhrase';
 import type { CapyBeePhrasePoolKey } from './data/capybeePhrases';
+import { HoneycombMap } from './components/HoneycombMap';
+import { useHoneycombCells } from './hooks/useHoneycombCells';
+import type { UseHoneycombCellsInput } from './hooks/useHoneycombCells';
+import oldWorldTabImage from './assets/honeycomb/old-world-tab.png';
+import newWorldTabImage from './assets/honeycomb/new-world-tab.png';
 
 export interface UserProfile {
   authenticated: boolean;
@@ -45,6 +50,7 @@ interface MissionCompletion {
   title: string;
   profileId: string;
   completedAt: string;
+  worldType?: 'old_world' | 'new_world';
   note?: string;
 }
 
@@ -224,9 +230,12 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
 
   const [worldType, setWorldType] = useState<'old_world' | 'new_world'>('old_world');
   const [memories, setMemories] = useState<MemoryEntry[]>([]);
+  const [allMemories, setAllMemories] = useState<MemoryEntry[]>([]);
   const [memoryTitle, setMemoryTitle] = useState('');
   const [memoryText, setMemoryText] = useState('');
   const [memoryFavorite, setMemoryFavorite] = useState(false);
+  const [homeAnimatedCellId, setHomeAnimatedCellId] = useState<string | null>(null);
+
 
   const [setupNickname, setSetupNickname] = useState('');
   const [setupBirthYear, setSetupBirthYear] = useState('');
@@ -286,6 +295,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     fetchMissionCompletions();
     fetchFriendships();
     fetchMemories(worldType);
+    fetchAllMemories();
   }, [profileMissing]);
 
   useEffect(() => {
@@ -293,6 +303,12 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       fetchMemories(worldType);
     }
   }, [worldType]);
+
+  useEffect(() => {
+    if (activeTab !== 'home') {
+      setHomeAnimatedCellId(null);
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (activeTab !== 'home') {
@@ -307,6 +323,15 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
 
   const homeAvatar = hasCheckInToday ? capyBeeAvatar.default : capyBeeAvatar.waving;
   const homeAvatarBubble = hasCheckInToday ? text.greetingReturning : text.greetingFirstVisit;
+
+  const homeHoneycombCells = useHoneycombCells({
+    checkIns,
+    missions: missionCompletions,
+    friendships,
+    memories: allMemories,
+    locale
+  } satisfies UseHoneycombCellsInput);
+
 
   const redirectToLogin = () => {
     window.location.href = '/oauth2/authorization/google';
@@ -403,13 +428,28 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     }
   };
 
+  const fetchAllMemories = async () => {
+    try {
+      const [oldWorldMemories, newWorldMemories] = await Promise.all([
+        request<MemoryEntry[]>('/api/memories?worldType=old_world'),
+        request<MemoryEntry[]>('/api/memories?worldType=new_world')
+      ]);
+
+      const merged = [...oldWorldMemories, ...newWorldMemories];
+      const deduplicated = Array.from(new Map(merged.map((entry) => [entry.id, entry])).values());
+      setAllMemories(deduplicated);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const submitCheckIn = async (event: React.FormEvent) => {
     event.preventDefault();
     setCheckInLoading(true);
     const submittedMood = mood;
 
     try {
-      await request<CheckIn>('/api/check-ins', {
+      const created = await request<CheckIn>('/api/check-ins', {
         method: 'POST',
         body: JSON.stringify({ mood: submittedMood, note })
       });
@@ -421,6 +461,9 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
         phrase: pickPhrase(moodPoolKey(submittedMood)),
         avatar: moodReactionAvatar(submittedMood)
       });
+      if (activeTab === 'home') {
+        setHomeAnimatedCellId(created.id);
+      }
     } catch (error) {
       console.error(error);
     } finally {
@@ -481,7 +524,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const completeMission = async (missionId: string) => {
     try {
       setCompletingMissionId(missionId);
-      await request<MissionCompletion>(`/api/missions/${missionId}/completions`, {
+      const created = await request<MissionCompletion>(`/api/missions/${missionId}/completions`, {
         method: 'POST',
         body: JSON.stringify({ note: missionNote })
       });
@@ -492,6 +535,9 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
         phrase: pickPhrase('missionComplete'),
         avatar: capyBeeAvatar.celebrating
       });
+      if (activeTab === 'home') {
+        setHomeAnimatedCellId(created.id);
+      }
     } catch (error) {
       console.error(error);
     } finally {
@@ -502,7 +548,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const addFriendship = async (event: React.FormEvent) => {
     event.preventDefault();
     try {
-      await request<FriendshipEntry>('/api/friendships', {
+      const created = await request<FriendshipEntry>('/api/friendships', {
         method: 'POST',
         body: JSON.stringify({ personLabel: friendLabel, stage: friendStage, note: friendNote })
       });
@@ -514,6 +560,9 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
         phrase: pickPhrase('friendshipAdded'),
         avatar: capyBeeAvatar.celebrating
       });
+      if (activeTab === 'home') {
+        setHomeAnimatedCellId(created.id);
+      }
     } catch (error) {
       console.error(error);
     }
@@ -531,7 +580,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const addMemory = async (event: React.FormEvent) => {
     event.preventDefault();
     try {
-      await request<MemoryEntry>('/api/memories', {
+      const created = await request<MemoryEntry>('/api/memories', {
         method: 'POST',
         body: JSON.stringify({
           worldType,
@@ -544,11 +593,15 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       setMemoryText('');
       setMemoryFavorite(false);
       await fetchMemories(worldType);
+      await fetchAllMemories();
       triggerFeedback({
         kind: 'memory',
         phrase: pickPhrase(worldType === 'old_world' ? 'memoryOldWorld' : 'memoryNewWorld'),
         avatar: capyBeeAvatar.celebrating
       });
+      if (activeTab === 'home') {
+        setHomeAnimatedCellId(created.id);
+      }
     } catch (error) {
       console.error(error);
     }
@@ -561,6 +614,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
         body: JSON.stringify({ isFavorite: !entry.isFavorite })
       });
       await fetchMemories(worldType);
+      await fetchAllMemories();
     } catch (error) {
       console.error(error);
     }
@@ -570,12 +624,11 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     try {
       await request<void>(`/api/memories/${id}`, { method: 'DELETE' });
       await fetchMemories(worldType);
+      await fetchAllMemories();
     } catch (error) {
       console.error(error);
     }
   };
-
-  const totalProgress = checkIns.length + missionCompletions.length + friendships.length + memories.length;
 
   if (profileMissing) {
     return (
@@ -708,14 +761,13 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
 
             <section className="panel">
               <h3>{text.honeycombProgress}</h3>
-              <div className="honeycomb-grid" aria-label="Progress map">
-                {Array.from({ length: 18 }).map((_, index) => (
-                  <span
-                    key={index}
-                    className={`honeycomb-cell ${index < totalProgress ? 'filled' : ''}`}
-                    title={index < totalProgress ? 'Filled' : 'Empty'}
-                  />
-                ))}
+              <div className="honeycomb-card">
+                <h4 className="honeycomb-heading">{locale === 'pl' ? 'Twoj ul' : 'Your hive'}</h4>
+                <HoneycombMap
+                  cells={homeHoneycombCells}
+                  ariaLabel={locale === 'pl' ? 'Twoj ul - postep' : 'Your hive - progress'}
+                  animatedCellId={homeAnimatedCellId}
+                />
               </div>
             </section>
 
@@ -723,7 +775,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
               <h3>{text.recentCheckins}</h3>
               {checkIns.length === 0 ? <p>{text.noItems}</p> : (
                 <div className="list-stack">
-                  {checkIns.map((entry, index) => (
+                  {[...checkIns].reverse().slice(0, 10).map((entry, index) => (
                     <motion.article
                       key={entry.id}
                       className="list-card"
@@ -785,6 +837,18 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
             </section>
 
             <section className="panel">
+              <h3>{text.honeycombProgress}</h3>
+              <div className="honeycomb-card">
+                <h4 className="honeycomb-heading">{locale === 'pl' ? 'Twoj ul' : 'Your hive'}</h4>
+                <HoneycombMap
+                  cells={homeHoneycombCells}
+                  ariaLabel={locale === 'pl' ? 'Twoj ul - postep' : 'Your hive - progress'}
+                  animatedCellId={homeAnimatedCellId}
+                />
+              </div>
+            </section>
+
+            <section className="panel">
               <h3>{text.completionHistory}</h3>
               {missionCompletions.length === 0 ? (
                 <div className="capybee-center-block">
@@ -793,7 +857,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                 </div>
               ) : (
                 <div className="list-stack">
-                  {missionCompletions.map((entry) => (
+                  {[...missionCompletions].reverse().slice(0, 20).map((entry) => (
                     <article key={entry.id} className="list-card">
                       <div className="line-between checkin-row">
                         <div className="checkin-headline">
@@ -837,6 +901,18 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                 </label>
                 <button className="primary-button" type="submit">{text.addEntry}</button>
               </form>
+            </section>
+
+            <section className="panel">
+              <h3>{text.honeycombProgress}</h3>
+              <div className="honeycomb-card">
+                <h4 className="honeycomb-heading">{locale === 'pl' ? 'Twoj ul' : 'Your hive'}</h4>
+                <HoneycombMap
+                  cells={homeHoneycombCells}
+                  ariaLabel={locale === 'pl' ? 'Twoj ul - postep' : 'Your hive - progress'}
+                  animatedCellId={homeAnimatedCellId}
+                />
+              </div>
             </section>
 
             <section className="panel">
@@ -884,6 +960,14 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                   {text.newWorld}
                 </button>
               </div>
+
+              <img
+                src={worldType === 'old_world' ? oldWorldTabImage : newWorldTabImage}
+                alt=""
+                draggable={false}
+                className="world-tab-header-image"
+              />
+
               <form className="stack-form" onSubmit={addMemory}>
                 <label>
                   {text.title}
@@ -909,6 +993,18 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                 </label>
                 <button className="primary-button" type="submit">{text.addMemory}</button>
               </form>
+            </section>
+
+            <section className="panel">
+              <h3>{text.honeycombProgress}</h3>
+              <div className="honeycomb-card">
+                <h4 className="honeycomb-heading">{locale === 'pl' ? 'Twoj ul' : 'Your hive'}</h4>
+                <HoneycombMap
+                  cells={homeHoneycombCells}
+                  ariaLabel={locale === 'pl' ? 'Twoj ul - postep' : 'Your hive - progress'}
+                  animatedCellId={homeAnimatedCellId}
+                />
+              </div>
             </section>
 
             <section className="panel">
@@ -941,8 +1037,21 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
         ) : null}
 
         {activeTab === 'profile' && profile ? (
-          <section className="panel">
-            <div className="title-with-avatar">
+          <>
+            <section className="panel">
+              <h3>{text.honeycombProgress}</h3>
+              <div className="honeycomb-card">
+                <h4 className="honeycomb-heading">{locale === 'pl' ? 'Twoj ul' : 'Your hive'}</h4>
+                <HoneycombMap
+                  cells={homeHoneycombCells}
+                  ariaLabel={locale === 'pl' ? 'Twoj ul - postep' : 'Your hive - progress'}
+                  animatedCellId={homeAnimatedCellId}
+                />
+              </div>
+            </section>
+
+            <section className="panel">
+              <div className="title-with-avatar">
               <CapyBeeAvatar src={capyBeeAvatar.default} size={80} />
               <h2>{text.profile}</h2>
             </div>
@@ -1003,7 +1112,8 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
 
               <button className="primary-button" type="submit">{text.save}</button>
             </form>
-          </section>
+            </section>
+          </>
         ) : null}
       </section>
 

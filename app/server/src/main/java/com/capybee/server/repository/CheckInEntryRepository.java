@@ -9,5 +9,5 @@ import com.capybee.server.domain.checkin.CheckInEntry;
 
 public interface CheckInEntryRepository extends JpaRepository<CheckInEntry, UUID> {
 
-    List<CheckInEntry> findTop10ByUserAccount_IdOrderByCreatedAtDesc(UUID userAccountId);
+    List<CheckInEntry> findAllByUserAccount_IdOrderByCreatedAtAsc(UUID userAccountId);
 }

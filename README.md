@@ -33,6 +33,33 @@ The project is scaffolded as a mono-repo, so the backend and frontend can be dev
 3. Run the UI from `app/ui` with Node.js and Vite.
 4. Build the Docker image from the repo root and deploy it to Fly.io.
 
+### Fast local workflow script
+
+Use the workflow script from the repository root when you want to validate changes quickly:
+
+1. `scripts\dev-workflow.cmd -Action all -ForceRestart`
+2. `scripts\dev-workflow.cmd -Action sync`
+3. `scripts\dev-workflow.cmd -Action start`
+4. `scripts\dev-workflow.cmd -Action stop`
+
+What each action does:
+
+- `all`: builds UI, copies `app/ui/dist` to both backend static folders, then starts backend + frontend
+- `sync`: builds UI and copies static files only
+- `start`: starts backend + frontend only
+- `stop`: stops the processes started by this workflow
+
+The script syncs UI artifacts to:
+
+- `app/server/src/main/resources/static`
+- `app/server/target/classes/static`
+
+You can also run the same actions from VS Code tasks:
+
+- `Workflow: Sync UI + Static`
+- `Workflow: Build + Copy + Start All`
+- `Workflow: Stop All`
+
 ### Fly.io notes
 
 - `fly.toml` expects the app to listen on port `8080`.

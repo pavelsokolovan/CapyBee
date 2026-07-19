@@ -47,7 +47,7 @@ public class FriendshipService {
     @Transactional(readOnly = true)
     public List<FriendshipResponse> listFriendships(OAuth2AuthenticationToken token) {
         FamilyProfile profile = childProfileService.getMyProfileEntity(token);
-        return friendshipEntryRepository.findTop20ByProfile_IdOrderByCreatedAtDesc(profile.getId())
+        return friendshipEntryRepository.findAllByProfile_IdOrderByCreatedAtAsc(profile.getId())
                 .stream()
                 .map(this::toResponse)
                 .toList();

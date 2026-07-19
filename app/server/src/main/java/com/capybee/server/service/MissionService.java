@@ -74,7 +74,7 @@ public class MissionService {
         FamilyProfile profile = childProfileService.getMyProfileEntity(token);
 
         List<MissionCompletion> completions = before == null
-                ? missionCompletionRepository.findTop20ByUserAccount_IdOrderByCompletedAtDesc(user.getId())
+                ? missionCompletionRepository.findAllByUserAccount_IdOrderByCompletedAtAsc(user.getId())
                 : missionCompletionRepository.findTop20ByUserAccount_IdAndCompletedAtLessThanOrderByCompletedAtDesc(
                         user.getId(), before);
 

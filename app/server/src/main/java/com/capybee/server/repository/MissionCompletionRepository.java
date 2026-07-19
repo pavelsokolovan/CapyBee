@@ -10,7 +10,7 @@ import com.capybee.server.domain.mission.MissionCompletion;
 
 public interface MissionCompletionRepository extends JpaRepository<MissionCompletion, UUID> {
 
-    List<MissionCompletion> findTop20ByUserAccount_IdOrderByCompletedAtDesc(UUID userAccountId);
+    List<MissionCompletion> findAllByUserAccount_IdOrderByCompletedAtAsc(UUID userAccountId);
 
     List<MissionCompletion> findTop20ByUserAccount_IdAndCompletedAtLessThanOrderByCompletedAtDesc(UUID userAccountId,
             Instant before);
