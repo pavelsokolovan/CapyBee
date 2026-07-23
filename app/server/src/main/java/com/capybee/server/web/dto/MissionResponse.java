@@ -6,6 +6,7 @@ public record MissionResponse(
         UUID id,
         String code,
         String title,
+        String timeHint,
         String description,
         boolean active) {
 }

@@ -3,6 +3,7 @@ export type CapyBeePhrasePoolKey =
   | 'moodOkay'
   | 'moodGood'
   | 'missionComplete'
+  | 'missionSkip'
   | 'friendshipAdded'
   | 'memoryOldWorld'
   | 'memoryNewWorld';
@@ -60,6 +61,16 @@ export const capybeePhrases: Record<CapyBeePhrasePoolKey, CapyBeePhrase[]> = {
     { en: 'You did something today that mattered.', pl: 'Dzis zrobiles cos, co ma znaczenie.' },
     { en: 'Look at the hive filling up. Look at that.', pl: 'Popatrz, jak ul sie zapelnia. No popatrz.' },
     { en: "Okay I'm a little proud of you right now.", pl: 'Wiesz co, jestem teraz z ciebie troche dumny.' }
+  ],
+  missionSkip: [
+    { en: 'Okay. Not every day is a mission day.', pl: 'Okej. Nie kazdy dzien musi byc na misje.' },
+    { en: "No worries - it'll be here tomorrow.", pl: 'Spoko, wroci innym razem.' },
+    { en: "That's fine. You don't owe me this one.", pl: 'W porzadku. Nie musisz mi nic udowadniac.' },
+    { en: 'Skipping counts as taking care of yourself too.', pl: 'Odpuszczenie sobie tez czasem znaczy dbac o siebie.' },
+    { en: "Some days just aren't mission days. That's okay.", pl: 'Sa dni bez misji. To normalne.' },
+    { en: "Noted. I'm not going anywhere.", pl: 'Zanotowane. Nigdzie sie nie wybieram.' },
+    { en: 'Fair enough. Rest counts too.', pl: 'Jasne. Odpoczynek tez sie liczy.' },
+    { en: "All good. We'll try again another day.", pl: 'Wszystko gra. Sprobujemy innym razem.' }
   ],
   friendshipAdded: [
     { en: 'Got it! Every step counts.', pl: 'Zapamietalem! Kazdy krok sie liczy.' },

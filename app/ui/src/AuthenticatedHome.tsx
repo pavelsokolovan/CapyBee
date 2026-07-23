@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { CapyBeeAvatar, CapyBeeBubble, capyBeeAvatar, sameCalendarDay } from './capybee';
 import { useCapyBeePhrase } from './hooks/useCapyBeePhrase';
 import type { CapyBeePhrasePoolKey } from './data/capybeePhrases';
@@ -39,6 +39,7 @@ interface Mission {
   id: string;
   code: string;
   title: string;
+  timeHint: string;
   description: string;
   active: boolean;
 }
@@ -78,6 +79,11 @@ type Mood = 'heavy' | 'okay' | 'good';
 type TabKey = 'home' | 'missions' | 'friendships' | 'memories' | 'profile';
 type FeedbackKind = 'checkin' | 'mission' | 'friendship' | 'memory';
 
+interface MissionSkipAcknowledgement {
+  missionId: string;
+  phrase: string;
+}
+
 interface ActiveFeedback {
   kind: FeedbackKind;
   phrase: string;
@@ -112,6 +118,13 @@ const copy = {
     missionSuggestion: 'I have a small mission for you today ->',
     missionEmpty: 'No missions right now - check back tomorrow!',
     missionDone: 'Mission done! A new cell in your hive',
+    missionNotToday: 'Not today',
+    missionOptionalNote: 'Anything you want to remember? (optional)',
+    missionSave: 'Save',
+    missionBack: 'Back',
+    missionUndoSkip: 'Undo',
+    missionSkipped: 'Mission skipped for now.',
+    missionCompleted: 'Completed',
     missionHistoryEmpty: 'No missions yet.',
     friendshipEmpty: 'Who did you notice today?',
     friendshipToast: 'Got it! Every step counts.',
@@ -120,7 +133,6 @@ const copy = {
     memorySavedOld: 'Saved. This will always be yours.',
     memorySavedNew: 'A new moment in the hive!',
     askName: 'What should I call you?',
-    completionNote: 'Completion note',
     person: 'Person',
     stage: 'Stage',
     note: 'Note',
@@ -160,6 +172,13 @@ const copy = {
     missionSuggestion: 'Mam dla ciebie mala misje na dzis ->',
     missionEmpty: 'Nie ma teraz misji - wroc jutro!',
     missionDone: 'Misja wykonana! Nowa komorka w ulu',
+    missionNotToday: 'Nie dzisiaj',
+    missionOptionalNote: 'Cos, co chcesz zapamietac? (opcjonalnie)',
+    missionSave: 'Zapisz',
+    missionBack: 'Wroc',
+    missionUndoSkip: 'Cofnij',
+    missionSkipped: 'Misja odlozona na teraz.',
+    missionCompleted: 'Ukończone',
     missionHistoryEmpty: 'Nie ma jeszcze zadnych misji.',
     friendshipEmpty: 'Kogo dzis zauwazyles?',
     friendshipToast: 'Zapamietalem! Kazdy krok sie liczy.',
@@ -168,7 +187,6 @@ const copy = {
     memorySavedOld: 'Zapamietane. To zawsze bedzie twoje.',
     memorySavedNew: 'Nowa chwila w ulu!',
     askName: 'Jak mam sie do ciebie zwracac?',
-    completionNote: 'Notatka do ukonczenia',
     person: 'Osoba',
     stage: 'Etap',
     note: 'Notatka',
@@ -204,6 +222,7 @@ function checkInListFace(mood: string) {
 }
 
 export function AuthenticatedHome({ user }: { user: UserProfile }) {
+  const prefersReducedMotion = useReducedMotion();
   const [activeTab, setActiveTab] = useState<TabKey>('home');
   const [profile, setProfile] = useState<ChildProfile | null>(null);
   const [profileMissing, setProfileMissing] = useState(false);
@@ -218,8 +237,13 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
 
   const [missions, setMissions] = useState<Mission[]>([]);
   const [missionCompletions, setMissionCompletions] = useState<MissionCompletion[]>([]);
-  const [missionNote, setMissionNote] = useState('');
-  const [completingMissionId, setCompletingMissionId] = useState<string | null>(null);
+  const [missionNotes, setMissionNotes] = useState<Record<string, string>>({});
+  const [expandedMissionId, setExpandedMissionId] = useState<string | null>(null);
+  const [savingMissionId, setSavingMissionId] = useState<string | null>(null);
+  const [cheerMissionId, setCheerMissionId] = useState<string | null>(null);
+  const [skipAcknowledgement, setSkipAcknowledgement] = useState<MissionSkipAcknowledgement | null>(null);
+  const [skipUndoMissionId, setSkipUndoMissionId] = useState<string | null>(null);
+  const [skipPendingMissionId, setSkipPendingMissionId] = useState<string | null>(null);
   const [activeFeedback, setActiveFeedback] = useState<ActiveFeedback | null>(null);
   const [feedbackFadeOut, setFeedbackFadeOut] = useState(false);
 
@@ -245,6 +269,10 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
 
   const feedbackFadeOutTimer = useRef<number | null>(null);
   const feedbackCleanupTimer = useRef<number | null>(null);
+  const missionSkipAckTimer = useRef<number | null>(null);
+  const missionSkipCollapseTimer = useRef<number | null>(null);
+  const missionSkipUndoTimer = useRef<number | null>(null);
+  const missionCheerTimer = useRef<number | null>(null);
 
   const text = copy[locale];
 
@@ -279,6 +307,10 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     return () => {
       if (feedbackFadeOutTimer.current) window.clearTimeout(feedbackFadeOutTimer.current);
       if (feedbackCleanupTimer.current) window.clearTimeout(feedbackCleanupTimer.current);
+      if (missionSkipAckTimer.current) window.clearTimeout(missionSkipAckTimer.current);
+      if (missionSkipCollapseTimer.current) window.clearTimeout(missionSkipCollapseTimer.current);
+      if (missionSkipUndoTimer.current) window.clearTimeout(missionSkipUndoTimer.current);
+      if (missionCheerTimer.current) window.clearTimeout(missionCheerTimer.current);
     };
   }, []);
 
@@ -320,6 +352,8 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     () => checkIns.some((entry) => sameCalendarDay(new Date(entry.createdAt), new Date())),
     [checkIns]
   );
+
+  const visibleMissions = useMemo(() => missions, [missions]);
 
   const homeAvatar = hasCheckInToday ? capyBeeAvatar.default : capyBeeAvatar.waving;
   const homeAvatarBubble = hasCheckInToday ? text.greetingReturning : text.greetingFirstVisit;
@@ -521,14 +555,23 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     }
   };
 
-  const completeMission = async (missionId: string) => {
+  const completeMission = async (missionId: string, noteValue: string) => {
     try {
-      setCompletingMissionId(missionId);
+      setSavingMissionId(missionId);
       const created = await request<MissionCompletion>(`/api/missions/${missionId}/completions`, {
         method: 'POST',
-        body: JSON.stringify({ note: missionNote })
+        body: JSON.stringify({ note: noteValue })
       });
-      setMissionNote('');
+      setMissionNotes((current) => ({ ...current, [missionId]: '' }));
+      setExpandedMissionId(null);
+      setCheerMissionId(missionId);
+      if (missionCheerTimer.current) {
+        window.clearTimeout(missionCheerTimer.current);
+      }
+      missionCheerTimer.current = window.setTimeout(() => {
+        setCheerMissionId((current) => (current === missionId ? null : current));
+      }, 2200);
+      await fetchMissions();
       await fetchMissionCompletions();
       triggerFeedback({
         kind: 'mission',
@@ -541,7 +584,65 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     } catch (error) {
       console.error(error);
     } finally {
-      setCompletingMissionId(null);
+      setSavingMissionId(null);
+    }
+  };
+
+  const skipMission = async (missionId: string) => {
+    if (skipPendingMissionId) {
+      return;
+    }
+
+    try {
+      setSkipPendingMissionId(missionId);
+      await request(`/api/missions/${missionId}/skip`, { method: 'POST' });
+
+      if (missionSkipAckTimer.current) {
+        window.clearTimeout(missionSkipAckTimer.current);
+      }
+      if (missionSkipCollapseTimer.current) {
+        window.clearTimeout(missionSkipCollapseTimer.current);
+      }
+
+      setExpandedMissionId((current) => (current === missionId ? null : current));
+      setMissionNotes((current) => ({ ...current, [missionId]: '' }));
+      setSkipAcknowledgement({ missionId, phrase: pickPhrase('missionSkip') });
+      await fetchMissions();
+      setSkipUndoMissionId(missionId);
+      setSkipPendingMissionId(null);
+
+      missionSkipAckTimer.current = window.setTimeout(() => {
+        setSkipAcknowledgement((current) => (current?.missionId === missionId ? null : current));
+      }, prefersReducedMotion ? 0 : 2200);
+
+      if (missionSkipUndoTimer.current) {
+        window.clearTimeout(missionSkipUndoTimer.current);
+      }
+      missionSkipUndoTimer.current = window.setTimeout(() => {
+        setSkipUndoMissionId((current) => (current === missionId ? null : current));
+      }, 4000);
+    } catch (error) {
+      setSkipPendingMissionId(null);
+      console.error(error);
+    }
+  };
+
+  const undoMissionSkip = async () => {
+    if (!skipUndoMissionId) {
+      return;
+    }
+
+    const missionId = skipUndoMissionId;
+    try {
+      await request(`/api/missions/${missionId}/skip/undo`, { method: 'POST' });
+      await fetchMissions();
+      setSkipUndoMissionId(null);
+      if (missionSkipUndoTimer.current) {
+        window.clearTimeout(missionSkipUndoTimer.current);
+        missionSkipUndoTimer.current = null;
+      }
+    } catch (error) {
+      console.error(error);
     }
   };
 
@@ -686,16 +787,16 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     <main className="app-shell">
       <header className="auth-topbar panel">
         <div className="auth-user">
-          {user.avatarUrl ? <img src={user.avatarUrl} alt={user.displayName} className="avatar" /> : null}
+          <CapyBeeAvatar src={capyBeeAvatar.faceHappy} size={48} alt={user.displayName} className="avatar" />
           <div>
             <h1>{profile ? profile.nickname : user.displayName}</h1>
-            <p>{user.email}</p>
+            {profile ? null : <p>{user.email}</p>}
           </div>
         </div>
         <div className="auth-actions">
           <label className="locale-control">
-            {text.language}
             <select
+              aria-label={text.language}
               value={locale}
               onChange={(event) => {
                 const nextLocale = event.target.value as 'en' | 'pl';
@@ -807,31 +908,81 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                 <h2>{text.missions}</h2>
               </div>
 
-              <label>
-                {text.completionNote}
-                <input value={missionNote} onChange={(event) => setMissionNote(event.target.value)} />
-              </label>
-
-              {missions.length === 0 ? (
+              {visibleMissions.length === 0 ? (
                 <div className="capybee-center-block">
                   <CapyBeeAvatar src={capyBeeAvatar.default} size={120} />
                   <CapyBeeBubble text={text.missionEmpty} />
                 </div>
               ) : (
                 <div className="list-stack">
-                  {missions.map((mission) => (
-                    <article key={mission.id} className="list-card">
-                      <h3>{mission.title}</h3>
-                      <p>{mission.description}</p>
-                      <button
-                        className="primary-button"
-                        onClick={() => completeMission(mission.id)}
-                        disabled={completingMissionId === mission.id}
-                      >
-                        {completingMissionId === mission.id ? text.saving : text.markComplete}
-                      </button>
-                    </article>
-                  ))}
+                  {visibleMissions.map((mission) => {
+                    const isExpanded = expandedMissionId === mission.id;
+                    const isSaving = savingMissionId === mission.id;
+                    const missionNote = missionNotes[mission.id] ?? '';
+                    const showCheerFace = cheerMissionId === mission.id;
+
+                    return (
+                      <article key={mission.id} className={['list-card', 'mission-card'].join(' ').trim()}>
+                        <div className="mission-header-row">
+                          <CapyBeeAvatar
+                            src={showCheerFace ? capyBeeAvatar.faceHappy : capyBeeAvatar.faceOkay}
+                            size={36}
+                          />
+                          <div className="mission-heading-block">
+                            <h3>{mission.title}</h3>
+                            <span className="mission-time-pill">{mission.timeHint}</span>
+                          </div>
+                        </div>
+
+                        {!isExpanded ? (
+                          <div className="mission-action-row">
+                            <button
+                              className="primary-button mission-primary-button"
+                              onClick={() => setExpandedMissionId(mission.id)}
+                            >
+                              {text.markComplete}
+                            </button>
+                            <button
+                              className="mission-skip-link"
+                              onClick={() => skipMission(mission.id)}
+                              disabled={skipPendingMissionId !== null || isSaving}
+                            >
+                              {text.missionNotToday}
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="mission-note-block">
+                            <textarea
+                              rows={2}
+                              className="check-in-note"
+                              value={missionNote}
+                              onChange={(event) => setMissionNotes((current) => ({
+                                ...current,
+                                [mission.id]: event.target.value
+                              }))}
+                              placeholder={text.missionOptionalNote}
+                            />
+                            <div className="mission-note-actions">
+                              <button
+                                className="primary-button mission-primary-button"
+                                onClick={() => completeMission(mission.id, missionNote)}
+                                disabled={isSaving}
+                              >
+                                {isSaving ? text.saving : text.missionSave}
+                              </button>
+                              <button
+                                className="secondary-button"
+                                onClick={() => setExpandedMissionId(null)}
+                                disabled={isSaving}
+                              >
+                                {text.missionBack}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </article>
+                    );
+                  })}
                 </div>
               )}
             </section>
@@ -1039,18 +1190,6 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
         {activeTab === 'profile' && profile ? (
           <>
             <section className="panel">
-              <h3>{text.honeycombProgress}</h3>
-              <div className="honeycomb-card">
-                <h4 className="honeycomb-heading">{locale === 'pl' ? 'Twoj ul' : 'Your hive'}</h4>
-                <HoneycombMap
-                  cells={homeHoneycombCells}
-                  ariaLabel={locale === 'pl' ? 'Twoj ul - postep' : 'Your hive - progress'}
-                  animatedCellId={homeAnimatedCellId}
-                />
-              </div>
-            </section>
-
-            <section className="panel">
               <div className="title-with-avatar">
               <CapyBeeAvatar src={capyBeeAvatar.default} size={80} />
               <h2>{text.profile}</h2>
@@ -1083,8 +1222,8 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
               </label>
 
               <label>
-                {text.language}
                 <select
+                  aria-label={text.language}
                   value={profile.preferredLocale}
                   onChange={(event) => setProfile({ ...profile, preferredLocale: event.target.value as 'en' | 'pl' })}
                 >
@@ -1127,6 +1266,13 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
         >
           <CapyBeeAvatar src={activeFeedback.avatar} size={48} />
           <span>{activeFeedback.phrase}</span>
+        </aside>
+      ) : null}
+
+      {skipUndoMissionId ? (
+        <aside className="skip-undo-toast" role="status" aria-live="polite">
+          <span>{text.missionSkipped}</span>
+          <button type="button" onClick={undoMissionSkip}>{text.missionUndoSkip}</button>
         </aside>
       ) : null}
 

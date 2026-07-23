@@ -36,6 +36,7 @@ import com.capybee.server.web.dto.CreateMissionCompletionRequest;
 import com.capybee.server.web.dto.FriendshipResponse;
 import com.capybee.server.web.dto.MemoryResponse;
 import com.capybee.server.web.dto.MissionCompletionResponse;
+import com.capybee.server.web.dto.MissionInteractionResponse;
 import com.capybee.server.web.dto.MissionResponse;
 import com.capybee.server.web.dto.UpdateChildProfileRequest;
 import com.capybee.server.web.dto.UpdateFriendshipRequest;
@@ -150,8 +151,10 @@ public class ApiController {
     }
 
     @GetMapping("/missions")
-    public List<MissionResponse> getMissions(@RequestParam(required = false) Boolean active) {
-        return missionService.getMissions(active);
+    public List<MissionResponse> getMissions(
+            Authentication authentication,
+            @RequestParam(required = false) Boolean active) {
+        return missionService.getMissions(requireOAuth2(authentication), active);
     }
 
     @PostMapping("/missions/{missionId}/completions")
@@ -168,6 +171,21 @@ public class ApiController {
             Authentication authentication,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant before) {
         return missionService.getMissionCompletions(requireOAuth2(authentication), before);
+    }
+
+    @PostMapping("/missions/{missionId}/skip")
+    @ResponseStatus(HttpStatus.CREATED)
+    public MissionInteractionResponse skipMission(
+            Authentication authentication,
+            @PathVariable UUID missionId) {
+        return missionService.skipMission(requireOAuth2(authentication), missionId);
+    }
+
+    @PostMapping("/missions/{missionId}/skip/undo")
+    public MissionInteractionResponse undoSkipMission(
+            Authentication authentication,
+            @PathVariable UUID missionId) {
+        return missionService.undoSkipMission(requireOAuth2(authentication), missionId);
     }
 
     @PostMapping("/friendships")

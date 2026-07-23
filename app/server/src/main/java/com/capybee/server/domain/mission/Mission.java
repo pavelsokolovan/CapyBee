@@ -26,8 +26,23 @@ public class Mission {
     @Column(nullable = false, length = 255)
     private String title;
 
+    @Column(name = "title_en", length = 255)
+    private String titleEn;
+
+    @Column(name = "title_pl", length = 255)
+    private String titlePl;
+
     @Column(nullable = false, columnDefinition = "text")
     private String description;
+
+    @Column(name = "time_hint_en", length = 64)
+    private String timeHintEn;
+
+    @Column(name = "time_hint_pl", length = 64)
+    private String timeHintPl;
+
+    @Column(length = 32)
+    private String category;
 
     @Column(nullable = false)
     private boolean active = true;
@@ -82,6 +97,46 @@ public class Mission {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getTitleEn() {
+        return titleEn;
+    }
+
+    public void setTitleEn(String titleEn) {
+        this.titleEn = titleEn;
+    }
+
+    public String getTitlePl() {
+        return titlePl;
+    }
+
+    public void setTitlePl(String titlePl) {
+        this.titlePl = titlePl;
+    }
+
+    public String getTimeHintEn() {
+        return timeHintEn;
+    }
+
+    public void setTimeHintEn(String timeHintEn) {
+        this.timeHintEn = timeHintEn;
+    }
+
+    public String getTimeHintPl() {
+        return timeHintPl;
+    }
+
+    public void setTimeHintPl(String timeHintPl) {
+        this.timeHintPl = timeHintPl;
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
     }
 
     public boolean isActive() {
