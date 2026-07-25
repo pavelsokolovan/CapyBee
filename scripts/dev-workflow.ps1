@@ -16,7 +16,7 @@ $serverStaticClassesPath = Join-Path $serverPath 'target/classes/static'
 $stateDir = Join-Path $repoRoot '.dev'
 $stateFile = Join-Path $stateDir 'processes.json'
 
-function Ensure-Path {
+function New-DirectoryIfMissing {
   param([string]$Path)
   if (-not (Test-Path $Path)) {
     New-Item -ItemType Directory -Path $Path | Out-Null
@@ -46,8 +46,8 @@ function Copy-BuildArtifacts {
     throw "UI dist folder not found: $uiDistPath. Run build first or remove -SkipBuild."
   }
 
-  Ensure-Path -Path $serverStaticResourcePath
-  Ensure-Path -Path $serverStaticClassesPath
+  New-DirectoryIfMissing -Path $serverStaticResourcePath
+  New-DirectoryIfMissing -Path $serverStaticClassesPath
 
   Write-Host '[sync] Copying UI dist -> server src resources static...'
   $null = & robocopy $uiDistPath $serverStaticResourcePath /E /IS /IT
@@ -84,7 +84,7 @@ function Write-ProcessState {
     [int]$FrontendPid
   )
 
-  Ensure-Path -Path $stateDir
+  New-DirectoryIfMissing -Path $stateDir
   @{
     backendPid = $BackendPid
     frontendPid = $FrontendPid
@@ -145,7 +145,7 @@ function Start-DevProcesses {
   $backendProc = Start-Process -FilePath 'cmd.exe' -ArgumentList '/d', '/c', 'mvn spring-boot:run' -WorkingDirectory $serverPath -PassThru
 
   Write-Host '[start] Starting frontend (Vite dev)...'
-  $frontendProc = Start-Process -FilePath 'cmd.exe' -ArgumentList '/d', '/c', 'npm.cmd run dev' -WorkingDirectory $uiPath -PassThru
+  $frontendProc = Start-Process -FilePath 'cmd.exe' -ArgumentList '/d', '/c', 'npm.cmd run dev -- --host 0.0.0.0 --strictPort' -WorkingDirectory $uiPath -PassThru
 
   Write-ProcessState -BackendPid $backendProc.Id -FrontendPid $frontendProc.Id
 
@@ -163,8 +163,7 @@ switch ($Action) {
     Start-DevProcesses
   }
   'all' {
-    Invoke-UiBuild
-    Copy-BuildArtifacts
+    Write-Host '[all] Starting Vite dev workflow for UI hot reload. Use action sync when you want to rebuild/copy assets for Spring Boot static serving.'
     Start-DevProcesses
   }
   'stop' {

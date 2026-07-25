@@ -511,6 +511,137 @@ a:hover {
   color: var(--muted);
 }
 
+.friendship-stage-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.friendship-stage-selector__step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.friendship-stage-chip {
+  min-height: 44px;
+  min-width: 44px;
+  border: 1px solid rgba(139, 107, 42, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.75);
+  padding: 8px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  cursor: pointer;
+  flex: 1 1 0;
+}
+
+.friendship-stage-chip.active {
+  transform: scale(1.03);
+  box-shadow: 0 10px 20px rgba(92, 64, 14, 0.16);
+}
+
+.friendship-stage-chip__icon {
+  font-size: 1rem;
+}
+
+.friendship-stage-selector__connector {
+  flex: 1 1 0;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(139, 107, 42, 0.18);
+}
+
+.friendship-stage-selector__connector.active {
+  background: rgba(242, 178, 51, 0.9);
+}
+
+.friendship-card {
+  display: grid;
+  gap: 8px;
+}
+
+.friendship-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.friendship-card__identity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.friendship-card__icon {
+  font-size: 1rem;
+}
+
+.friendship-card__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(139, 107, 42, 0.16);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--muted);
+  font-size: 0.74rem;
+  flex-shrink: 0;
+}
+
+.friendship-card__meta {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.friendship-card__date {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.friendship-card__note {
+  margin-top: 0;
+}
+
+.friendship-card__remove {
+  min-height: 40px;
+  width: fit-content;
+  padding: 0 12px;
+  border: 1px solid rgba(139, 107, 42, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.friendship-empty-state__copy {
+  max-width: 320px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.friendship-toast {
+  background: #fdf0c0;
+  border-color: #e8c97a;
+  box-shadow: 0 12px 26px rgba(92, 64, 14, 0.16);
+}
+
+.capybee-toast__avatar {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
 .mission-card {
   overflow: hidden;
   transition: max-height 300ms ease, opacity 300ms ease, padding 300ms ease, margin 300ms ease, border-color 300ms ease;

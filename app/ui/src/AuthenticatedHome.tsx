@@ -2,12 +2,16 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { CapyBeeAvatar, CapyBeeBubble, capyBeeAvatar, sameCalendarDay } from './capybee';
 import { useCapyBeePhrase } from './hooks/useCapyBeePhrase';
+import { useFriendshipAddedPhrase } from './hooks/useFriendshipAddedPhrase';
 import type { CapyBeePhrasePoolKey } from './data/capybeePhrases';
 import { HoneycombMap } from './components/HoneycombMap';
+import { FriendshipStageSelector } from './components/FriendshipStageSelector';
+import { FriendshipToast } from './components/FriendshipToast';
 import { useHoneycombCells } from './hooks/useHoneycombCells';
 import type { UseHoneycombCellsInput } from './hooks/useHoneycombCells';
 import oldWorldTabImage from './assets/honeycomb/old-world-tab.png';
 import newWorldTabImage from './assets/honeycomb/new-world-tab.png';
+import { STAGE_META, type FriendshipStage } from './constants/friendshipStages';
 
 export interface UserProfile {
   authenticated: boolean;
@@ -90,7 +94,20 @@ interface ActiveFeedback {
   avatar: string;
 }
 
-const stageOptions = ['noticed', 'was_nice', 'talked', 'want_to_know_better'];
+const friendshipStageLabelMap = {
+  en: {
+    noticed: 'Noticed them',
+    was_nice: 'They were nice to me',
+    talked: 'We talked',
+    want_to_know_better: 'Want to know them better'
+  },
+  pl: {
+    noticed: 'Zauważyłem/-am',
+    was_nice: 'Był/a dla mnie miły/a',
+    talked: 'Porozmawialiśmy',
+    want_to_know_better: 'Chcę go/ją lepiej poznać'
+  }
+} as const;
 
 const copy = {
   en: {
@@ -127,7 +144,13 @@ const copy = {
     missionCompleted: 'Completed',
     missionHistoryEmpty: 'No missions yet.',
     friendshipEmpty: 'Who did you notice today?',
+    friendshipEmptyState: 'No one here yet — that\'s okay. We\'ll find your people.',
     friendshipToast: 'Got it! Every step counts.',
+    friendshipStageLabel: 'Stage',
+    friendshipNotePlaceholder: 'What do you remember about them?',
+    friendshipRemove: 'Remove',
+    friendshipRemoved: 'Removed. Undo',
+    friendshipUndo: 'Undo',
     memoryOldEmpty: 'Your old home is safe here.',
     memoryNewEmpty: 'Start building your new hive.',
     memorySavedOld: 'Saved. This will always be yours.',
@@ -181,7 +204,13 @@ const copy = {
     missionCompleted: 'Ukończone',
     missionHistoryEmpty: 'Nie ma jeszcze zadnych misji.',
     friendshipEmpty: 'Kogo dzis zauwazyles?',
+    friendshipEmptyState: 'Nikogo tu jeszcze nie ma — to nic. Znajdziemy twoją paczkę.',
     friendshipToast: 'Zapamietalem! Kazdy krok sie liczy.',
+    friendshipStageLabel: 'Etap',
+    friendshipNotePlaceholder: 'Co o nich pamiętasz?',
+    friendshipRemove: 'Usuń',
+    friendshipRemoved: 'Usunięto. Cofnij',
+    friendshipUndo: 'Cofnij',
     memoryOldEmpty: 'Twoj stary dom jest tutaj bezpieczny.',
     memoryNewEmpty: 'Zacznij budowac swoj nowy ul.',
     memorySavedOld: 'Zapamietane. To zawsze bedzie twoje.',
@@ -228,6 +257,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const [profileMissing, setProfileMissing] = useState(false);
   const [locale, setLocale] = useState<'en' | 'pl'>('en');
   const pickPhrase = useCapyBeePhrase(locale);
+  const pickFriendshipPhrase = useFriendshipAddedPhrase(locale);
 
   const [mood, setMood] = useState<Mood>('okay');
   const [note, setNote] = useState('');
@@ -249,8 +279,11 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
 
   const [friendships, setFriendships] = useState<FriendshipEntry[]>([]);
   const [friendLabel, setFriendLabel] = useState('');
-  const [friendStage, setFriendStage] = useState(stageOptions[0]);
+  const [friendStage, setFriendStage] = useState<FriendshipStage>('noticed');
   const [friendNote, setFriendNote] = useState('');
+  const [friendshipToast, setFriendshipToast] = useState<{ message: string; avatarSrc: string } | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [pendingDeleteTimer, setPendingDeleteTimer] = useState<number | null>(null);
 
   const [worldType, setWorldType] = useState<'old_world' | 'new_world'>('old_world');
   const [memories, setMemories] = useState<MemoryEntry[]>([]);
@@ -273,8 +306,10 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const missionSkipCollapseTimer = useRef<number | null>(null);
   const missionSkipUndoTimer = useRef<number | null>(null);
   const missionCheerTimer = useRef<number | null>(null);
+  const friendshipDeleteTimer = useRef<number | null>(null);
 
   const text = copy[locale];
+  const getFriendshipStageLabel = (stage: FriendshipStage) => friendshipStageLabelMap[locale][stage];
 
   const triggerFeedback = (nextFeedback: ActiveFeedback) => {
     if (feedbackFadeOutTimer.current) window.clearTimeout(feedbackFadeOutTimer.current);
@@ -311,6 +346,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       if (missionSkipCollapseTimer.current) window.clearTimeout(missionSkipCollapseTimer.current);
       if (missionSkipUndoTimer.current) window.clearTimeout(missionSkipUndoTimer.current);
       if (missionCheerTimer.current) window.clearTimeout(missionCheerTimer.current);
+      if (friendshipDeleteTimer.current) window.clearTimeout(friendshipDeleteTimer.current);
     };
   }, []);
 
@@ -354,6 +390,13 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   );
 
   const visibleMissions = useMemo(() => missions, [missions]);
+  const sortedFriendships = useMemo(() => {
+    return [...friendships].sort((left, right) => {
+      const leftTime = new Date(left.createdAt ?? left.updatedAt).getTime();
+      const rightTime = new Date(right.createdAt ?? right.updatedAt).getTime();
+      return rightTime - leftTime;
+    });
+  }, [friendships]);
 
   const homeAvatar = hasCheckInToday ? capyBeeAvatar.default : capyBeeAvatar.waving;
   const homeAvatarBubble = hasCheckInToday ? text.greetingReturning : text.greetingFirstVisit;
@@ -655,11 +698,11 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       });
       setFriendLabel('');
       setFriendNote('');
+      setFriendStage('noticed');
       await fetchFriendships();
-      triggerFeedback({
-        kind: 'friendship',
-        phrase: pickPhrase('friendshipAdded'),
-        avatar: capyBeeAvatar.celebrating
+      setFriendshipToast({
+        message: pickFriendshipPhrase(friendStage, friendLabel || 'them'),
+        avatarSrc: resolveFriendshipAvatar(friendStage)
       });
       if (activeTab === 'home') {
         setHomeAnimatedCellId(created.id);
@@ -669,13 +712,39 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     }
   };
 
-  const removeFriendship = async (id: string) => {
-    try {
-      await request<void>(`/api/friendships/${id}`, { method: 'DELETE' });
-      await fetchFriendships();
-    } catch (error) {
-      console.error(error);
+  const resolveFriendshipAvatar = (stage: FriendshipStage) => {
+    const expression = STAGE_META[stage].avatarExpression;
+    if (expression === 'excited') return capyBeeAvatar.celebrating;
+    if (expression === 'warm-smile') return capyBeeAvatar.faceHappy;
+    if (expression === 'hopeful') return capyBeeAvatar.waving;
+    return capyBeeAvatar.default;
+  };
+
+  const handleFriendshipRemoveClick = (id: string) => {
+    if (friendshipDeleteTimer.current) {
+      window.clearTimeout(friendshipDeleteTimer.current);
     }
+
+    setPendingDeleteId(id);
+    friendshipDeleteTimer.current = window.setTimeout(async () => {
+      try {
+        await request<void>(`/api/friendships/${id}`, { method: 'DELETE' });
+        await fetchFriendships();
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setPendingDeleteId(null);
+        friendshipDeleteTimer.current = null;
+      }
+    }, 5000);
+  };
+
+  const undoFriendshipRemove = () => {
+    if (friendshipDeleteTimer.current) {
+      window.clearTimeout(friendshipDeleteTimer.current);
+      friendshipDeleteTimer.current = null;
+    }
+    setPendingDeleteId(null);
   };
 
   const addMemory = async (event: React.FormEvent) => {
@@ -1039,16 +1108,20 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                   <input value={friendLabel} onChange={(event) => setFriendLabel(event.target.value)} required />
                 </label>
                 <label>
-                  {text.stage}
-                  <select value={friendStage} onChange={(event) => setFriendStage(event.target.value)}>
-                    {stageOptions.map((stage) => (
-                      <option key={stage} value={stage}>{stage}</option>
-                    ))}
-                  </select>
+                  {text.friendshipStageLabel}
+                  <FriendshipStageSelector
+                    value={friendStage}
+                    onChange={(stage) => setFriendStage(stage)}
+                    getLabel={(stage) => getFriendshipStageLabel(stage)}
+                  />
                 </label>
                 <label>
                   {text.note}
-                  <input value={friendNote} onChange={(event) => setFriendNote(event.target.value)} />
+                  <input
+                    value={friendNote}
+                    onChange={(event) => setFriendNote(event.target.value)}
+                    placeholder={text.friendshipNotePlaceholder}
+                  />
                 </label>
                 <button className="primary-button" type="submit">{text.addEntry}</button>
               </form>
@@ -1067,23 +1140,44 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
             </section>
 
             <section className="panel">
-              {friendships.length === 0 ? (
-                <div className="capybee-center-block">
-                  <CapyBeeAvatar src={capyBeeAvatar.default} size={120} />
-                  <CapyBeeBubble text={text.friendshipEmpty} />
+              {sortedFriendships.length === 0 ? (
+                <div className="capybee-center-block friendship-empty-state">
+                  <CapyBeeAvatar src={capyBeeAvatar.waving} size={128} />
+                  <p className="friendship-empty-state__copy">{text.friendshipEmptyState}</p>
                 </div>
               ) : (
                 <div className="list-stack">
-                  {friendships.map((entry) => (
-                    <article key={entry.id} className="list-card">
-                      <div className="line-between">
-                        <strong>{entry.personLabel}</strong>
-                        <span>{entry.stage}</span>
-                      </div>
-                      {entry.note ? <p>{entry.note}</p> : null}
-                      <button className="danger-button" onClick={() => removeFriendship(entry.id)}>Delete</button>
-                    </article>
-                  ))}
+                  {sortedFriendships.map((entry) => {
+                    const stage = (entry.stage as FriendshipStage) || 'noticed';
+                    const stageMeta = STAGE_META[stage] ?? STAGE_META.noticed;
+                    const isPendingDelete = pendingDeleteId === entry.id;
+
+                    return (
+                      <motion.article
+                        key={entry.id}
+                        className={`list-card friendship-card ${isPendingDelete ? 'pending-delete' : ''}`}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: isPendingDelete ? 0.55 : 1, y: 0 }}
+                        transition={{ duration: 0.18 }}
+                        style={{ borderLeft: `4px solid ${stageMeta.colorToken}` }}
+                      >
+                        <div className="friendship-card__header">
+                          <div className="friendship-card__identity">
+                            <span className="friendship-card__icon">{stageMeta.icon}</span>
+                            <strong>{entry.personLabel}</strong>
+                          </div>
+                          <div className="friendship-card__meta">
+                            <span className="friendship-card__badge">{getFriendshipStageLabel(stage)}</span>
+                            <span className="friendship-card__date">{new Date(entry.createdAt).toLocaleDateString(locale)}</span>
+                          </div>
+                        </div>
+                        {entry.note ? <p className="friendship-card__note">{entry.note}</p> : null}
+                        <button className="friendship-card__remove" onClick={() => handleFriendshipRemoveClick(entry.id)}>
+                          {text.friendshipRemove}
+                        </button>
+                      </motion.article>
+                    );
+                  })}
                 </div>
               )}
             </section>
@@ -1266,6 +1360,15 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
         >
           <CapyBeeAvatar src={activeFeedback.avatar} size={48} />
           <span>{activeFeedback.phrase}</span>
+        </aside>
+      ) : null}
+
+      <FriendshipToast toast={friendshipToast} onDismiss={() => setFriendshipToast(null)} />
+
+      {pendingDeleteId ? (
+        <aside className="skip-undo-toast" role="status" aria-live="polite">
+          <span>{text.friendshipRemoved}</span>
+          <button type="button" onClick={undoFriendshipRemove}>{text.friendshipUndo}</button>
         </aside>
       ) : null}
 
