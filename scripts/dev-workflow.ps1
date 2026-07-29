@@ -46,6 +46,15 @@ function Copy-BuildArtifacts {
     throw "UI dist folder not found: $uiDistPath. Run build first or remove -SkipBuild."
   }
 
+  # Clean old static directories to remove stale assets
+  Write-Host '[sync] Cleaning old static directories...'
+  if (Test-Path $serverStaticResourcePath) {
+    Remove-Item -Path $serverStaticResourcePath -Recurse -Force | Out-Null
+  }
+  if (Test-Path $serverStaticClassesPath) {
+    Remove-Item -Path $serverStaticClassesPath -Recurse -Force | Out-Null
+  }
+
   New-DirectoryIfMissing -Path $serverStaticResourcePath
   New-DirectoryIfMissing -Path $serverStaticClassesPath
 
@@ -126,6 +135,22 @@ function Stop-DevProcesses {
   Write-Host '[stop] Dev processes stopped.'
 }
 
+function Ensure-UiDependencies {
+  if (-not (Test-Path (Join-Path $uiPath 'node_modules'))) {
+    Write-Host '[start] UI dependencies not installed. Running npm install...'
+    Push-Location $uiPath
+    try {
+      & npm.cmd install
+      if ($LASTEXITCODE -ne 0) {
+        throw "npm install failed with exit code $LASTEXITCODE"
+      }
+    } finally {
+      Pop-Location
+    }
+    Write-Host '[start] UI dependencies installed.'
+  }
+}
+
 function Start-DevProcesses {
   $existing = Read-ProcessState
   if ($existing -and -not $ForceRestart) {
@@ -140,6 +165,8 @@ function Start-DevProcesses {
   if ($ForceRestart) {
     Stop-DevProcesses
   }
+
+  Ensure-UiDependencies
 
   Write-Host '[start] Starting backend (Spring Boot)...'
   $backendProc = Start-Process -FilePath 'cmd.exe' -ArgumentList '/d', '/c', 'mvn spring-boot:run' -WorkingDirectory $serverPath -PassThru
@@ -156,6 +183,7 @@ function Start-DevProcesses {
 
 switch ($Action) {
   'sync' {
+    Ensure-UiDependencies
     Invoke-UiBuild
     Copy-BuildArtifacts
   }
@@ -163,7 +191,10 @@ switch ($Action) {
     Start-DevProcesses
   }
   'all' {
-    Write-Host '[all] Starting Vite dev workflow for UI hot reload. Use action sync when you want to rebuild/copy assets for Spring Boot static serving.'
+    Write-Host '[all] Building UI, syncing static files for Spring Boot, then starting backend and frontend...'
+    Ensure-UiDependencies
+    Invoke-UiBuild
+    Copy-BuildArtifacts
     Start-DevProcesses
   }
   'stop' {

@@ -109,6 +109,47 @@ const friendshipStageLabelMap = {
   }
 } as const;
 
+function StarIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M12 3.5l2.6 5.6 6.1.6-4.6 4.2 1.3 6.1L12 16.9l-5.4 3.1 1.3-6.1L3.3 9.7l6.1-.6L12 3.5z"
+        fill={filled ? '#f2b233' : 'none'}
+        stroke="#c8952a"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M5 7h14M10 4h4a1 1 0 011 1v2H9V5a1 1 0 011-1z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M6.5 7l.8 12a1.5 1.5 0 001.5 1.4h6.4a1.5 1.5 0 001.5-1.4L17.5 7"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M10 11v6M14 11v6"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 const copy = {
   en: {
     homeTitle: "How's today?",
@@ -163,7 +204,10 @@ const copy = {
     title: 'Title',
     story: 'Story',
     favoriteMemory: 'Favorite memory',
+    deleteMemory: 'Delete memory',
     addMemory: 'Add memory',
+    memoryDeleted: 'Memory removed.',
+    memoryUndoDelete: 'Undo',
     profileActive: 'Profile active',
     markComplete: 'Mark complete',
     honeycombProgress: 'Honeycomb progress',
@@ -223,7 +267,10 @@ const copy = {
     title: 'Tytul',
     story: 'Historia',
     favoriteMemory: 'Ulubione wspomnienie',
+    deleteMemory: 'Usuń wspomnienie',
     addMemory: 'Dodaj wspomnienie',
+    memoryDeleted: 'Wspomnienie usunięte.',
+    memoryUndoDelete: 'Cofnij',
     profileActive: 'Profil aktywny',
     markComplete: 'Oznacz jako ukonczone',
     honeycombProgress: 'Postep ula',
@@ -291,6 +338,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const [memoryTitle, setMemoryTitle] = useState('');
   const [memoryText, setMemoryText] = useState('');
   const [memoryFavorite, setMemoryFavorite] = useState(false);
+  const [pendingDeleteMemoryId, setPendingDeleteMemoryId] = useState<string | null>(null);
   const [homeAnimatedCellId, setHomeAnimatedCellId] = useState<string | null>(null);
 
 
@@ -307,6 +355,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const missionSkipUndoTimer = useRef<number | null>(null);
   const missionCheerTimer = useRef<number | null>(null);
   const friendshipDeleteTimer = useRef<number | null>(null);
+  const memoryDeleteTimerRef = useRef<number | null>(null);
 
   const text = copy[locale];
   const getFriendshipStageLabel = (stage: FriendshipStage) => friendshipStageLabelMap[locale][stage];
@@ -347,6 +396,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       if (missionSkipUndoTimer.current) window.clearTimeout(missionSkipUndoTimer.current);
       if (missionCheerTimer.current) window.clearTimeout(missionCheerTimer.current);
       if (friendshipDeleteTimer.current) window.clearTimeout(friendshipDeleteTimer.current);
+      if (memoryDeleteTimerRef.current) window.clearTimeout(memoryDeleteTimerRef.current);
     };
   }, []);
 
@@ -397,6 +447,20 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       return rightTime - leftTime;
     });
   }, [friendships]);
+
+  const sortedMemories = useMemo(() => {
+    return [...memories].sort((a, b) => {
+      if (a.isFavorite !== b.isFavorite) {
+        return a.isFavorite ? -1 : 1;
+      }
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }, [memories]);
+
+  const visibleMemories = useMemo(
+    () => sortedMemories.filter((entry) => entry.id !== pendingDeleteMemoryId),
+    [sortedMemories, pendingDeleteMemoryId]
+  );
 
   const homeAvatar = hasCheckInToday ? capyBeeAvatar.default : capyBeeAvatar.waving;
   const homeAvatarBubble = hasCheckInToday ? text.greetingReturning : text.greetingFirstVisit;
@@ -790,7 +854,8 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     }
   };
 
-  const deleteMemory = async (id: string) => {
+  const commitMemoryDelete = async (id: string) => {
+    setPendingDeleteMemoryId((current) => (current === id ? null : current));
     try {
       await request<void>(`/api/memories/${id}`, { method: 'DELETE' });
       await fetchMemories(worldType);
@@ -798,6 +863,32 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     } catch (error) {
       console.error(error);
     }
+  };
+
+  const requestDeleteMemory = (id: string) => {
+    // Only one pending delete at a time — if another is already waiting, commit it now.
+    if (pendingDeleteMemoryId && pendingDeleteMemoryId !== id) {
+      if (memoryDeleteTimerRef.current) {
+        window.clearTimeout(memoryDeleteTimerRef.current);
+      }
+      commitMemoryDelete(pendingDeleteMemoryId);
+    }
+
+    setPendingDeleteMemoryId(id);
+    if (memoryDeleteTimerRef.current) {
+      window.clearTimeout(memoryDeleteTimerRef.current);
+    }
+    memoryDeleteTimerRef.current = window.setTimeout(() => {
+      commitMemoryDelete(id);
+    }, 4000);
+  };
+
+  const undoMemoryDelete = () => {
+    if (memoryDeleteTimerRef.current) {
+      window.clearTimeout(memoryDeleteTimerRef.current);
+      memoryDeleteTimerRef.current = null;
+    }
+    setPendingDeleteMemoryId(null);
   };
 
   if (profileMissing) {
@@ -1263,16 +1354,30 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                 </div>
               ) : (
                 <div className="list-stack">
-                  {memories.map((entry) => (
-                    <article key={entry.id} className="list-card">
+                  {visibleMemories.map((entry) => (
+                    <article key={entry.id} className="list-card memory-card">
                       <div className="line-between">
                         <strong>{entry.title || 'Memory'}</strong>
-                        <button className="ghost-button" onClick={() => toggleFavorite(entry)}>
-                          {entry.isFavorite ? '★' : '☆'}
+                        <button
+                          className={entry.isFavorite ? 'favorite-star active' : 'favorite-star'}
+                          onClick={() => toggleFavorite(entry)}
+                          aria-label={text.favoriteMemory}
+                          aria-pressed={entry.isFavorite}
+                        >
+                          <StarIcon filled={entry.isFavorite} />
                         </button>
                       </div>
-                      {entry.textContent ? <p>{entry.textContent}</p> : null}
-                      <button className="danger-button" onClick={() => deleteMemory(entry.id)}>Delete</button>
+                      {entry.textContent ? <p className="memory-story-preview">{entry.textContent}</p> : null}
+                      <div className="memory-card-footer">
+                        <span className="memory-card-date">{new Date(entry.createdAt).toLocaleDateString(locale)}</span>
+                        <button
+                          className="icon-delete-button"
+                          onClick={() => requestDeleteMemory(entry.id)}
+                          aria-label={text.deleteMemory}
+                        >
+                          <TrashIcon />
+                        </button>
+                      </div>
                     </article>
                   ))}
                 </div>
@@ -1376,6 +1481,13 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
         <aside className="skip-undo-toast" role="status" aria-live="polite">
           <span>{text.missionSkipped}</span>
           <button type="button" onClick={undoMissionSkip}>{text.missionUndoSkip}</button>
+        </aside>
+      ) : null}
+
+      {pendingDeleteMemoryId ? (
+        <aside className="skip-undo-toast" role="status" aria-live="polite">
+          <span>{text.memoryDeleted}</span>
+          <button type="button" onClick={undoMemoryDelete}>{text.memoryUndoDelete}</button>
         </aside>
       ) : null}
 
