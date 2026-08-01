@@ -97,6 +97,7 @@ export function HoneycombMap({
   const hideTimerRef = useRef<number | null>(null);
   const animTimerRef = useRef<number | null>(null);
   const animFrameRef = useRef<number | null>(null);
+  const scrollFrameRef = useRef<number | null>(null);
   // Guard: don't trigger load-more while we are processing a previous add
   const loadingMoreRef = useRef(false);
 
@@ -167,10 +168,12 @@ export function HoneycombMap({
     const targetViewboxY = Math.max(0, lastRowY - (VISIBLE_VB_HEIGHT - ROW_STEP * 1.5));
     const targetScrollTop = targetViewboxY * scale;
 
-    // Use requestAnimationFrame to ensure DOM is updated
-    animFrameRef.current = window.requestAnimationFrame(() => {
-      animFrameRef.current = window.requestAnimationFrame(() => {
+    // Use a dedicated RAF ref so the animation effect can't cancel this scroll
+    if (scrollFrameRef.current) window.cancelAnimationFrame(scrollFrameRef.current);
+    scrollFrameRef.current = window.requestAnimationFrame(() => {
+      scrollFrameRef.current = window.requestAnimationFrame(() => {
         scroll.scrollTop = targetScrollTop;
+        scrollFrameRef.current = null;
       });
     });
   }, [cells.length, scale]);
@@ -226,6 +229,7 @@ export function HoneycombMap({
     if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
     if (animTimerRef.current) window.clearTimeout(animTimerRef.current);
     if (animFrameRef.current) window.cancelAnimationFrame(animFrameRef.current);
+    if (scrollFrameRef.current) window.cancelAnimationFrame(scrollFrameRef.current);
   }, []);
 
   // ─── Tooltip positioning (relative to shell, accounts for scroll offset) ──

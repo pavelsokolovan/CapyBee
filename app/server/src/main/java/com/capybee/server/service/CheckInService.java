@@ -1,6 +1,7 @@
 package com.capybee.server.service;
 
 import java.util.List;
+import java.util.UUID;
 
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.stereotype.Service;
@@ -43,6 +44,20 @@ public class CheckInService {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @Transactional
+    public void deleteCheckIn(OAuth2AuthenticationToken oauth2Token, UUID checkInId) {
+        UserAccount user = userService.getCurrentUser(oauth2Token);
+        CheckInEntry entry = checkInEntryRepository.findById(checkInId)
+                .orElseThrow(() -> new IllegalArgumentException("Check-in not found"));
+        
+        // Ensure user owns this check-in
+        if (!entry.getUserAccount().getId().equals(user.getId())) {
+            throw new IllegalArgumentException("Not authorized to delete this check-in");
+        }
+        
+        checkInEntryRepository.delete(entry);
     }
 
     private CheckInResponse toResponse(CheckInEntry entry) {

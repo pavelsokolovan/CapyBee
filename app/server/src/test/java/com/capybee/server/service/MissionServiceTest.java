@@ -87,7 +87,7 @@ class MissionServiceTest {
         List<MissionResponse> result = missionService.getMissions(new OAuth2AuthenticationToken(
                 principal,
                 List.of(),
-                "name"), true);
+            "name"), true);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).id()).isEqualTo(mission.getId());

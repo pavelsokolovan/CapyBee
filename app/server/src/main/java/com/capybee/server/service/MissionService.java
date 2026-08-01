@@ -142,6 +142,20 @@ public class MissionService {
         return completions.stream().map(entry -> toMissionCompletionResponse(entry, profile.getId())).toList();
     }
 
+    @Transactional
+    public void deleteMissionCompletion(OAuth2AuthenticationToken token, UUID completionId) {
+        UserAccount user = userService.getCurrentUser(token);
+        MissionCompletion completion = missionCompletionRepository.findById(completionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mission completion not found"));
+        
+        // Ensure user owns this completion
+        if (!completion.getUserAccount().getId().equals(user.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not authorized to delete this mission completion");
+        }
+        
+        missionCompletionRepository.delete(completion);
+    }
+
     private Instant getLastActionedAt(FamilyProfile profile, Mission mission) {
         return missionChildStateRepository.findByProfile_IdAndMission_Id(profile.getId(), mission.getId())
                 .map(MissionChildState::getLastActionedAt)

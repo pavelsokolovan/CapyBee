@@ -4,13 +4,19 @@ interface FriendshipStageSelectorProps {
   value: FriendshipStage;
   onChange: (stage: FriendshipStage) => void;
   getLabel: (stage: FriendshipStage) => string;
+  ariaLabel?: string;
 }
 
-export function FriendshipStageSelector({ value, onChange, getLabel }: FriendshipStageSelectorProps) {
+export function FriendshipStageSelector({
+  value,
+  onChange,
+  getLabel,
+  ariaLabel = 'Friendship stage'
+}: FriendshipStageSelectorProps) {
   const activeIndex = FRIENDSHIP_STAGES.indexOf(value);
 
   return (
-    <div className="friendship-stage-selector" role="group" aria-label="Friendship stage">
+    <div className="friendship-stage-selector" role="group" aria-label={ariaLabel}>
       {FRIENDSHIP_STAGES.map((stage, index) => {
         const isActive = value === stage;
         const showConnector = index < FRIENDSHIP_STAGES.length - 1 && (isActive || index < activeIndex);

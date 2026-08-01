@@ -130,6 +130,12 @@ public class ApiController {
         return checkInService.getMyRecentCheckIns(requireOAuth2(authentication));
     }
 
+    @DeleteMapping("/check-ins/{checkInId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteCheckIn(Authentication authentication, @PathVariable UUID checkInId) {
+        checkInService.deleteCheckIn(requireOAuth2(authentication), checkInId);
+    }
+
     @PostMapping("/child-profile")
     @ResponseStatus(HttpStatus.CREATED)
     public ChildProfileResponse createChildProfile(
@@ -171,6 +177,12 @@ public class ApiController {
             Authentication authentication,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant before) {
         return missionService.getMissionCompletions(requireOAuth2(authentication), before);
+    }
+
+    @DeleteMapping("/missions/completions/{completionId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteMissionCompletion(Authentication authentication, @PathVariable UUID completionId) {
+        missionService.deleteMissionCompletion(requireOAuth2(authentication), completionId);
     }
 
     @PostMapping("/missions/{missionId}/skip")

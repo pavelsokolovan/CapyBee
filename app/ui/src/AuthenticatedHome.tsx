@@ -11,6 +11,8 @@ import { useHoneycombCells } from './hooks/useHoneycombCells';
 import type { UseHoneycombCellsInput } from './hooks/useHoneycombCells';
 import oldWorldTabImage from './assets/honeycomb/old-world-tab.png';
 import newWorldTabImage from './assets/honeycomb/new-world-tab.png';
+import missionsTabImage from './assets/honeycomb/missions-tab.png';
+import friendshipsTabImage from './assets/honeycomb/friedships-tab.png';
 import { STAGE_META, type FriendshipStage } from './constants/friendshipStages';
 
 export interface UserProfile {
@@ -92,6 +94,100 @@ interface ActiveFeedback {
   kind: FeedbackKind;
   phrase: string;
   avatar: string;
+}
+
+const missionTitleOverridesPl: Record<string, string> = {
+  say_hi_once: 'Powiedz „cześć” jednej osobie',
+  sit_one_table_closer: 'Usiądź przy stoliku o jeden bliżej',
+  find_one_good_thing: 'Znajdź jedną dobrą rzecz',
+  draw_old_and_new_home: 'Narysuj stary i nowy dom',
+  ask_about_one_club: 'Zapytaj o jedno kółko zainteresowań',
+  say_hi_someone_new_school: 'Powiedz „cześć” komuś nowemu w szkole',
+  ask_favorite_subject: 'Zapytaj kogoś o ulubiony przedmiot',
+  sit_somewhere_new_lunch: 'Usiądź dziś w nowym miejscu na lunchu',
+  compliment_someone_small: 'Powiedz komuś drobny komplement',
+  learn_one_new_word_local_language: 'Naucz się jednego nowego słowa w lokalnym języku',
+  find_one_new_thing_near_home: 'Znajdź jedną nową rzecz w okolicy domu',
+  try_new_food_here: 'Spróbuj jednego nowego jedzenia',
+  ask_teacher_question_after_class: 'Zadaj nauczycielowi jedno pytanie po lekcji',
+  draw_old_street_memory: 'Narysuj lub opisz z pamięci swoją starą ulicę',
+  write_smell_sound_home: 'Zapisz zapach lub dźwięk, który przypomina ci dom',
+  message_old_friend_hi: 'Napisz do starego przyjaciela, żeby się przywitać',
+  name_one_thing_easier_here: 'Wskaż jedną rzecz, która tutaj jest łatwiejsza niż w dawnym domu',
+  look_up_school_club: 'Sprawdź jedno kółko lub aktywność w szkole',
+  ask_explain_game_rule: 'Poproś kogoś o wyjaśnienie gry lub zasady',
+  photo_today_okay: 'Zrób zdjęcie czegoś, co sprawiło, że dziś było okej',
+  wave_smile_two_days: 'Pomachaj lub uśmiechnij się do tej samej osoby przez dwa dni z rzędu',
+  cook_something_from_home: 'Zaproponuj rodzinie wspólne ugotowanie czegoś z domu',
+  find_popular_school_sport: 'Dowiedz się, jaki sport jest popularny w nowej szkole',
+  write_one_sentence_today_felt: 'Napisz jedno zdanie o tym, jak naprawdę minął dziś dzień',
+  offer_help_classmate_small: 'Zaproponuj koledze lub koleżance pomoc w czymś drobnym'
+};
+
+const missionTitleOverridesEn: Record<string, string> = {
+  say_hi_once: 'Say hi to one person',
+  sit_one_table_closer: 'Sit one table closer',
+  find_one_good_thing: 'Find one good thing',
+  draw_old_and_new_home: 'Draw old and new home',
+  ask_about_one_club: 'Ask about one club',
+  say_hi_someone_new_school: 'Say hi to someone new at school',
+  ask_favorite_subject: 'Ask someone what their favorite subject is',
+  sit_somewhere_new_lunch: 'Sit somewhere new at lunch',
+  compliment_someone_small: 'Compliment someone on something small',
+  learn_one_new_word_local_language: 'Learn one new word in the local language',
+  find_one_new_thing_near_home: 'Find one thing near your home you did not notice before',
+  try_new_food_here: 'Try one food you have not tried here yet',
+  ask_teacher_question_after_class: 'Ask a teacher one question after class',
+  draw_old_street_memory: 'Draw or describe your old street from memory',
+  write_smell_sound_home: 'Write down a smell or sound that reminds you of home',
+  message_old_friend_hi: 'Message an old friend just to say hi',
+  name_one_thing_easier_here: 'Name one thing that is easier here than back home',
+  look_up_school_club: 'Look up one club or activity at your school',
+  ask_explain_game_rule: 'Ask someone to explain a game or rule you do not know',
+  photo_today_okay: 'Take a photo of something that made today okay',
+  wave_smile_two_days: 'Wave or smile at the same person two days in a row',
+  cook_something_from_home: 'Ask your family to cook something from home together',
+  find_popular_school_sport: 'Find out what sport is popular at your new school',
+  write_one_sentence_today_felt: 'Write one sentence about how today actually felt',
+  offer_help_classmate_small: 'Offer to help a classmate with something small'
+};
+
+function polishMinutesLabel(minutes: number): string {
+  if (minutes === 1) return 'minutę';
+  const mod10 = minutes % 10;
+  const mod100 = minutes % 100;
+  if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) {
+    return 'minuty';
+  }
+  return 'minut';
+}
+
+function localizeMissionTimeHint(timeHint: string, locale: 'en' | 'pl'): string {
+  const normalized = timeHint.trim().toLowerCase();
+  const minuteMatch = normalized.match(/(\d+)\s*min/);
+
+  if (!minuteMatch) return timeHint;
+
+  const minutes = Number(minuteMatch[1]);
+
+  if (locale === 'pl') {
+    if (normalized.includes('this takes') || normalized.includes('to zajmie')) {
+      return `To zajmie ${minutes} ${polishMinutesLabel(minutes)}`;
+    }
+    return timeHint;
+  }
+
+  if (normalized.includes('to zajmie') || normalized.includes('this takes')) {
+    return `This takes ${minutes} minute${minutes === 1 ? '' : 's'}`;
+  }
+  return timeHint;
+}
+
+function localizeMissionTitle(code: string, title: string, locale: 'en' | 'pl'): string {
+  if (locale === 'pl') {
+    return missionTitleOverridesPl[code] ?? title;
+  }
+  return missionTitleOverridesEn[code] ?? title;
 }
 
 const friendshipStageLabelMap = {
@@ -208,74 +304,112 @@ const copy = {
     addMemory: 'Add memory',
     memoryDeleted: 'Memory removed.',
     memoryUndoDelete: 'Undo',
+    checkInDeleted: 'Check-in removed.',
+    checkInUndoDelete: 'Undo',
+    deleteCheckIn: 'Delete check-in',
+    missionDeleted: 'Mission removed.',
+    missionUndoDelete: 'Undo',
+    deleteMission: 'Delete mission',
     profileActive: 'Profile active',
     markComplete: 'Mark complete',
     honeycombProgress: 'Honeycomb progress',
     recentCheckins: 'Recent check-ins',
-    completionHistory: 'Completion history'
+    completionHistory: 'Completion history',
+    nickname: 'Nickname',
+    birthYear: 'Birth year',
+    avatarSeed: 'Avatar seed',
+    english: 'English',
+    polish: 'Polish',
+    logout: 'Log out',
+    moodHeavy: 'Heavy',
+    moodOkay: 'Okay',
+    moodGood: 'Good',
+    hiveTitle: 'Your hive',
+    hiveAriaLabel: 'Your hive - progress',
+    memoryFallbackTitle: 'Memory',
+    friendshipStageAriaLabel: 'Friendship stage'
   },
   pl: {
-    homeTitle: 'Jak dzis bylo?',
-    profileSetupTitle: 'Utworz profil dziecka',
-    profileSetupHint: 'Uzyj ksywki. Prawdziwe imie nie jest wymagane.',
+    homeTitle: 'Jak minął dzień?',
+    profileSetupTitle: 'Utwórz profil dziecka',
+    profileSetupHint: 'Użyj pseudonimu. Prawdziwe imię nie jest wymagane.',
     save: 'Zapisz',
     saving: 'Zapisywanie...',
-    setUp: 'Utworz profil',
+    setUp: 'Utwórz profil',
     checkInPlaceholder: 'Opcjonalna notatka',
     missions: 'Misje',
     friendships: 'Relacje',
     memories: 'Wspomnienia',
     profile: 'Profil',
     home: 'Start',
-    oldWorld: 'Stary swiat',
-    newWorld: 'Nowy swiat',
-    language: 'Jezyk',
+    oldWorld: 'Stary Świat',
+    newWorld: 'Nowy Świat',
+    language: 'Język',
     noItems: 'Na razie nic tu nie ma.',
-    greetingFirstVisit: 'Hej! Jak dzis bylo?',
-    greetingReturning: 'Milo cie znowu widziec.',
-    reactionHeavy: 'To brzmi ciezko. Jestem tu.',
-    reactionOkay: 'Okej to tez jest cos. Dobra robota.',
-    reactionGood: 'To swietnie! Ciesze sie razem z toba.',
-    missionSuggestion: 'Mam dla ciebie mala misje na dzis ->',
-    missionEmpty: 'Nie ma teraz misji - wroc jutro!',
-    missionDone: 'Misja wykonana! Nowa komorka w ulu',
+    greetingFirstVisit: 'Hej! Jak minął dzień?',
+    greetingReturning: 'Miło cię znowu widzieć.',
+    reactionHeavy: 'To brzmi ciężko. Jestem obok.',
+    reactionOkay: 'To, że jest po prostu okej, też się liczy. Dobra robota.',
+    reactionGood: 'To świetnie! Cieszę się razem z tobą.',
+    missionSuggestion: 'Mam dla ciebie małą misję na dziś ->',
+    missionEmpty: 'Teraz nie ma nowych misji. Zajrzyj jutro!',
+    missionDone: 'Misja wykonana! Nowa komórka w ulu.',
     missionNotToday: 'Nie dzisiaj',
-    missionOptionalNote: 'Cos, co chcesz zapamietac? (opcjonalnie)',
+    missionOptionalNote: 'Coś, co chcesz zapamiętać? (opcjonalnie)',
     missionSave: 'Zapisz',
-    missionBack: 'Wroc',
+    missionBack: 'Wróć',
     missionUndoSkip: 'Cofnij',
-    missionSkipped: 'Misja odlozona na teraz.',
+    missionSkipped: 'Misja odłożona na teraz.',
     missionCompleted: 'Ukończone',
-    missionHistoryEmpty: 'Nie ma jeszcze zadnych misji.',
-    friendshipEmpty: 'Kogo dzis zauwazyles?',
+    missionHistoryEmpty: 'Nie ma jeszcze żadnych misji.',
+    friendshipEmpty: 'Kogo dziś zauważyłeś?',
     friendshipEmptyState: 'Nikogo tu jeszcze nie ma — to nic. Znajdziemy twoją paczkę.',
-    friendshipToast: 'Zapamietalem! Kazdy krok sie liczy.',
+    friendshipToast: 'Zapamiętałem! Każdy krok się liczy.',
     friendshipStageLabel: 'Etap',
     friendshipNotePlaceholder: 'Co o nich pamiętasz?',
     friendshipRemove: 'Usuń',
     friendshipRemoved: 'Usunięto. Cofnij',
     friendshipUndo: 'Cofnij',
-    memoryOldEmpty: 'Twoj stary dom jest tutaj bezpieczny.',
-    memoryNewEmpty: 'Zacznij budowac swoj nowy ul.',
-    memorySavedOld: 'Zapamietane. To zawsze bedzie twoje.',
+    memoryOldEmpty: 'Twój stary dom jest tutaj bezpieczny.',
+    memoryNewEmpty: 'Zacznij budować swój nowy ul.',
+    memorySavedOld: 'Zapisane. To zawsze będzie twoje.',
     memorySavedNew: 'Nowa chwila w ulu!',
-    askName: 'Jak mam sie do ciebie zwracac?',
+    askName: 'Jak mam się do ciebie zwracać?',
     person: 'Osoba',
     stage: 'Etap',
     note: 'Notatka',
     addEntry: 'Dodaj wpis',
-    title: 'Tytul',
+    title: 'Tytuł',
     story: 'Historia',
     favoriteMemory: 'Ulubione wspomnienie',
     deleteMemory: 'Usuń wspomnienie',
     addMemory: 'Dodaj wspomnienie',
     memoryDeleted: 'Wspomnienie usunięte.',
     memoryUndoDelete: 'Cofnij',
+    checkInDeleted: 'Meldunek dnia usunięty.',
+    checkInUndoDelete: 'Cofnij',
+    deleteCheckIn: 'Usuń meldunek dnia',
+    missionDeleted: 'Misja usunięta.',
+    missionUndoDelete: 'Cofnij',
+    deleteMission: 'Usuń misję',
     profileActive: 'Profil aktywny',
-    markComplete: 'Oznacz jako ukonczone',
-    honeycombProgress: 'Postep ula',
-    recentCheckins: 'Ostatnie check-iny',
-    completionHistory: 'Historia ukonczen'
+    markComplete: 'Oznacz jako ukończone',
+    honeycombProgress: 'Postęp ula',
+    recentCheckins: 'Twoje ostatnie chwile',
+    completionHistory: 'Historia ukończeń',
+    nickname: 'Pseudonim',
+    birthYear: 'Rok urodzenia',
+    avatarSeed: 'Nazwa awatara',
+    english: 'Angielski',
+    polish: 'Polski',
+    logout: 'Wyloguj',
+    moodHeavy: 'Ciężko',
+    moodOkay: 'Okej',
+    moodGood: 'Dobrze',
+    hiveTitle: 'Twój ul',
+    hiveAriaLabel: 'Twój ul — postęp',
+    memoryFallbackTitle: 'Wspomnienie',
+    friendshipStageAriaLabel: 'Etap relacji'
   }
 };
 
@@ -331,6 +465,8 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const [friendshipToast, setFriendshipToast] = useState<{ message: string; avatarSrc: string } | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [pendingDeleteTimer, setPendingDeleteTimer] = useState<number | null>(null);
+  const [pendingDeleteCheckInId, setPendingDeleteCheckInId] = useState<string | null>(null);
+  const [pendingDeleteMissionId, setPendingDeleteMissionId] = useState<string | null>(null);
 
   const [worldType, setWorldType] = useState<'old_world' | 'new_world'>('old_world');
   const [memories, setMemories] = useState<MemoryEntry[]>([]);
@@ -356,8 +492,15 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const missionCheerTimer = useRef<number | null>(null);
   const friendshipDeleteTimer = useRef<number | null>(null);
   const memoryDeleteTimerRef = useRef<number | null>(null);
+  const checkInDeleteTimerRef = useRef<number | null>(null);
+  const missionCompletionDeleteTimerRef = useRef<number | null>(null);
 
   const text = copy[locale];
+  const moodLabels: Record<Mood, string> = {
+    heavy: locale === 'pl' ? text.moodHeavy : 'Heavy',
+    okay: locale === 'pl' ? text.moodOkay : 'Okay',
+    good: locale === 'pl' ? text.moodGood : 'Good'
+  };
   const getFriendshipStageLabel = (stage: FriendshipStage) => friendshipStageLabelMap[locale][stage];
 
   const triggerFeedback = (nextFeedback: ActiveFeedback) => {
@@ -423,6 +566,12 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   }, [worldType]);
 
   useEffect(() => {
+    if (!profileMissing) {
+      fetchMissions();
+    }
+  }, [locale, profileMissing]);
+
+  useEffect(() => {
     if (activeTab !== 'home') {
       setHomeAnimatedCellId(null);
     }
@@ -460,6 +609,16 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const visibleMemories = useMemo(
     () => sortedMemories.filter((entry) => entry.id !== pendingDeleteMemoryId),
     [sortedMemories, pendingDeleteMemoryId]
+  );
+
+  const visibleCheckIns = useMemo(
+    () => checkIns.filter((entry) => entry.id !== pendingDeleteCheckInId),
+    [checkIns, pendingDeleteCheckInId]
+  );
+
+  const visibleMissionCompletions = useMemo(
+    () => missionCompletions.filter((entry) => entry.id !== pendingDeleteMissionId),
+    [missionCompletions, pendingDeleteMissionId]
   );
 
   const homeAvatar = hasCheckInToday ? capyBeeAvatar.default : capyBeeAvatar.waving;
@@ -535,7 +694,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
 
   const fetchMissions = async () => {
     try {
-      const data = await request<Mission[]>('/api/missions?active=true');
+      const data = await request<Mission[]>(`/api/missions?active=true&locale=${locale}`);
       setMissions(data);
     } catch (error) {
       console.error(error);
@@ -765,7 +924,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       setFriendStage('noticed');
       await fetchFriendships();
       setFriendshipToast({
-        message: pickFriendshipPhrase(friendStage, friendLabel || 'them'),
+        message: pickFriendshipPhrase(friendStage, friendLabel || (locale === 'pl' ? 'kogoś' : 'them')),
         avatarSrc: resolveFriendshipAvatar(friendStage)
       });
       if (activeTab === 'home') {
@@ -891,6 +1050,78 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     setPendingDeleteMemoryId(null);
   };
 
+  const commitCheckInDelete = async (id: string) => {
+    setPendingDeleteCheckInId((current) => (current === id ? null : current));
+    try {
+      await request<void>(`/api/check-ins/${id}`, { method: 'DELETE' });
+      await fetchCheckIns();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const requestDeleteCheckIn = (id: string) => {
+    // Only one pending delete at a time — if another is already waiting, commit it now.
+    if (pendingDeleteCheckInId && pendingDeleteCheckInId !== id) {
+      if (checkInDeleteTimerRef.current) {
+        window.clearTimeout(checkInDeleteTimerRef.current);
+      }
+      commitCheckInDelete(pendingDeleteCheckInId);
+    }
+
+    setPendingDeleteCheckInId(id);
+    if (checkInDeleteTimerRef.current) {
+      window.clearTimeout(checkInDeleteTimerRef.current);
+    }
+    checkInDeleteTimerRef.current = window.setTimeout(() => {
+      commitCheckInDelete(id);
+    }, 4000);
+  };
+
+  const undoCheckInDelete = () => {
+    if (checkInDeleteTimerRef.current) {
+      window.clearTimeout(checkInDeleteTimerRef.current);
+      checkInDeleteTimerRef.current = null;
+    }
+    setPendingDeleteCheckInId(null);
+  };
+
+  const commitMissionCompletionDelete = async (id: string) => {
+    setPendingDeleteMissionId((current) => (current === id ? null : current));
+    try {
+      await request<void>(`/api/missions/completions/${id}`, { method: 'DELETE' });
+      await fetchMissionCompletions();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const requestDeleteMissionCompletion = (id: string) => {
+    // Only one pending delete at a time — if another is already waiting, commit it now.
+    if (pendingDeleteMissionId && pendingDeleteMissionId !== id) {
+      if (missionCompletionDeleteTimerRef.current) {
+        window.clearTimeout(missionCompletionDeleteTimerRef.current);
+      }
+      commitMissionCompletionDelete(pendingDeleteMissionId);
+    }
+
+    setPendingDeleteMissionId(id);
+    if (missionCompletionDeleteTimerRef.current) {
+      window.clearTimeout(missionCompletionDeleteTimerRef.current);
+    }
+    missionCompletionDeleteTimerRef.current = window.setTimeout(() => {
+      commitMissionCompletionDelete(id);
+    }, 4000);
+  };
+
+  const undoMissionCompletionDelete = () => {
+    if (missionCompletionDeleteTimerRef.current) {
+      window.clearTimeout(missionCompletionDeleteTimerRef.current);
+      missionCompletionDeleteTimerRef.current = null;
+    }
+    setPendingDeleteMissionId(null);
+  };
+
   if (profileMissing) {
     return (
       <main className="app-shell">
@@ -904,12 +1135,12 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
 
           <form className="stack-form" onSubmit={createProfile}>
             <label>
-              Nickname
+              {text.nickname}
               <input value={setupNickname} onChange={(event) => setSetupNickname(event.target.value)} required />
             </label>
 
             <label>
-              Birth year
+              {text.birthYear}
               <input
                 type="number"
                 value={setupBirthYear}
@@ -924,13 +1155,13 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                 value={setupLocale}
                 onChange={(event) => setSetupLocale(event.target.value as 'en' | 'pl')}
               >
-                <option value="en">English</option>
-                <option value="pl">Polski</option>
+                <option value="en">{text.english}</option>
+                <option value="pl">{text.polish}</option>
               </select>
             </label>
 
             <label>
-              Avatar seed
+              {text.avatarSeed}
               <input value={setupAvatarSeed} onChange={(event) => setSetupAvatarSeed(event.target.value)} />
             </label>
 
@@ -970,7 +1201,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
               <option value="pl">PL</option>
             </select>
           </label>
-          <a href="/logout" className="secondary-button">Log out</a>
+          <a href="/logout" className="secondary-button">{text.logout}</a>
         </div>
       </header>
 
@@ -996,7 +1227,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                         onChange={(event) => setMood(event.target.value as Mood)}
                       />
                       <CapyBeeAvatar src={moodPickerAvatar(value)} size={72} className="mood-avatar" />
-                      <span className="mood-label">{value}</span>
+                      <span className="mood-label">{moodLabels[value]}</span>
                     </label>
                   ))}
                 </div>
@@ -1023,10 +1254,10 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
             <section className="panel">
               <h3>{text.honeycombProgress}</h3>
               <div className="honeycomb-card">
-                <h4 className="honeycomb-heading">{locale === 'pl' ? 'Twoj ul' : 'Your hive'}</h4>
+                <h4 className="honeycomb-heading">{locale === 'pl' ? text.hiveTitle : 'Your hive'}</h4>
                 <HoneycombMap
                   cells={homeHoneycombCells}
-                  ariaLabel={locale === 'pl' ? 'Twoj ul - postep' : 'Your hive - progress'}
+                  ariaLabel={locale === 'pl' ? text.hiveAriaLabel : 'Your hive - progress'}
                   animatedCellId={homeAnimatedCellId}
                 />
               </div>
@@ -1034,26 +1265,38 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
 
             <section className="panel">
               <h3>{text.recentCheckins}</h3>
-              {checkIns.length === 0 ? <p>{text.noItems}</p> : (
+              {visibleCheckIns.length === 0 ? <p>{text.noItems}</p> : (
                 <div className="list-stack">
-                  {[...checkIns].reverse().slice(0, 10).map((entry, index) => (
-                    <motion.article
-                      key={entry.id}
-                      className="list-card"
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.04 }}
-                    >
-                      <div className="line-between checkin-row">
-                        <div className="checkin-headline">
-                          <CapyBeeAvatar src={checkInListFace(entry.mood)} size={32} />
-                          <strong>{entry.mood}</strong>
+                  {[...visibleCheckIns].reverse().slice(0, 10).map((entry, index) => {
+                    const isPendingDelete = pendingDeleteCheckInId === entry.id;
+                    return (
+                      <motion.article
+                        key={entry.id}
+                        className={`list-card ${isPendingDelete ? 'pending-delete' : ''}`}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: isPendingDelete ? 0.55 : 1, y: 0 }}
+                        transition={{ delay: index * 0.04 }}
+                      >
+                        <div className="line-between checkin-row">
+                          <div className="checkin-headline">
+                            <CapyBeeAvatar src={checkInListFace(entry.mood)} size={32} />
+                            <strong>{entry.mood}</strong>
+                          </div>
                         </div>
-                        <span>{new Date(entry.createdAt).toLocaleDateString(locale)}</span>
-                      </div>
-                      {entry.note ? <p>{entry.note}</p> : null}
-                    </motion.article>
-                  ))}
+                        {entry.note ? <p>{entry.note}</p> : null}
+                        <div className="line-between">
+                          <span>{new Date(entry.createdAt).toLocaleDateString(locale)}</span>
+                          <button
+                            className="icon-delete-button"
+                            onClick={() => requestDeleteCheckIn(entry.id)}
+                            aria-label={text.deleteCheckIn}
+                          >
+                            <TrashIcon />
+                          </button>
+                        </div>
+                      </motion.article>
+                    );
+                  })}
                 </div>
               )}
             </section>
@@ -1067,6 +1310,13 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                 <CapyBeeAvatar src={capyBeeAvatar.waving} size={96} />
                 <h2>{text.missions}</h2>
               </div>
+
+              <img
+                src={missionsTabImage}
+                alt=""
+                draggable={false}
+                className="world-tab-header-image"
+              />
 
               {visibleMissions.length === 0 ? (
                 <div className="capybee-center-block">
@@ -1089,8 +1339,8 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                             size={36}
                           />
                           <div className="mission-heading-block">
-                            <h3>{mission.title}</h3>
-                            <span className="mission-time-pill">{mission.timeHint}</span>
+                            <h3>{localizeMissionTitle(mission.code, mission.title, locale)}</h3>
+                            <span className="mission-time-pill">{localizeMissionTimeHint(mission.timeHint, locale)}</span>
                           </div>
                         </div>
 
@@ -1150,10 +1400,10 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
             <section className="panel">
               <h3>{text.honeycombProgress}</h3>
               <div className="honeycomb-card">
-                <h4 className="honeycomb-heading">{locale === 'pl' ? 'Twoj ul' : 'Your hive'}</h4>
+                <h4 className="honeycomb-heading">{locale === 'pl' ? text.hiveTitle : 'Your hive'}</h4>
                 <HoneycombMap
                   cells={homeHoneycombCells}
-                  ariaLabel={locale === 'pl' ? 'Twoj ul - postep' : 'Your hive - progress'}
+                  ariaLabel={locale === 'pl' ? text.hiveAriaLabel : 'Your hive - progress'}
                   animatedCellId={homeAnimatedCellId}
                 />
               </div>
@@ -1161,25 +1411,43 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
 
             <section className="panel">
               <h3>{text.completionHistory}</h3>
-              {missionCompletions.length === 0 ? (
+              {visibleMissionCompletions.length === 0 ? (
                 <div className="capybee-center-block">
                   <CapyBeeAvatar src={capyBeeAvatar.default} size={120} />
                   <p className="empty-copy">{text.missionHistoryEmpty}</p>
                 </div>
               ) : (
                 <div className="list-stack">
-                  {[...missionCompletions].reverse().slice(0, 20).map((entry) => (
-                    <article key={entry.id} className="list-card">
-                      <div className="line-between checkin-row">
-                        <div className="checkin-headline">
-                          <CapyBeeAvatar src={capyBeeAvatar.faceHappy} size={32} />
-                          <strong>{entry.title}</strong>
+                  {[...visibleMissionCompletions].reverse().slice(0, 20).map((entry) => {
+                    const isPendingDelete = pendingDeleteMissionId === entry.id;
+                    return (
+                      <motion.article
+                        key={entry.id}
+                        className={`list-card ${isPendingDelete ? 'pending-delete' : ''}`}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: isPendingDelete ? 0.55 : 1, y: 0 }}
+                        transition={{ duration: 0.18 }}
+                      >
+                        <div className="line-between checkin-row">
+                          <div className="checkin-headline">
+                            <CapyBeeAvatar src={capyBeeAvatar.faceHappy} size={32} />
+                            <strong>{localizeMissionTitle(entry.missionCode, entry.title, locale)}</strong>
+                          </div>
                         </div>
-                        <span>{new Date(entry.completedAt).toLocaleDateString(locale)}</span>
-                      </div>
-                      {entry.note ? <p>{entry.note}</p> : null}
-                    </article>
-                  ))}
+                        {entry.note ? <p>{entry.note}</p> : null}
+                        <div className="line-between">
+                          <span>{new Date(entry.completedAt).toLocaleDateString(locale)}</span>
+                          <button
+                            className="icon-delete-button"
+                            onClick={() => requestDeleteMissionCompletion(entry.id)}
+                            aria-label={text.deleteMission}
+                          >
+                            <TrashIcon />
+                          </button>
+                        </div>
+                      </motion.article>
+                    );
+                  })}
                 </div>
               )}
             </section>
@@ -1193,6 +1461,14 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                 <CapyBeeAvatar src={capyBeeAvatar.waving} size={96} />
                 <h2>{text.friendships}</h2>
               </div>
+
+              <img
+                src={friendshipsTabImage}
+                alt=""
+                draggable={false}
+                className="world-tab-header-image"
+              />
+
               <form className="stack-form" onSubmit={addFriendship}>
                 <label>
                   {text.person}
@@ -1204,6 +1480,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                     value={friendStage}
                     onChange={(stage) => setFriendStage(stage)}
                     getLabel={(stage) => getFriendshipStageLabel(stage)}
+                    ariaLabel={locale === 'pl' ? text.friendshipStageAriaLabel : 'Friendship stage'}
                   />
                 </label>
                 <label>
@@ -1214,17 +1491,17 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                     placeholder={text.friendshipNotePlaceholder}
                   />
                 </label>
-                <button className="primary-button" type="submit">{text.addEntry}</button>
+                <button className="primary-button" type="submit">{locale === 'pl' ? 'Dodaj' : 'Add'}</button>
               </form>
             </section>
 
             <section className="panel">
               <h3>{text.honeycombProgress}</h3>
               <div className="honeycomb-card">
-                <h4 className="honeycomb-heading">{locale === 'pl' ? 'Twoj ul' : 'Your hive'}</h4>
+                <h4 className="honeycomb-heading">{locale === 'pl' ? text.hiveTitle : 'Your hive'}</h4>
                 <HoneycombMap
                   cells={homeHoneycombCells}
-                  ariaLabel={locale === 'pl' ? 'Twoj ul - postep' : 'Your hive - progress'}
+                  ariaLabel={locale === 'pl' ? text.hiveAriaLabel : 'Your hive - progress'}
                   animatedCellId={homeAnimatedCellId}
                 />
               </div>
@@ -1263,9 +1540,16 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                           </div>
                         </div>
                         {entry.note ? <p className="friendship-card__note">{entry.note}</p> : null}
-                        <button className="friendship-card__remove" onClick={() => handleFriendshipRemoveClick(entry.id)}>
-                          {text.friendshipRemove}
-                        </button>
+                        <div className="line-between">
+                          <span></span>
+                          <button
+                            className="icon-delete-button"
+                            onClick={() => handleFriendshipRemoveClick(entry.id)}
+                            aria-label={text.friendshipRemove}
+                          >
+                            <TrashIcon />
+                          </button>
+                        </div>
                       </motion.article>
                     );
                   })}
@@ -1319,14 +1603,16 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                     required
                   />
                 </label>
-                <label className="checkbox-inline">
-                  <input
-                    type="checkbox"
-                    checked={memoryFavorite}
-                    onChange={(event) => setMemoryFavorite(event.target.checked)}
-                  />
-                  {text.favoriteMemory}
-                </label>
+                <button
+                  type="button"
+                  className={memoryFavorite ? 'memory-favorite-toggle checked' : 'memory-favorite-toggle'}
+                  onClick={() => setMemoryFavorite((current) => !current)}
+                  aria-pressed={memoryFavorite}
+                  aria-label={text.favoriteMemory}
+                >
+                  <span className="memory-favorite-toggle__icon" aria-hidden="true">⭐</span>
+                  <span className="memory-favorite-toggle__label">{text.favoriteMemory}</span>
+                </button>
                 <button className="primary-button" type="submit">{text.addMemory}</button>
               </form>
             </section>
@@ -1334,10 +1620,10 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
             <section className="panel">
               <h3>{text.honeycombProgress}</h3>
               <div className="honeycomb-card">
-                <h4 className="honeycomb-heading">{locale === 'pl' ? 'Twoj ul' : 'Your hive'}</h4>
+                <h4 className="honeycomb-heading">{locale === 'pl' ? text.hiveTitle : 'Your hive'}</h4>
                 <HoneycombMap
                   cells={homeHoneycombCells}
-                  ariaLabel={locale === 'pl' ? 'Twoj ul - postep' : 'Your hive - progress'}
+                  ariaLabel={locale === 'pl' ? text.hiveAriaLabel : 'Your hive - progress'}
                   animatedCellId={homeAnimatedCellId}
                 />
               </div>
@@ -1357,7 +1643,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                   {visibleMemories.map((entry) => (
                     <article key={entry.id} className="list-card memory-card">
                       <div className="line-between">
-                        <strong>{entry.title || 'Memory'}</strong>
+                        <strong>{entry.title || (locale === 'pl' ? text.memoryFallbackTitle : 'Memory')}</strong>
                         <button
                           className={entry.isFavorite ? 'favorite-star active' : 'favorite-star'}
                           onClick={() => toggleFavorite(entry)}
@@ -1401,7 +1687,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
               }}
             >
               <label>
-                Nickname
+                {text.nickname}
                 <input
                   value={profile.nickname}
                   onChange={(event) => setProfile({ ...profile, nickname: event.target.value })}
@@ -1409,7 +1695,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
               </label>
 
               <label>
-                Birth year
+                {text.birthYear}
                 <input
                   type="number"
                   value={profile.birthYear ?? ''}
@@ -1421,32 +1707,38 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
               </label>
 
               <label>
+                {text.language}
                 <select
                   aria-label={text.language}
                   value={profile.preferredLocale}
                   onChange={(event) => setProfile({ ...profile, preferredLocale: event.target.value as 'en' | 'pl' })}
                 >
-                  <option value="en">English</option>
-                  <option value="pl">Polski</option>
+                  <option value="en">{text.english}</option>
+                  <option value="pl">{text.polish}</option>
                 </select>
               </label>
 
               <label>
-                Avatar seed
+                {text.avatarSeed}
                 <input
                   value={profile.avatarSeed ?? ''}
                   onChange={(event) => setProfile({ ...profile, avatarSeed: event.target.value })}
                 />
               </label>
 
-              <label className="checkbox-inline">
-                <input
-                  type="checkbox"
-                  checked={profile.active}
-                  onChange={(event) => setProfile({ ...profile, active: event.target.checked })}
-                />
-                {text.profileActive}
-              </label>
+              <div className="profile-switch-row">
+                <span>{text.profileActive}</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={profile.active}
+                  aria-label={text.profileActive}
+                  className={profile.active ? 'profile-switch checked' : 'profile-switch'}
+                  onClick={() => setProfile({ ...profile, active: !profile.active })}
+                >
+                  <span className="profile-switch__thumb" aria-hidden="true" />
+                </button>
+              </div>
 
               <button className="primary-button" type="submit">{text.save}</button>
             </form>
@@ -1488,6 +1780,20 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
         <aside className="skip-undo-toast" role="status" aria-live="polite">
           <span>{text.memoryDeleted}</span>
           <button type="button" onClick={undoMemoryDelete}>{text.memoryUndoDelete}</button>
+        </aside>
+      ) : null}
+
+      {pendingDeleteCheckInId ? (
+        <aside className="skip-undo-toast" role="status" aria-live="polite">
+          <span>{text.checkInDeleted}</span>
+          <button type="button" onClick={undoCheckInDelete}>{text.checkInUndoDelete}</button>
+        </aside>
+      ) : null}
+
+      {pendingDeleteMissionId ? (
+        <aside className="skip-undo-toast" role="status" aria-live="polite">
+          <span>{text.missionDeleted}</span>
+          <button type="button" onClick={undoMissionCompletionDelete}>{text.missionUndoDelete}</button>
         </aside>
       ) : null}
 
