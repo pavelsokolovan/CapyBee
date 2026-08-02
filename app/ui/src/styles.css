@@ -535,6 +535,23 @@ a:hover {
   gap: 10px;
 }
 
+.profile-nav-button {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(139, 107, 42, 0.2);
+  background: rgba(255, 255, 255, 0.72);
+  padding: 0;
+}
+
+.profile-nav-button.active {
+  border-color: rgba(139, 107, 42, 0.38);
+  box-shadow: 0 0 0 3px rgba(242, 178, 51, 0.24);
+}
+
 .locale-control {
   display: flex;
   align-items: center;
@@ -707,6 +724,40 @@ a:hover {
 
 .friendship-stage-selector__connector.active {
   background: rgba(242, 178, 51, 0.9);
+}
+
+@media (max-width: 480px) {
+  .friendship-stage-selector {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+
+  .friendship-stage-selector__step {
+    flex-direction: column;
+    align-items: stretch;
+    flex: none;
+  }
+
+  .friendship-stage-chip {
+    flex: none;
+    width: 100%;
+    justify-content: flex-start;
+    text-align: left;
+    border-radius: 14px;
+    padding: 10px 14px;
+  }
+
+  .friendship-stage-chip__label {
+    white-space: normal;
+  }
+
+  .friendship-stage-selector__connector {
+    flex: none;
+    width: 2px;
+    height: 14px;
+    margin-left: 22px;
+  }
 }
 
 .friendship-card {
@@ -1279,8 +1330,8 @@ a:hover {
   bottom: 10px;
   z-index: 50;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
   border: 1px solid var(--panel-border);
   background: rgba(255, 255, 255, 0.92);
   border-radius: 18px;
@@ -1289,16 +1340,32 @@ a:hover {
 }
 
 .nav-item {
-  min-height: 44px;
+  min-height: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   border-radius: 12px;
   border: 1px solid transparent;
   background: transparent;
-  font-size: 0.8rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 6px 2px;
+}
+
+.nav-item span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .nav-item.active {
   background: rgba(242, 178, 51, 0.18);
   border-color: rgba(139, 107, 42, 0.24);
+  color: var(--accent-strong);
 }
 
 .avatar {
@@ -1446,16 +1513,12 @@ a:hover {
 
   .auth-actions {
     width: 100%;
-    justify-content: space-between;
+    justify-content: flex-end;
+    flex-wrap: wrap;
   }
 
   .mood-selector {
     grid-template-columns: repeat(3, 1fr);
-  }
-
-  .bottom-nav {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    row-gap: 6px;
   }
 
   .honeycomb-map-shell {

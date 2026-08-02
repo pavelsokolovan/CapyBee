@@ -7,6 +7,7 @@ import { capybeePhrases, type CapyBeePhrasePoolKey } from './data/capybeePhrases
 import { HoneycombMap } from './components/HoneycombMap';
 import { FriendshipStageSelector } from './components/FriendshipStageSelector';
 import { FriendshipToast } from './components/FriendshipToast';
+import { HomeIcon, MissionsIcon, FriendshipsIcon, MemoriesIcon, ProfileIcon } from './components/NavIcons';
 import { useHoneycombCells } from './hooks/useHoneycombCells';
 import type { UseHoneycombCellsInput } from './hooks/useHoneycombCells';
 import oldWorldTabImage from './assets/honeycomb/old-world-tab.png';
@@ -260,6 +261,7 @@ const copy = {
     memories: 'Memories',
     profile: 'Profile',
     home: 'Home',
+    navLabel: 'Main navigation',
     oldWorld: 'Old World',
     newWorld: 'New World',
     language: 'Language',
@@ -342,6 +344,7 @@ const copy = {
     memories: 'Wspomnienia',
     profile: 'Profil',
     home: 'Start',
+    navLabel: 'Główna nawigacja',
     oldWorld: 'Stary Świat',
     newWorld: 'Nowy Świat',
     language: 'Język',
@@ -531,6 +534,12 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     good: locale === 'pl' ? text.moodGood : 'Good'
   };
   const getFriendshipStageLabel = (stage: FriendshipStage) => friendshipStageLabelMap[locale][stage];
+  const bottomNavItems = [
+    { key: 'home' as const, label: text.home, Icon: HomeIcon },
+    { key: 'missions' as const, label: text.missions, Icon: MissionsIcon },
+    { key: 'friendships' as const, label: text.friendships, Icon: FriendshipsIcon },
+    { key: 'memories' as const, label: text.memories, Icon: MemoriesIcon }
+  ];
 
   const triggerFeedback = (nextFeedback: ActiveFeedback) => {
     if (feedbackFadeOutTimer.current) window.clearTimeout(feedbackFadeOutTimer.current);
@@ -1215,6 +1224,15 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
           </div>
         </div>
         <div className="auth-actions">
+          <button
+            type="button"
+            className={activeTab === 'profile' ? 'profile-nav-button active' : 'profile-nav-button'}
+            onClick={() => setActiveTab('profile')}
+            aria-label={text.profile}
+            aria-current={activeTab === 'profile' ? 'page' : undefined}
+          >
+            <ProfileIcon active={activeTab === 'profile'} />
+          </button>
           <label className="locale-control">
             <select
               aria-label={text.language}
@@ -1827,22 +1845,22 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
         </aside>
       ) : null}
 
-      <nav className="bottom-nav">
-        {([
-          ['home', text.home],
-          ['missions', text.missions],
-          ['friendships', text.friendships],
-          ['memories', text.memories],
-          ['profile', text.profile]
-        ] as Array<[TabKey, string]>).map(([key, label]) => (
-          <button
-            key={key}
-            className={activeTab === key ? 'nav-item active' : 'nav-item'}
-            onClick={() => setActiveTab(key)}
-          >
-            {label}
-          </button>
-        ))}
+      <nav className="bottom-nav" aria-label={text.navLabel}>
+        {bottomNavItems.map(({ key, label, Icon }) => {
+          const isActive = activeTab === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              className={isActive ? 'nav-item active' : 'nav-item'}
+              onClick={() => setActiveTab(key)}
+              aria-current={isActive ? 'page' : undefined}
+            >
+              <Icon active={isActive} />
+              <span>{label}</span>
+            </button>
+          );
+        })}
       </nav>
     </main>
   );
