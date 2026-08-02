@@ -4,99 +4,107 @@ import { AuthenticatedHome } from './AuthenticatedHome';
 import type { UserProfile } from './AuthenticatedHome';
 import { CapyBeeAvatar, CapyBeeBubble, capyBeeAvatar } from './capybee';
 
-const landingCopy = {
+const authCopy = {
   en: {
     loading: 'One moment...',
     sessionExpired: "Hey, you're back! Sign in again.",
-    signIn: 'Sign in',
-    eyebrow: 'CapyBee concept scaffold',
-    heroTitle: 'Gentle software for a harder transition.',
-    heroLead:
-      'CapyBee helps children settle into a new country with gentle daily check-ins, tiny real-world missions, and private spaces for old and new memories.',
-    continueWithGoogle: 'Continue with Google',
-    viewOverview: 'View app overview',
-    firstScreen: 'First screen',
-    welcomeHive: 'Welcome to your hive.',
-    heroCardLead: 'A safe first release for families: simple setup, warm tone, and one small step at a time.',
-    builtForMilestone: 'Built for the first milestone',
-    scaffoldSupports: 'What the scaffold already supports',
-    firstReleaseShape: 'First release shape',
-    afterSignIn: 'What happens after sign-in',
-    profileSetup: 'Profile setup',
-    profileSetupDescription: 'Parent creates one child profile using nickname and language preference.',
-    dailyFlow: 'Daily flow',
-    dailyFlowDescription: 'Child can check in, finish a mission, and track tiny social progress privately.',
-    twoWorlds: 'Two worlds',
-    twoWorldsDescription: 'Old World and New World memories are stored side-by-side, never replacing each other.',
-    highlights: [
-      {
-        title: 'Google sign-in',
-        description: 'Parent login starts with Google OAuth and opens a private family space.'
-      },
-      {
-        title: 'Child profile setup',
-        description: 'Create one child profile with nickname and language preference in a few taps.'
-      },
-      {
-        title: 'Daily support loop',
-        description: 'Check-ins, missions, friendship notes, and memories are all stored safely for one family.'
-      },
-      {
-        title: 'Mobile-first experience',
-        description: 'Core flows are optimized for phones so children can use CapyBee in short, calm sessions.'
-      }
-    ]
+    signIn: 'Sign in'
   },
   pl: {
     loading: 'Chwileczkę...',
     sessionExpired: 'Hej, wróciłeś! Zaloguj się ponownie.',
-    signIn: 'Zaloguj się',
-    eyebrow: 'Szkielet koncepcji CapyBee',
-    heroTitle: 'Łagodne wsparcie na trudniejszy czas zmiany.',
-    heroLead:
-      'CapyBee pomaga dzieciom odnaleźć się w nowym kraju dzięki codziennym, spokojnym meldunkom, małym misjom w prawdziwym świecie oraz bezpiecznej przestrzeni na stare i nowe wspomnienia.',
-    continueWithGoogle: 'Kontynuuj z Google',
-    viewOverview: 'Zobacz przegląd aplikacji',
-    firstScreen: 'Pierwszy ekran',
-    welcomeHive: 'Witaj w swoim ulu.',
-    heroCardLead: 'Bezpieczna pierwsza wersja dla rodzin: prosty start, ciepły ton i jeden mały krok naraz.',
-    builtForMilestone: 'Zaprojektowane na pierwszy etap',
-    scaffoldSupports: 'Co już wspiera ten szkielet',
-    firstReleaseShape: 'Kształt pierwszego wydania',
-    afterSignIn: 'Co dzieje się po zalogowaniu',
-    profileSetup: 'Konfiguracja profilu',
-    profileSetupDescription: 'Rodzic tworzy jeden profil dziecka z pseudonimem i preferowanym językiem.',
-    dailyFlow: 'Codzienny rytm',
-    dailyFlowDescription: 'Dziecko może zrobić meldunek dnia, wykonać misję i prywatnie śledzić małe postępy społeczne.',
-    twoWorlds: 'Dwa światy',
-    twoWorldsDescription: 'Wspomnienia ze Starego i Nowego Świata są przechowywane obok siebie, bez zastępowania jednych drugimi.',
-    highlights: [
+    signIn: 'Zaloguj się'
+  }
+} as const;
+
+const landingCopy = {
+  en: {
+    tagline: 'Together we build a new hive',
+    heroTitle: 'Hey, you found the hive.',
+    heroLine: "Let's settle in - one small step at a time.",
+    ctaPrimary: 'Continue with Google',
+    trustLine: 'Private. No ads. Just for your family.',
+    featuresHeading: 'How CapyBee helps',
+    featuresEyebrow: 'What your child actually does',
+    features: [
       {
-        title: 'Logowanie przez Google',
-        description: 'Rodzic loguje się przez Google OAuth i otwiera prywatną przestrzeń rodziny.'
+        title: 'A 2-minute daily check-in',
+        body: 'Not a questionnaire - just "heavy, okay, or good?" CapyBee responds with warmth, never a lecture.'
       },
       {
-        title: 'Profil dziecka',
-        description: 'W kilku kliknięciach tworzysz profil dziecka z pseudonimem i preferowanym językiem.'
+        title: 'Two worlds, side by side',
+        body: 'Old World memories and New World wins live together in one hive. Nothing gets deleted, nothing has to be replaced.'
       },
       {
-        title: 'Codzienna pętla wsparcia',
-        description: 'Meldunki dnia, misje, notatki o relacjach i wspomnienia są bezpiecznie przechowywane dla jednej rodziny.'
+        title: 'Small, real-world missions',
+        body: 'Gentle nudges like saying hi to one person - always optional, never punished for skipping.'
       },
       {
-        title: 'Doświadczenie mobile-first',
-        description: 'Kluczowe ścieżki są zoptymalizowane pod telefon, aby dzieci mogły korzystać z CapyBee krótko i spokojnie.'
+        title: 'A private friendship tracker',
+        body: 'A quiet place to notice small social steps. No public profiles, no strangers, ever.'
+      }
+    ],
+    afterHeading: 'What happens after you sign in',
+    afterEyebrow: 'First session',
+    after: [
+      {
+        title: 'Profile setup',
+        body: "You create one child profile with a nickname and a language preference - that's it."
+      },
+      {
+        title: 'Daily flow',
+        body: 'Your child checks in, tries a small mission, and quietly tracks social progress - five minutes, max.'
+      },
+      {
+        title: 'Two worlds',
+        body: 'Old World and New World memories are stored side by side, never replacing each other.'
+      }
+    ]
+  },
+  pl: {
+    tagline: 'Razem budujemy nowy ul',
+    heroTitle: 'Hej, znalazłeś nasz ul.',
+    heroLine: 'Urządzimy się tu małymi krokami.',
+    ctaPrimary: 'Kontynuuj z Google',
+    trustLine: 'Prywatnie. Bez reklam. Tylko dla waszej rodziny.',
+    featuresHeading: 'Jak CapyBee pomaga',
+    featuresEyebrow: 'Co robi twoje dziecko',
+    features: [
+      {
+        title: '2-minutowy codzienny check-in',
+        body: 'To nie test. Tylko: ciężko, okej czy dobrze? CapyBee odpowiada ciepło i spokojnie.'
+      },
+      {
+        title: 'Dwa światy obok siebie',
+        body: 'Wspomnienia ze Starego Świata i nowe sukcesy żyją razem w jednym ulu.'
+      },
+      {
+        title: 'Małe misje w prawdziwym świecie',
+        body: 'Delikatne kroki, jak powiedzenie komuś cześć. Zawsze opcjonalnie, bez kar.'
+      },
+      {
+        title: 'Prywatny tracker znajomości',
+        body: 'Ciche miejsce na małe kroki społeczne. Bez obcych i bez publicznych profili.'
+      }
+    ],
+    afterHeading: 'Co dzieje się po zalogowaniu',
+    afterEyebrow: 'Pierwsza sesja',
+    after: [
+      {
+        title: 'Ustawienie profilu',
+        body: 'Tworzysz jeden profil dziecka z pseudonimem i językiem - i gotowe.'
+      },
+      {
+        title: 'Codzienny rytm',
+        body: 'Dziecko robi check-in, próbuje małej misji i zaznacza postępy - maksymalnie 5 minut.'
+      },
+      {
+        title: 'Dwa światy',
+        body: 'Wspomnienia ze Starego i Nowego Świata są obok siebie, nic nie znika.'
       }
     ]
   }
 } as const;
-
-const stats = [
-  { label: 'Stack', value: 'Spring Boot + React' },
-  { label: 'Auth', value: 'Google OAuth' },
-  { label: 'Database', value: 'PostgreSQL' },
-  { label: 'Deploy', value: 'Fly.io' }
-];
 
 function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -104,7 +112,8 @@ function App() {
   const [sessionExpired, setSessionExpired] = useState(false);
 
   const locale: 'pl' | 'en' = navigator.language.toLowerCase().startsWith('pl') ? 'pl' : 'en';
-  const text = landingCopy[locale];
+  const authText = authCopy[locale];
+  const t = landingCopy[locale];
 
   useEffect(() => {
     checkAuthStatus();
@@ -131,7 +140,7 @@ function App() {
     return (
       <main className="auth-loading">
         <CapyBeeAvatar src={capyBeeAvatar.default} size={120} />
-        <p>{text.loading}</p>
+        <p>{authText.loading}</p>
       </main>
     );
   }
@@ -145,10 +154,10 @@ function App() {
       <main className="auth-loading">
         <CapyBeeAvatar src={capyBeeAvatar.waving} size={120} />
         <CapyBeeBubble
-          text={text.sessionExpired}
+          text={authText.sessionExpired}
         />
         <a className="primary-button" href="/oauth2/authorization/google">
-          {text.signIn}
+          {authText.signIn}
         </a>
       </main>
     );
@@ -156,49 +165,36 @@ function App() {
 
   return (
     <main className="page-shell">
-      <section className="hero">
-        <div className="hero-copy">
-          <CapyBeeAvatar src={capyBeeAvatar.waving} size={200} alt="CapyBee" className="hero-capybee" />
-          <span className="eyebrow">{text.eyebrow}</span>
-          <h1>{text.heroTitle}</h1>
-          <p className="lead">{text.heroLead}</p>
-          <div className="hero-actions">
-            <a className="primary-button" href="/oauth2/authorization/google">
-              {text.continueWithGoogle}
-            </a>
-            <a className="secondary-button" href="#overview">
-              {text.viewOverview}
-            </a>
-          </div>
-        </div>
+      <div className="landing-hex-bg" aria-hidden="true">
+        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="hexPattern" width="68" height="108" patternUnits="userSpaceOnUse" patternTransform="scale(1.4)">
+              <polygon points="32,2 62,18 62,54 32,70 2,54 2,18" fill="none" stroke="#f2b233" strokeWidth="1" strokeOpacity="0.08" />
+              <polygon points="32,72 62,88 62,124 32,140 2,124 2,88" fill="none" stroke="#f2b233" strokeWidth="1" strokeOpacity="0.08" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#hexPattern)" />
+        </svg>
+      </div>
 
-        <motion.aside
-          className="hero-card"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: 'easeOut' }}
-        >
-          <div className="hero-card-badge">{text.firstScreen}</div>
-          <h2>{text.welcomeHive}</h2>
-          <p>{text.heroCardLead}</p>
-          <div className="hero-card-grid">
-            {stats.map((stat) => (
-              <div key={stat.label} className="stat-chip">
-                <span>{stat.label}</span>
-                <strong>{stat.value}</strong>
-              </div>
-            ))}
-          </div>
-        </motion.aside>
+      <section className="hero hero-minimal">
+        <CapyBeeAvatar src={capyBeeAvatar.waving} size={140} alt="CapyBee" className="hero-capybee" />
+        <span className="eyebrow">{t.tagline}</span>
+        <h1>{t.heroTitle}</h1>
+        <p className="hero-subline">{t.heroLine}</p>
+        <a className="primary-button" href="/oauth2/authorization/google">
+          {t.ctaPrimary}
+        </a>
+        <span className="trust-line">{t.trustLine}</span>
       </section>
 
       <section className="overview" id="overview">
         <div className="section-heading">
-          <span>{text.builtForMilestone}</span>
-          <h2>{text.scaffoldSupports}</h2>
+          <span>{t.featuresEyebrow}</span>
+          <h2>{t.featuresHeading}</h2>
         </div>
         <div className="feature-grid">
-          {text.highlights.map((item, index) => (
+          {t.features.map((item, index) => (
             <motion.article
               key={item.title}
               className="feature-card"
@@ -208,7 +204,7 @@ function App() {
             >
               <span className="feature-index">0{index + 1}</span>
               <h3>{item.title}</h3>
-              <p>{item.description}</p>
+              <p>{item.body}</p>
             </motion.article>
           ))}
         </div>
@@ -216,22 +212,16 @@ function App() {
 
       <section className="roadmap">
         <div className="section-heading compact">
-          <span>{text.firstReleaseShape}</span>
-          <h2>{text.afterSignIn}</h2>
+          <span>{t.afterEyebrow}</span>
+          <h2>{t.afterHeading}</h2>
         </div>
         <div className="roadmap-list">
-          <div>
-            <strong>{text.profileSetup}</strong>
-            <p>{text.profileSetupDescription}</p>
-          </div>
-          <div>
-            <strong>{text.dailyFlow}</strong>
-            <p>{text.dailyFlowDescription}</p>
-          </div>
-          <div>
-            <strong>{text.twoWorlds}</strong>
-            <p>{text.twoWorldsDescription}</p>
-          </div>
+          {t.after.map((item) => (
+            <div key={item.title}>
+              <strong>{item.title}</strong>
+              <p>{item.body}</p>
+            </div>
+          ))}
         </div>
       </section>
     </main>

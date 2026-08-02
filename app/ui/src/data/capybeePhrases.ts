@@ -1,4 +1,5 @@
 export type CapyBeePhrasePoolKey =
+  | 'homeGreeting'
   | 'moodHeavy'
   | 'moodOkay'
   | 'moodGood'
@@ -14,6 +15,18 @@ export type CapyBeePhrase = {
 };
 
 export const capybeePhrases: Record<CapyBeePhrasePoolKey, CapyBeePhrase[]> = {
+  homeGreeting: [
+    { en: 'Hey! How was today?', pl: 'Hej! Jak było dziś?' },
+    { en: "Hi there! What's today been like?", pl: 'Cześć! Jak minął dzisiejszy dzień?' },
+    { en: "Hey, good to see you! How's today going?", pl: 'Hej, dobrze cię widzieć! Jak leci dzisiaj?' },
+    { en: "Hi! I've been buzzing around waiting for you.", pl: 'Cześć! Bzyczałem tu na ciebie.' },
+    { en: "Hey you! How's today feeling?", pl: 'Hej, to ty! Jak się dziś czujesz?' },
+    { en: 'Hi! Ready to check in?', pl: 'Cześć! Gotowy na check-in?' },
+    { en: "Hey! Glad you're here. How was today?", pl: 'Hej! Fajnie, że jesteś. Jak było dziś?' },
+    { en: "Hi! What's going on in your hive today?", pl: 'Cześć! Co słychać w twoim ulu dzisiaj?' },
+    { en: "Hey, welcome back! How's today shaping up?", pl: 'Hej, witaj z powrotem! Jak wygląda dzisiaj?' },
+    { en: "Hi! I saved you a spot. How's today?", pl: 'Cześć! Zostawiłem ci miejsce. Jak dziś?' }
+  ],
   moodHeavy: [
     { en: "That sounds really hard. I'm here.", pl: 'To brzmi naprawdę ciężko. Jestem obok.' },
     { en: 'Heavy days happen. You showed up anyway.', pl: 'Ciężkie dni się zdarzają. A ty i tak się pojawiłeś.' },

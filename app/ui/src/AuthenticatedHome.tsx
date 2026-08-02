@@ -3,7 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { CapyBeeAvatar, CapyBeeBubble, capyBeeAvatar, sameCalendarDay } from './capybee';
 import { useCapyBeePhrase } from './hooks/useCapyBeePhrase';
 import { useFriendshipAddedPhrase } from './hooks/useFriendshipAddedPhrase';
-import type { CapyBeePhrasePoolKey } from './data/capybeePhrases';
+import { capybeePhrases, type CapyBeePhrasePoolKey } from './data/capybeePhrases';
 import { HoneycombMap } from './components/HoneycombMap';
 import { FriendshipStageSelector } from './components/FriendshipStageSelector';
 import { FriendshipToast } from './components/FriendshipToast';
@@ -431,6 +431,34 @@ function checkInListFace(mood: string) {
   return capyBeeAvatar.faceHappy;
 }
 
+const HOME_GREETING_LAST_INDEX_KEY = 'capybee.homeGreeting.lastIndex';
+
+function pickHomeGreetingIndex() {
+  const pool = capybeePhrases.homeGreeting;
+  if (pool.length === 0) return 0;
+
+  if (typeof window === 'undefined') {
+    return Math.floor(Math.random() * pool.length);
+  }
+
+  let lastIndex: number | null = null;
+  const raw = window.sessionStorage.getItem(HOME_GREETING_LAST_INDEX_KEY);
+  if (raw !== null) {
+    const parsed = Number.parseInt(raw, 10);
+    if (Number.isInteger(parsed) && parsed >= 0 && parsed < pool.length) {
+      lastIndex = parsed;
+    }
+  }
+
+  let index = 0;
+  do {
+    index = Math.floor(Math.random() * pool.length);
+  } while (pool.length > 1 && index === lastIndex);
+
+  window.sessionStorage.setItem(HOME_GREETING_LAST_INDEX_KEY, String(index));
+  return index;
+}
+
 export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const prefersReducedMotion = useReducedMotion();
   const [activeTab, setActiveTab] = useState<TabKey>('home');
@@ -476,6 +504,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const [memoryFavorite, setMemoryFavorite] = useState(false);
   const [pendingDeleteMemoryId, setPendingDeleteMemoryId] = useState<string | null>(null);
   const [homeAnimatedCellId, setHomeAnimatedCellId] = useState<string | null>(null);
+  const [homeGreetingIndex] = useState(() => pickHomeGreetingIndex());
 
 
   const [setupNickname, setSetupNickname] = useState('');
@@ -621,8 +650,9 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     [missionCompletions, pendingDeleteMissionId]
   );
 
+  const homeGreeting = capybeePhrases.homeGreeting[homeGreetingIndex] ?? capybeePhrases.homeGreeting[0];
   const homeAvatar = hasCheckInToday ? capyBeeAvatar.default : capyBeeAvatar.waving;
-  const homeAvatarBubble = hasCheckInToday ? text.greetingReturning : text.greetingFirstVisit;
+  const homeAvatarBubble = locale === 'pl' ? (homeGreeting?.pl ?? homeGreeting?.en ?? '') : (homeGreeting?.en ?? homeGreeting?.pl ?? '');
 
   const homeHoneycombCells = useHoneycombCells({
     checkIns,
