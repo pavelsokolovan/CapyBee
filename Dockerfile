@@ -15,7 +15,7 @@ RUN mvn -B -DskipTests package
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
-ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75 -Dfile.encoding=UTF-8"
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75 -Xss256k -Dfile.encoding=UTF-8"
 COPY --from=server-build /workspace/app/server/target/capybee-server-0.0.1-SNAPSHOT.jar /app/app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
