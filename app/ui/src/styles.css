@@ -509,18 +509,26 @@ a:hover {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: 10px;
+  padding: 10px 12px;
 }
 
 .auth-user {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .auth-user h1 {
   margin: 0;
-  font-size: clamp(1.1rem, 4vw, 1.5rem);
+  font-size: clamp(0.98rem, 3.6vw, 1.2rem);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: clamp(120px, 38vw, 220px);
 }
 
 .auth-user p {
@@ -532,12 +540,14 @@ a:hover {
 .auth-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
 }
 
 .profile-nav-button {
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -555,9 +565,34 @@ a:hover {
 .locale-control {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-size: 0.85rem;
   color: var(--muted);
+}
+
+.locale-control select {
+  width: auto;
+  min-width: 58px;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  line-height: 1;
+}
+
+.auth-actions .secondary-button {
+  min-height: 36px;
+  padding: 0 10px;
+  font-size: 0.82rem;
+}
+
+.logout-button {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.logout-label-short {
+  display: none;
 }
 
 .locale-control select,
@@ -1369,8 +1404,8 @@ a:hover {
 }
 
 .avatar {
-  width: 48px;
-  height: 48px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   object-fit: cover;
 }
@@ -1507,14 +1542,59 @@ a:hover {
 
 @media (max-width: 640px) {
   .auth-topbar {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 9px 10px;
   }
 
   .auth-actions {
-    width: 100%;
+    width: auto;
     justify-content: flex-end;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+
+  .auth-user {
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 8px;
+  }
+
+  .auth-user h1 {
+    max-width: clamp(120px, 40vw, 168px);
+    font-size: clamp(0.95rem, 3.8vw, 1.05rem);
+  }
+
+  .profile-nav-button {
+    width: 34px;
+    height: 34px;
+  }
+
+  .locale-control select {
+    min-width: 52px;
+    padding: 5px 8px;
+  }
+
+  .auth-actions .secondary-button {
+    min-height: 34px;
+    padding: 0 8px;
+    font-size: 0.78rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .auth-user h1 {
+    max-width: clamp(116px, 36vw, 144px);
+  }
+
+  .logout-label-full {
+    display: none;
+  }
+
+  .logout-label-short {
+    display: inline;
   }
 
   .mood-selector {

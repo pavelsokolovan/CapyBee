@@ -526,6 +526,8 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const memoryDeleteTimerRef = useRef<number | null>(null);
   const checkInDeleteTimerRef = useRef<number | null>(null);
   const missionCompletionDeleteTimerRef = useRef<number | null>(null);
+  const worldTypeRef = useRef<'old_world' | 'new_world'>(worldType);
+  const memoriesFetchAbortRef = useRef<AbortController | null>(null);
 
   const text = copy[locale];
   const moodLabels: Record<Mood, string> = {
@@ -598,10 +600,14 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   }, [profileMissing]);
 
   useEffect(() => {
-    if (!profileMissing) {
-      fetchMemories(worldType);
-    }
+    worldTypeRef.current = worldType;
   }, [worldType]);
+
+  useEffect(() => {
+    if (activeTab === 'memories' && !profileMissing) {
+      fetchAllMemories();
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (!profileMissing) {
@@ -636,13 +642,13 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   }, [friendships]);
 
   const sortedMemories = useMemo(() => {
-    return [...memories].sort((a, b) => {
+    return [...allMemories].sort((a, b) => {
       if (a.isFavorite !== b.isFavorite) {
         return a.isFavorite ? -1 : 1;
       }
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
-  }, [memories]);
+  }, [allMemories]);
 
   const visibleMemories = useMemo(
     () => sortedMemories.filter((entry) => entry.id !== pendingDeleteMemoryId),
@@ -759,11 +765,21 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   };
 
   const fetchMemories = async (targetWorld: 'old_world' | 'new_world') => {
+    memoriesFetchAbortRef.current?.abort();
+    const controller = new AbortController();
+    memoriesFetchAbortRef.current = controller;
     try {
-      const data = await request<MemoryEntry[]>(`/api/memories?worldType=${targetWorld}`);
-      setMemories(data);
+      const data = await request<MemoryEntry[]>(
+        `/api/memories?worldType=${targetWorld}`,
+        { signal: controller.signal }
+      );
+      if (worldTypeRef.current === targetWorld) {
+        setMemories(data);
+      }
     } catch (error) {
-      console.error(error);
+      if ((error as Error).name !== 'AbortError') {
+        console.error(error);
+      }
     }
   };
 
@@ -1217,9 +1233,9 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     <main className="app-shell">
       <header className="auth-topbar panel">
         <div className="auth-user">
-          <CapyBeeAvatar src={capyBeeAvatar.faceHappy} size={48} alt={user.displayName} className="avatar" />
+          <CapyBeeAvatar src={capyBeeAvatar.faceHappy} size={34} alt={user.displayName} className="avatar" />
           <div>
-            <h1>{profile ? profile.nickname : user.displayName}</h1>
+            <h1 title={profile ? profile.nickname : user.displayName}>{profile ? profile.nickname : user.displayName}</h1>
             {profile ? null : <p>{user.email}</p>}
           </div>
         </div>
@@ -1249,7 +1265,10 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
               <option value="pl">PL</option>
             </select>
           </label>
-          <a href="/logout" className="secondary-button">{text.logout}</a>
+          <a href="/logout" className="secondary-button logout-button" aria-label={text.logout}>
+            <span className="logout-label-full">{text.logout}</span>
+            <span className="logout-label-short" aria-hidden="true">{locale === 'pl' ? 'Wyj.' : 'Out'}</span>
+          </a>
         </div>
       </header>
 
@@ -1678,13 +1697,13 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
             </section>
 
             <section className="panel">
-              {memories.length === 0 ? (
+              {allMemories.length === 0 ? (
                 <div className="capybee-center-block">
                   <CapyBeeAvatar
-                    src={worldType === 'old_world' ? capyBeeAvatar.empathetic : capyBeeAvatar.default}
+                    src={capyBeeAvatar.empathetic}
                     size={120}
                   />
-                  <CapyBeeBubble text={worldType === 'old_world' ? text.memoryOldEmpty : text.memoryNewEmpty} />
+                  <CapyBeeBubble text={text.memoryOldEmpty} />
                 </div>
               ) : (
                 <div className="list-stack">
