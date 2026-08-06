@@ -2,6 +2,7 @@ package com.capybee.server.service;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -35,6 +36,13 @@ public class MemoryService {
     public MemoryResponse createMemory(OAuth2AuthenticationToken token, CreateMemoryRequest request) {
         FamilyProfile profile = childProfileService.getMyProfileEntity(token);
 
+        if (request.id() != null) {
+            Optional<MemoryEntry> existing = memoryEntryRepository.findByIdAndProfile_Id(request.id(), profile.getId());
+            if (existing.isPresent()) {
+                return toResponse(existing.get());
+            }
+        }
+
         String textContent = trimToNull(request.textContent());
         String mediaUrl = trimToNull(request.mediaUrl());
         if (textContent == null && mediaUrl == null) {
@@ -42,6 +50,9 @@ public class MemoryService {
         }
 
         MemoryEntry entry = new MemoryEntry();
+        if (request.id() != null) {
+            entry.setId(request.id());
+        }
         entry.setProfile(profile);
         entry.setWorldType(requireWorldType(request.worldType()));
         entry.setTitle(trimToNull(request.title()));

@@ -2,6 +2,7 @@ package com.capybee.server.service;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -35,7 +36,17 @@ public class FriendshipService {
     public FriendshipResponse createFriendship(OAuth2AuthenticationToken token, CreateFriendshipRequest request) {
         FamilyProfile profile = childProfileService.getMyProfileEntity(token);
 
+        if (request.id() != null) {
+            Optional<FriendshipEntry> existing = friendshipEntryRepository.findByIdAndProfile_Id(request.id(), profile.getId());
+            if (existing.isPresent()) {
+                return toResponse(existing.get());
+            }
+        }
+
         FriendshipEntry entry = new FriendshipEntry();
+        if (request.id() != null) {
+            entry.setId(request.id());
+        }
         entry.setProfile(profile);
         entry.setPersonLabel(requirePersonLabel(request.personLabel()));
         entry.setStage(requireStage(request.stage()));

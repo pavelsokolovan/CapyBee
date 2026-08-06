@@ -1,6 +1,7 @@
 package com.capybee.server.service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
@@ -28,7 +29,21 @@ public class CheckInService {
     public CheckInResponse createCheckIn(OAuth2AuthenticationToken oauth2Token, CreateCheckInRequest request) {
         UserAccount user = userService.getCurrentUser(oauth2Token);
 
+        if (request.id() != null) {
+            Optional<CheckInEntry> existing = checkInEntryRepository.findById(request.id());
+            if (existing.isPresent()) {
+                CheckInEntry found = existing.get();
+                if (!found.getUserAccount().getId().equals(user.getId())) {
+                    throw new IllegalArgumentException("Id already used by another account");
+                }
+                return toResponse(found);
+            }
+        }
+
         CheckInEntry entry = new CheckInEntry();
+        if (request.id() != null) {
+            entry.setId(request.id());
+        }
         entry.setUserAccount(user);
         entry.setMood(request.mood());
         entry.setNote(request.note());

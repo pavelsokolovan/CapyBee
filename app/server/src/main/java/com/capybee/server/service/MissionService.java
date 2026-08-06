@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -79,11 +80,25 @@ public class MissionService {
         Mission mission = missionRepository.findById(Objects.requireNonNull(missionId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mission not found"));
 
+        if (request.id() != null) {
+            Optional<MissionCompletion> existing = missionCompletionRepository.findById(request.id());
+            if (existing.isPresent()) {
+                MissionCompletion found = existing.get();
+                if (!found.getUserAccount().getId().equals(user.getId())) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Id already used by another account");
+                }
+                return toMissionCompletionResponse(found, profile.getId());
+            }
+        }
+
         if (!mission.isActive()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mission is not active");
         }
 
         MissionCompletion completion = new MissionCompletion();
+        if (request.id() != null) {
+            completion.setId(request.id());
+        }
         completion.setMission(mission);
         completion.setUserAccount(user);
         completion.setNote(trimToNull(request.note()));

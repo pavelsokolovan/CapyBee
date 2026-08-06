@@ -16,6 +16,8 @@ import newWorldTabImage from './assets/honeycomb/new-world-tab.png';
 import missionsTabImage from './assets/honeycomb/missions-tab.png';
 import friendshipsTabImage from './assets/honeycomb/friedships-tab.png';
 import { STAGE_META, type FriendshipStage } from './constants/friendshipStages';
+import { enqueueAction } from './offline/queueStore';
+import { flushQueue, startSyncLoop, onSyncStatusChange } from './offline/syncEngine';
 
 export interface UserProfile {
   authenticated: boolean;
@@ -518,7 +520,6 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const [mood, setMood] = useState<Mood>('okay');
   const [note, setNote] = useState('');
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
-  const [checkInLoading, setCheckInLoading] = useState(false);
   const [missionSuggestionVisible, setMissionSuggestionVisible] = useState(false);
 
   const [missions, setMissions] = useState<Mission[]>([]);
@@ -553,6 +554,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const [homeAnimatedCellId, setHomeAnimatedCellId] = useState<string | null>(null);
   const [homeGreetingIndex] = useState(() => pickHomeGreetingIndex());
   const [tutorialActive, setTutorialActive] = useState(false);
+  const [pendingSync, setPendingSync] = useState(0);
 
 
   const [setupNickname, setSetupNickname] = useState('');
@@ -625,6 +627,15 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
 
   useEffect(() => {
     initialize();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onSyncStatusChange(setPendingSync);
+    const stopLoop = startSyncLoop();
+    return () => {
+      unsubscribe();
+      stopLoop();
+    };
   }, []);
 
   useEffect(() => {
@@ -863,30 +874,36 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
 
   const submitCheckIn = async (event: React.FormEvent) => {
     event.preventDefault();
-    setCheckInLoading(true);
     const submittedMood = mood;
+    const submittedNote = note;
+    const clientId = crypto.randomUUID();
+    const optimisticCheckIn: CheckIn = {
+      id: clientId,
+      mood: submittedMood,
+      note: submittedNote,
+      createdAt: new Date().toISOString()
+    };
 
-    try {
-      const created = await request<CheckIn>('/api/check-ins', {
-        method: 'POST',
-        body: JSON.stringify({ mood: submittedMood, note })
-      });
-      setNote('');
-      await fetchCheckIns();
-      setMissionSuggestionVisible(true);
-      triggerFeedback({
-        kind: 'checkin',
-        phrase: pickPhrase(moodPoolKey(submittedMood)),
-        avatar: moodReactionAvatar(submittedMood)
-      });
-      if (activeTab === 'home') {
-        setHomeAnimatedCellId(created.id);
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setCheckInLoading(false);
+    setCheckIns((current) => [...current, optimisticCheckIn]);
+    setNote('');
+    setMissionSuggestionVisible(true);
+    triggerFeedback({
+      kind: 'checkin',
+      phrase: pickPhrase(moodPoolKey(submittedMood)),
+      avatar: moodReactionAvatar(submittedMood)
+    });
+    if (activeTab === 'home') {
+      setHomeAnimatedCellId(clientId);
     }
+
+    await enqueueAction({
+      clientId,
+      type: 'checkIn',
+      path: '/api/check-ins',
+      payload: { mood: submittedMood, note: submittedNote },
+      createdAt: Date.now()
+    });
+    flushQueue();
   };
 
   const createProfile = async (event: React.FormEvent) => {
@@ -941,36 +958,45 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   };
 
   const completeMission = async (missionId: string, noteValue: string) => {
-    try {
-      setSavingMissionId(missionId);
-      const created = await request<MissionCompletion>(`/api/missions/${missionId}/completions`, {
-        method: 'POST',
-        body: JSON.stringify({ note: noteValue })
-      });
-      setMissionNotes((current) => ({ ...current, [missionId]: '' }));
-      setExpandedMissionId(null);
-      setCheerMissionId(missionId);
-      if (missionCheerTimer.current) {
-        window.clearTimeout(missionCheerTimer.current);
-      }
-      missionCheerTimer.current = window.setTimeout(() => {
-        setCheerMissionId((current) => (current === missionId ? null : current));
-      }, 2200);
-      await fetchMissions();
-      await fetchMissionCompletions();
-      triggerFeedback({
-        kind: 'mission',
-        phrase: pickPhrase('missionComplete'),
-        avatar: capyBeeAvatar.celebrating
-      });
-      if (activeTab === 'home') {
-        setHomeAnimatedCellId(created.id);
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setSavingMissionId(null);
+    const clientId = crypto.randomUUID();
+    const mission = missions.find((m) => m.id === missionId);
+    const optimisticCompletion: MissionCompletion = {
+      id: clientId,
+      missionId,
+      missionCode: mission?.code ?? '',
+      title: mission?.title ?? '',
+      profileId: profile?.id ?? '',
+      completedAt: new Date().toISOString(),
+      note: noteValue || undefined
+    };
+
+    setMissionCompletions((current) => [...current, optimisticCompletion]);
+    setMissionNotes((current) => ({ ...current, [missionId]: '' }));
+    setExpandedMissionId(null);
+    setCheerMissionId(missionId);
+    if (missionCheerTimer.current) {
+      window.clearTimeout(missionCheerTimer.current);
     }
+    missionCheerTimer.current = window.setTimeout(() => {
+      setCheerMissionId((current) => (current === missionId ? null : current));
+    }, 2200);
+    triggerFeedback({
+      kind: 'mission',
+      phrase: pickPhrase('missionComplete'),
+      avatar: capyBeeAvatar.celebrating
+    });
+    if (activeTab === 'home') {
+      setHomeAnimatedCellId(clientId);
+    }
+
+    await enqueueAction({
+      clientId,
+      type: 'missionCompletion',
+      path: `/api/missions/${missionId}/completions`,
+      payload: { note: noteValue },
+      createdAt: Date.now()
+    });
+    flushQueue();
   };
 
   const skipMission = async (missionId: string) => {
@@ -1033,25 +1059,40 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
 
   const addFriendship = async (event: React.FormEvent) => {
     event.preventDefault();
-    try {
-      const created = await request<FriendshipEntry>('/api/friendships', {
-        method: 'POST',
-        body: JSON.stringify({ personLabel: friendLabel, stage: friendStage, note: friendNote })
-      });
-      setFriendLabel('');
-      setFriendNote('');
-      setFriendStage('noticed');
-      await fetchFriendships();
-      setFriendshipToast({
-        message: pickFriendshipPhrase(friendStage, friendLabel || (locale === 'pl' ? 'kogoś' : 'them')),
-        avatarSrc: resolveFriendshipAvatar(friendStage)
-      });
-      if (activeTab === 'home') {
-        setHomeAnimatedCellId(created.id);
-      }
-    } catch (error) {
-      console.error(error);
+    const submittedLabel = friendLabel;
+    const submittedStage = friendStage;
+    const submittedNote = friendNote;
+    const clientId = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const optimisticFriendship: FriendshipEntry = {
+      id: clientId,
+      personLabel: submittedLabel,
+      stage: submittedStage,
+      note: submittedNote || undefined,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    setFriendships((current) => [...current, optimisticFriendship]);
+    setFriendLabel('');
+    setFriendNote('');
+    setFriendStage('noticed');
+    setFriendshipToast({
+      message: pickFriendshipPhrase(submittedStage, submittedLabel || (locale === 'pl' ? 'kogoś' : 'them')),
+      avatarSrc: resolveFriendshipAvatar(submittedStage)
+    });
+    if (activeTab === 'home') {
+      setHomeAnimatedCellId(clientId);
     }
+
+    await enqueueAction({
+      clientId,
+      type: 'friendship',
+      path: '/api/friendships',
+      payload: { personLabel: submittedLabel, stage: submittedStage, note: submittedNote },
+      createdAt: Date.now()
+    });
+    flushQueue();
   };
 
   const resolveFriendshipAvatar = (stage: FriendshipStage) => {
@@ -1091,32 +1132,44 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
 
   const addMemory = async (event: React.FormEvent) => {
     event.preventDefault();
-    try {
-      const created = await request<MemoryEntry>('/api/memories', {
-        method: 'POST',
-        body: JSON.stringify({
-          worldType,
-          title: memoryTitle,
-          textContent: memoryText,
-          isFavorite: memoryFavorite
-        })
-      });
-      setMemoryTitle('');
-      setMemoryText('');
-      setMemoryFavorite(false);
-      await fetchMemories(worldType);
-      await fetchAllMemories();
-      triggerFeedback({
-        kind: 'memory',
-        phrase: pickPhrase(worldType === 'old_world' ? 'memoryOldWorld' : 'memoryNewWorld'),
-        avatar: capyBeeAvatar.celebrating
-      });
-      if (activeTab === 'home') {
-        setHomeAnimatedCellId(created.id);
-      }
-    } catch (error) {
-      console.error(error);
+    const submittedWorldType = worldType;
+    const submittedTitle = memoryTitle;
+    const submittedText = memoryText;
+    const submittedFavorite = memoryFavorite;
+    const clientId = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const optimisticMemory: MemoryEntry = {
+      id: clientId,
+      worldType: submittedWorldType,
+      title: submittedTitle || undefined,
+      textContent: submittedText,
+      isFavorite: submittedFavorite,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    setMemories((current) => [optimisticMemory, ...current]);
+    setAllMemories((current) => [optimisticMemory, ...current]);
+    setMemoryTitle('');
+    setMemoryText('');
+    setMemoryFavorite(false);
+    triggerFeedback({
+      kind: 'memory',
+      phrase: pickPhrase(submittedWorldType === 'old_world' ? 'memoryOldWorld' : 'memoryNewWorld'),
+      avatar: capyBeeAvatar.celebrating
+    });
+    if (activeTab === 'home') {
+      setHomeAnimatedCellId(clientId);
     }
+
+    await enqueueAction({
+      clientId,
+      type: 'memory',
+      path: '/api/memories',
+      payload: { worldType: submittedWorldType, title: submittedTitle, textContent: submittedText, isFavorite: submittedFavorite },
+      createdAt: Date.now()
+    });
+    flushQueue();
   };
 
   const toggleFavorite = async (entry: MemoryEntry) => {
@@ -1311,6 +1364,16 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
           </div>
         </div>
         <div className="auth-actions">
+          {pendingSync > 0 && (
+            <motion.span
+              className="sync-indicator"
+              animate={{ opacity: [0.4, 1, 0.4] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              aria-hidden="true"
+            >
+              🐝
+            </motion.span>
+          )}
           <button
             ref={profileButtonRef}
             type="button"
@@ -1377,8 +1440,8 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                   onChange={(event) => setNote(event.target.value)}
                   placeholder={text.checkInPlaceholder}
                 />
-                <button type="submit" className="primary-button" disabled={checkInLoading}>
-                  {checkInLoading ? text.saving : text.save}
+                <button type="submit" className="primary-button">
+                  {text.save}
                 </button>
               </form>
 

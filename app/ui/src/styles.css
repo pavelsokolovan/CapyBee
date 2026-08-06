@@ -545,6 +545,13 @@ a:hover {
   flex: 0 0 auto;
 }
 
+.sync-indicator {
+  font-size: 18px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+
 .profile-nav-button {
   width: 36px;
   height: 36px;

@@ -125,7 +125,11 @@ function App() {
       if (res.ok) {
         const data = await res.json();
         setUser(data);
-        setSessionExpired(false);
+        if (!data.authenticated) {
+          setSessionExpired(true);
+        } else {
+          setSessionExpired(false);
+        }
       } else if (res.status === 401) {
         setSessionExpired(true);
       }

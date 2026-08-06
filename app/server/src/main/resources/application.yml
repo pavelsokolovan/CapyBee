@@ -15,6 +15,11 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: never
+    timeout: 30d
   security:
     oauth2:
       client:
@@ -34,6 +39,11 @@ server:
   port: ${PORT:8080}
   error:
     include-message: always
+  servlet:
+    session:
+      cookie:
+        max-age: 30d
+        same-site: lax
 
 management:
   endpoints:
