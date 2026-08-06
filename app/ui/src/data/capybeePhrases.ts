@@ -46,7 +46,7 @@ export const capybeePhrases: Record<CapyBeePhrasePoolKey, CapyBeePhrase[]> = {
     { en: 'Noted. Okay is a perfectly good day.', pl: 'Przyjęte. Okej to też dobry dzień.' },
     { en: 'Okay today. Maybe something small tomorrow.', pl: 'Dziś okej. Może jutro zrobimy mały krok.' },
     { en: "Middle of the road. I'll take it. 🍯", pl: 'Tak pośrodku. Biorę to. 🍯' },
-    { en: 'You checked in. That alone counts.', pl: 'Zrobiłeś meldunek dnia. To samo w sobie się liczy.' },
+    { en: 'You checked in. That alone counts.', pl: 'Zrobiłeś check-in dnia. To samo w sobie się liczy.' },
     { en: 'Okay and honest beats fake good any day.', pl: 'Szczere okej zawsze wygrywa z udawanym super.' },
     { en: 'Cool. No pressure to make it more than that.', pl: 'Spokojnie. Nie musisz robić z tego nic więcej.' },
     { en: 'Okay noted. See you tomorrow?', pl: 'Okej, zapisane. Do jutra?' }

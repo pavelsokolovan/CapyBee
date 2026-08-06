@@ -44,6 +44,9 @@ public class FamilyProfile {
     @Column(nullable = false)
     private boolean active = true;
 
+    @Column(name = "has_seen_onboarding", nullable = false)
+    private boolean hasSeenOnboarding = false;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -114,6 +117,14 @@ public class FamilyProfile {
 
     public void setActive(boolean active) {
         this.active = active;
+    }
+
+    public boolean isHasSeenOnboarding() {
+        return hasSeenOnboarding;
+    }
+
+    public void setHasSeenOnboarding(boolean hasSeenOnboarding) {
+        this.hasSeenOnboarding = hasSeenOnboarding;
     }
 
     public Instant getCreatedAt() {

@@ -5,5 +5,6 @@ public record UpdateChildProfileRequest(
         Integer birthYear,
         String preferredLocale,
         String avatarSeed,
-        Boolean active) {
+        Boolean active,
+        Boolean hasSeenOnboarding) {
 }

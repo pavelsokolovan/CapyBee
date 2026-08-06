@@ -75,6 +75,9 @@ public class ChildProfileService {
         if (request.active() != null) {
             profile.setActive(request.active());
         }
+        if (request.hasSeenOnboarding() != null) {
+            profile.setHasSeenOnboarding(request.hasSeenOnboarding());
+        }
 
         return toResponse(Objects.requireNonNull(familyProfileRepository.save(profile)));
     }
@@ -138,6 +141,7 @@ public class ChildProfileService {
                 profile.getPreferredLocale(),
                 profile.getAvatarSeed(),
                 profile.isActive(),
+                profile.isHasSeenOnboarding(),
                 profile.getCreatedAt(),
                 profile.getUpdatedAt());
     }

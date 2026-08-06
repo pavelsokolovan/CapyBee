@@ -10,6 +10,7 @@ public record ChildProfileResponse(
         String preferredLocale,
         String avatarSeed,
         boolean active,
+        boolean hasSeenOnboarding,
         Instant createdAt,
         Instant updatedAt) {
 }

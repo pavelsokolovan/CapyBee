@@ -7,6 +7,7 @@ import { capybeePhrases, type CapyBeePhrasePoolKey } from './data/capybeePhrases
 import { HoneycombMap } from './components/HoneycombMap';
 import { FriendshipStageSelector } from './components/FriendshipStageSelector';
 import { FriendshipToast } from './components/FriendshipToast';
+import { OnboardingTutorial } from './components/OnboardingTutorial';
 import { HomeIcon, MissionsIcon, FriendshipsIcon, MemoriesIcon, ProfileIcon } from './components/NavIcons';
 import { useHoneycombCells } from './hooks/useHoneycombCells';
 import type { UseHoneycombCellsInput } from './hooks/useHoneycombCells';
@@ -38,6 +39,7 @@ interface ChildProfile {
   preferredLocale: 'en' | 'pl';
   avatarSeed?: string;
   active: boolean;
+  hasSeenOnboarding: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -329,7 +331,28 @@ const copy = {
     hiveTitle: 'Your hive',
     hiveAriaLabel: 'Your hive - progress',
     memoryFallbackTitle: 'Memory',
-    friendshipStageAriaLabel: 'Friendship stage'
+    friendshipStageAriaLabel: 'Friendship stage',
+    onboardingWelcomeTitle: "Hey, I'm CapyBee.",
+    onboardingWelcomeBody: "I'll show you around - quick, promise.",
+    onboardingStartTitle: 'This is where you check in.',
+    onboardingStartBody: "Pick heavy, okay, or good - whatever's true today. No wrong answer, and I'll always react to what you tell me.",
+    onboardingHiveTitle: 'This is your hive.',
+    onboardingHiveBody: 'Every check-in, mission, and memory adds one cell. It starts empty on purpose - we fill it together, over time.',
+    onboardingHistoryTitle: 'Your check-ins stay here.',
+    onboardingHistoryBody: 'This list helps you look back at your days. You can see how things change over time, one check-in at a time.',
+    onboardingMissionsTitle: 'Missions live here.',
+    onboardingMissionsBody: "I'll suggest one small real-world thing to try. Do it, or tap Not today - skipped missions just wait at the bottom, they never disappear.",
+    onboardingFriendshipsTitle: 'Friendships are private, just for you.',
+    onboardingFriendshipsBody: 'Noticed someone? Said hi? Log it here. No one else ever sees this list - not even other kids using CapyBee.',
+    onboardingMemoriesTitle: 'Both your worlds live here.',
+    onboardingMemoriesBody: "Old World keeps what you miss - golden, safe, always yours. New World grows as you build your life here. Neither one replaces the other.",
+    onboardingProfileTitle: 'One more thing.',
+    onboardingProfileBody: 'This is your profile, up here. Language and a few settings live behind it - you can peek anytime.',
+    onboardingDoneTitle: "That's the hive.",
+    onboardingDoneBody: "Come back anytime - I'm here.",
+    onboardingNext: 'Next',
+    onboardingSkip: 'Skip',
+    onboardingStart: "Let's go"
   },
   pl: {
     homeTitle: 'Jak minął dzień?',
@@ -412,7 +435,28 @@ const copy = {
     hiveTitle: 'Twój ul',
     hiveAriaLabel: 'Twój ul — postęp',
     memoryFallbackTitle: 'Wspomnienie',
-    friendshipStageAriaLabel: 'Etap relacji'
+    friendshipStageAriaLabel: 'Etap relacji',
+    onboardingWelcomeTitle: 'Hej, jestem CapyBee.',
+    onboardingWelcomeBody: 'Pokażę ci, co tu jest - szybko, obiecuję.',
+    onboardingStartTitle: 'Tu mówisz, jak się dziś czujesz.',
+    onboardingStartBody: 'Wybierz ciężko, okej albo dobrze - co jest prawdą dziś. Nie ma złej odpowiedzi, a ja zawsze zareaguję na to, co mi powiesz.',
+    onboardingHiveTitle: 'To twój ul.',
+    onboardingHiveBody: 'Każdy check-in, misja i wspomnienie dodają jedną komórkę. Zaczyna się pusty specjalnie - zapełniamy go razem, po trochu.',
+    onboardingHistoryTitle: 'Tu zostają twoje check-iny.',
+    onboardingHistoryBody: 'Ta lista pomaga wracać do twoich dni. Możesz zobaczyć, jak wszystko zmienia się z czasem, krok po kroku.',
+    onboardingMissionsTitle: 'Tu mieszkają misje.',
+    onboardingMissionsBody: 'Zaproponuję ci jedną małą, prawdziwą rzecz do zrobienia. Zrób ją albo kliknij Nie dziś - pominięte misje po prostu czekają na dole, nigdy nie znikają.',
+    onboardingFriendshipsTitle: 'Relacje są prywatne, tylko dla ciebie.',
+    onboardingFriendshipsBody: 'Zauważyłeś kogoś? Powiedziałeś cześć? Zapisz to tutaj. Nikt inny tego nie widzi - nawet inne dzieci używające CapyBee.',
+    onboardingMemoriesTitle: 'Oba twoje światy są tutaj.',
+    onboardingMemoriesBody: 'Stary Świat trzyma to, za czym tęsknisz - złoty, bezpieczny, zawsze twój. Nowy Świat rośnie, gdy budujesz tu swoje życie. Żaden nie zastępuje drugiego.',
+    onboardingProfileTitle: 'I jeszcze jedno.',
+    onboardingProfileBody: 'To twój profil, tutaj na górze. Język i kilka ustawień są za nim - możesz tam zajrzeć, kiedy chcesz.',
+    onboardingDoneTitle: 'To twój ul.',
+    onboardingDoneBody: 'Wracaj tu, kiedy chcesz - jestem tu.',
+    onboardingNext: 'Dalej',
+    onboardingSkip: 'Pomiń',
+    onboardingStart: 'Zaczynamy'
   }
 };
 
@@ -467,7 +511,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const [activeTab, setActiveTab] = useState<TabKey>('home');
   const [profile, setProfile] = useState<ChildProfile | null>(null);
   const [profileMissing, setProfileMissing] = useState(false);
-  const [locale, setLocale] = useState<'en' | 'pl'>('en');
+  const [locale, setLocale] = useState<'en' | 'pl'>('pl');
   const pickPhrase = useCapyBeePhrase(locale);
   const pickFriendshipPhrase = useFriendshipAddedPhrase(locale);
 
@@ -508,11 +552,12 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const [pendingDeleteMemoryId, setPendingDeleteMemoryId] = useState<string | null>(null);
   const [homeAnimatedCellId, setHomeAnimatedCellId] = useState<string | null>(null);
   const [homeGreetingIndex] = useState(() => pickHomeGreetingIndex());
+  const [tutorialActive, setTutorialActive] = useState(false);
 
 
   const [setupNickname, setSetupNickname] = useState('');
   const [setupBirthYear, setSetupBirthYear] = useState('');
-  const [setupLocale, setSetupLocale] = useState<'en' | 'pl'>('en');
+  const [setupLocale, setSetupLocale] = useState<'en' | 'pl'>('pl');
   const [setupAvatarSeed, setSetupAvatarSeed] = useState('sunny-bee');
   const [setupLoading, setSetupLoading] = useState(false);
 
@@ -528,6 +573,13 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const missionCompletionDeleteTimerRef = useRef<number | null>(null);
   const worldTypeRef = useRef<'old_world' | 'new_world'>(worldType);
   const memoriesFetchAbortRef = useRef<AbortController | null>(null);
+  const moodSectionRef = useRef<HTMLElement>(null);
+  const hiveSectionRef = useRef<HTMLElement>(null);
+  const checkInHistorySectionRef = useRef<HTMLElement>(null);
+  const missionsNavRef = useRef<HTMLButtonElement>(null);
+  const friendshipsNavRef = useRef<HTMLButtonElement>(null);
+  const memoriesNavRef = useRef<HTMLButtonElement>(null);
+  const profileButtonRef = useRef<HTMLButtonElement>(null);
 
   const text = copy[locale];
   const moodLabels: Record<Mood, string> = {
@@ -542,6 +594,11 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     { key: 'friendships' as const, label: text.friendships, Icon: FriendshipsIcon },
     { key: 'memories' as const, label: text.memories, Icon: MemoriesIcon }
   ];
+  const navRefByKey: Partial<Record<TabKey, typeof missionsNavRef>> = {
+    missions: missionsNavRef,
+    friendships: friendshipsNavRef,
+    memories: memoriesNavRef
+  };
 
   const triggerFeedback = (nextFeedback: ActiveFeedback) => {
     if (feedbackFadeOutTimer.current) window.clearTimeout(feedbackFadeOutTimer.current);
@@ -586,6 +643,12 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   useEffect(() => {
     if (profile) {
       setLocale(profile.preferredLocale);
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    if (profile && !profile.hasSeenOnboarding) {
+      setTutorialActive(true);
     }
   }, [profile]);
 
@@ -866,7 +929,8 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
           birthYear: changes.birthYear,
           preferredLocale: changes.preferredLocale,
           avatarSeed: changes.avatarSeed,
-          active: changes.active
+          active: changes.active,
+          hasSeenOnboarding: changes.hasSeenOnboarding
         })
       });
       setProfile(updated);
@@ -1177,6 +1241,13 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     setPendingDeleteMissionId(null);
   };
 
+  const finishTutorial = () => {
+    setTutorialActive(false);
+    if (profile) {
+      updateProfile({ hasSeenOnboarding: true });
+    }
+  };
+
   if (profileMissing) {
     return (
       <main className="app-shell">
@@ -1241,6 +1312,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
         </div>
         <div className="auth-actions">
           <button
+            ref={profileButtonRef}
             type="button"
             className={activeTab === 'profile' ? 'profile-nav-button active' : 'profile-nav-button'}
             onClick={() => setActiveTab('profile')}
@@ -1280,7 +1352,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
               <CapyBeeBubble text={homeAvatarBubble} />
             </section>
 
-            <section className="panel">
+            <section className="panel" ref={moodSectionRef}>
               <h2>{text.homeTitle}</h2>
               <form className="stack-form" onSubmit={submitCheckIn}>
                 <div className="mood-selector compact">
@@ -1318,7 +1390,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
               ) : null}
             </section>
 
-            <section className="panel">
+            <section className="panel" ref={hiveSectionRef}>
               <h3>{text.honeycombProgress}</h3>
               <div className="honeycomb-card">
                 <h4 className="honeycomb-heading">{locale === 'pl' ? text.hiveTitle : 'Your hive'}</h4>
@@ -1330,9 +1402,14 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
               </div>
             </section>
 
-            <section className="panel">
+            <section className="panel" ref={checkInHistorySectionRef}>
               <h3>{text.recentCheckins}</h3>
-              {visibleCheckIns.length === 0 ? <p>{text.noItems}</p> : (
+              {visibleCheckIns.length === 0 ? (
+                <div className="capybee-center-block">
+                  <CapyBeeAvatar src={capyBeeAvatar.default} size={120} />
+                  <p className="empty-copy">{text.noItems}</p>
+                </div>
+              ) : (
                 <div className="list-stack">
                   {[...visibleCheckIns].reverse().slice(0, 10).map((entry, index) => {
                     const isPendingDelete = pendingDeleteCheckInId === entry.id;
@@ -1870,6 +1947,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
           return (
             <button
               key={key}
+              ref={navRefByKey[key]}
               type="button"
               className={isActive ? 'nav-item active' : 'nav-item'}
               onClick={() => setActiveTab(key)}
@@ -1881,6 +1959,22 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
           );
         })}
       </nav>
+
+      {tutorialActive && activeTab === 'home' ? (
+        <OnboardingTutorial
+          copy={text}
+          targets={{
+            moodSection: moodSectionRef,
+            hiveSection: hiveSectionRef,
+            checkInHistorySection: checkInHistorySectionRef,
+            missionsNav: missionsNavRef,
+            friendshipsNav: friendshipsNavRef,
+            memoriesNav: memoriesNavRef,
+            profileButton: profileButtonRef
+          }}
+          onFinish={finishTutorial}
+        />
+      ) : null}
     </main>
   );
 }
