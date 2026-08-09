@@ -8,12 +8,14 @@ const authCopy = {
   en: {
     loading: 'One moment...',
     sessionExpired: "Hey, you're back! Sign in again.",
-    signIn: 'Sign in'
+    signIn: 'Sign in',
+    signInOfflineHint: 'Connect to the internet to sign in.'
   },
   pl: {
     loading: 'Chwileczkę...',
     sessionExpired: 'Hej, wróciłeś! Zaloguj się ponownie.',
-    signIn: 'Zaloguj się'
+    signIn: 'Zaloguj się',
+    signInOfflineHint: 'Połącz się z internetem, aby się zalogować.'
   }
 } as const;
 
@@ -110,6 +112,9 @@ function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
+  const [networkUnavailable, setNetworkUnavailable] = useState(false);
+  const [isSigningIn, setIsSigningIn] = useState(false);
 
   const locale: 'pl' | 'en' = navigator.language.toLowerCase().startsWith('pl') ? 'pl' : 'en';
   const authText = authCopy[locale];
@@ -119,9 +124,28 @@ function App() {
     checkAuthStatus();
   }, []);
 
+  useEffect(() => {
+    const syncOnlineStatus = () => setIsOnline(navigator.onLine);
+    window.addEventListener('online', syncOnlineStatus);
+    window.addEventListener('offline', syncOnlineStatus);
+    return () => {
+      window.removeEventListener('online', syncOnlineStatus);
+      window.removeEventListener('offline', syncOnlineStatus);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isOnline) {
+      setNetworkUnavailable(false);
+    }
+  }, [isOnline]);
+
   const checkAuthStatus = async () => {
     try {
-      const res = await fetch('/api/auth-status');
+      const res = await fetch('/api/auth-status', {
+        credentials: 'include',
+        cache: 'no-store'
+      });
       if (res.ok) {
         const data = await res.json();
         setUser(data);
@@ -139,6 +163,42 @@ function App() {
       setLoading(false);
     }
   };
+
+  const canReachBackend = async () => {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 2500);
+
+    try {
+      const res = await fetch('/api/health', {
+        credentials: 'include',
+        cache: 'no-store',
+        signal: controller.signal
+      });
+      return res.ok;
+    } catch {
+      return false;
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  };
+
+  const startGoogleSignIn = async () => {
+    if (isSigningIn) {
+      return;
+    }
+
+    setIsSigningIn(true);
+    const reachable = await canReachBackend();
+    if (!reachable) {
+      setNetworkUnavailable(true);
+      setIsSigningIn(false);
+      return;
+    }
+
+    window.location.assign('/oauth2/authorization/google');
+  };
+
+  const signInDisabled = !isOnline || networkUnavailable || isSigningIn;
 
   if (loading) {
     return (
@@ -160,9 +220,18 @@ function App() {
         <CapyBeeBubble
           text={authText.sessionExpired}
         />
-        <a className="primary-button" href="/oauth2/authorization/google">
-          {authText.signIn}
-        </a>
+        {!signInDisabled ? (
+          <button className="primary-button" type="button" onClick={startGoogleSignIn}>
+            {authText.signIn}
+          </button>
+        ) : (
+          <>
+            <button className="primary-button primary-button-disabled" type="button" disabled>
+              {authText.signIn}
+            </button>
+            <p className="offline-auth-hint">{authText.signInOfflineHint}</p>
+          </>
+        )}
       </main>
     );
   }
@@ -186,9 +255,18 @@ function App() {
         <span className="eyebrow">{t.tagline}</span>
         <h1>{t.heroTitle}</h1>
         <p className="hero-subline">{t.heroLine}</p>
-        <a className="primary-button" href="/oauth2/authorization/google">
-          {t.ctaPrimary}
-        </a>
+        {!signInDisabled ? (
+          <button className="primary-button" type="button" onClick={startGoogleSignIn}>
+            {t.ctaPrimary}
+          </button>
+        ) : (
+          <>
+            <button className="primary-button primary-button-disabled" type="button" disabled>
+              {t.ctaPrimary}
+            </button>
+            <p className="offline-auth-hint">{authText.signInOfflineHint}</p>
+          </>
+        )}
         <span className="trust-line">{t.trustLine}</span>
       </section>
 

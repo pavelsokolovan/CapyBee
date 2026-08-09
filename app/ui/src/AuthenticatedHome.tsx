@@ -540,9 +540,15 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const [friendNote, setFriendNote] = useState('');
   const [friendshipToast, setFriendshipToast] = useState<{ message: string; avatarSrc: string } | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deletedFriendshipIds, setDeletedFriendshipIds] = useState<Set<string>>(new Set());
+  const [pendingDeletedFriendship, setPendingDeletedFriendship] = useState<FriendshipEntry | null>(null);
   const [pendingDeleteTimer, setPendingDeleteTimer] = useState<number | null>(null);
   const [pendingDeleteCheckInId, setPendingDeleteCheckInId] = useState<string | null>(null);
+  const [deletedCheckInIds, setDeletedCheckInIds] = useState<Set<string>>(new Set());
+  const [pendingDeletedCheckIn, setPendingDeletedCheckIn] = useState<CheckIn | null>(null);
   const [pendingDeleteMissionId, setPendingDeleteMissionId] = useState<string | null>(null);
+  const [deletedMissionCompletionIds, setDeletedMissionCompletionIds] = useState<Set<string>>(new Set());
+  const [pendingDeletedMissionCompletion, setPendingDeletedMissionCompletion] = useState<MissionCompletion | null>(null);
 
   const [worldType, setWorldType] = useState<'old_world' | 'new_world'>('old_world');
   const [memories, setMemories] = useState<MemoryEntry[]>([]);
@@ -551,6 +557,8 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const [memoryText, setMemoryText] = useState('');
   const [memoryFavorite, setMemoryFavorite] = useState(false);
   const [pendingDeleteMemoryId, setPendingDeleteMemoryId] = useState<string | null>(null);
+  const [deletedMemoryIds, setDeletedMemoryIds] = useState<Set<string>>(new Set());
+  const [pendingDeletedMemory, setPendingDeletedMemory] = useState<MemoryEntry | null>(null);
   const [homeAnimatedCellId, setHomeAnimatedCellId] = useState<string | null>(null);
   const [homeGreetingIndex] = useState(() => pickHomeGreetingIndex());
   const [tutorialActive, setTutorialActive] = useState(false);
@@ -708,12 +716,14 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
 
   const visibleMissions = useMemo(() => missions, [missions]);
   const sortedFriendships = useMemo(() => {
-    return [...friendships].sort((left, right) => {
+    return [...friendships]
+      .filter((entry) => !deletedFriendshipIds.has(entry.id))
+      .sort((left, right) => {
       const leftTime = new Date(left.createdAt ?? left.updatedAt).getTime();
       const rightTime = new Date(right.createdAt ?? right.updatedAt).getTime();
       return rightTime - leftTime;
     });
-  }, [friendships]);
+  }, [friendships, deletedFriendshipIds]);
 
   const sortedMemories = useMemo(() => {
     return [...allMemories].sort((a, b) => {
@@ -725,18 +735,18 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   }, [allMemories]);
 
   const visibleMemories = useMemo(
-    () => sortedMemories.filter((entry) => entry.id !== pendingDeleteMemoryId),
-    [sortedMemories, pendingDeleteMemoryId]
+    () => sortedMemories.filter((entry) => entry.id !== pendingDeleteMemoryId && !deletedMemoryIds.has(entry.id)),
+    [sortedMemories, pendingDeleteMemoryId, deletedMemoryIds]
   );
 
   const visibleCheckIns = useMemo(
-    () => checkIns.filter((entry) => entry.id !== pendingDeleteCheckInId),
-    [checkIns, pendingDeleteCheckInId]
+    () => checkIns.filter((entry) => entry.id !== pendingDeleteCheckInId && !deletedCheckInIds.has(entry.id)),
+    [checkIns, pendingDeleteCheckInId, deletedCheckInIds]
   );
 
   const visibleMissionCompletions = useMemo(
-    () => missionCompletions.filter((entry) => entry.id !== pendingDeleteMissionId),
-    [missionCompletions, pendingDeleteMissionId]
+    () => missionCompletions.filter((entry) => entry.id !== pendingDeleteMissionId && !deletedMissionCompletionIds.has(entry.id)),
+    [missionCompletions, pendingDeleteMissionId, deletedMissionCompletionIds]
   );
 
   const homeGreeting = capybeePhrases.homeGreeting[homeGreetingIndex] ?? capybeePhrases.homeGreeting[0];
@@ -752,13 +762,37 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   } satisfies UseHoneycombCellsInput);
 
 
+  const canReachBackend = async () => {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 2500);
+    try {
+      const res = await fetch('/api/health', {
+        credentials: 'include',
+        cache: 'no-store',
+        signal: controller.signal
+      });
+      return res.ok;
+    } catch {
+      return false;
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  };
+
   const redirectToLogin = () => {
-    window.location.href = '/oauth2/authorization/google';
+    void (async () => {
+      const reachable = await canReachBackend();
+      if (!reachable) {
+        return;
+      }
+      window.location.href = '/oauth2/authorization/google';
+    })();
   };
 
   const request = async <T,>(path: string, init?: RequestInit): Promise<T> => {
     const res = await fetch(path, {
       credentials: 'include',
+      cache: 'no-store',
       headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
       ...init
     });
@@ -900,6 +934,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       clientId,
       type: 'checkIn',
       path: '/api/check-ins',
+      method: 'POST',
       payload: { mood: submittedMood, note: submittedNote },
       createdAt: Date.now()
     });
@@ -993,6 +1028,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       clientId,
       type: 'missionCompletion',
       path: `/api/missions/${missionId}/completions`,
+      method: 'POST',
       payload: { note: noteValue },
       createdAt: Date.now()
     });
@@ -1089,6 +1125,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       clientId,
       type: 'friendship',
       path: '/api/friendships',
+      method: 'POST',
       payload: { personLabel: submittedLabel, stage: submittedStage, note: submittedNote },
       createdAt: Date.now()
     });
@@ -1108,15 +1145,30 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       window.clearTimeout(friendshipDeleteTimer.current);
     }
 
+    const target = friendships.find((entry) => entry.id === id);
+    if (!target) {
+      return;
+    }
+
     setPendingDeleteId(id);
+    setPendingDeletedFriendship(target);
+    setDeletedFriendshipIds((current) => new Set(current).add(id));
+    setFriendships((current) => current.filter((entry) => entry.id !== id));
     friendshipDeleteTimer.current = window.setTimeout(async () => {
       try {
-        await request<void>(`/api/friendships/${id}`, { method: 'DELETE' });
-        await fetchFriendships();
+        await enqueueAction({
+          clientId: id,
+          type: 'friendshipDelete',
+          path: `/api/friendships/${id}`,
+          method: 'DELETE',
+          createdAt: Date.now()
+        });
+        flushQueue();
       } catch (error) {
         console.error(error);
       } finally {
         setPendingDeleteId(null);
+        setPendingDeletedFriendship(null);
         friendshipDeleteTimer.current = null;
       }
     }, 5000);
@@ -1127,6 +1179,15 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       window.clearTimeout(friendshipDeleteTimer.current);
       friendshipDeleteTimer.current = null;
     }
+    if (pendingDeletedFriendship) {
+      setFriendships((current) => [...current, pendingDeletedFriendship]);
+      setDeletedFriendshipIds((current) => {
+        const next = new Set(current);
+        next.delete(pendingDeletedFriendship.id);
+        return next;
+      });
+    }
+    setPendingDeletedFriendship(null);
     setPendingDeleteId(null);
   };
 
@@ -1166,6 +1227,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       clientId,
       type: 'memory',
       path: '/api/memories',
+      method: 'POST',
       payload: { worldType: submittedWorldType, title: submittedTitle, textContent: submittedText, isFavorite: submittedFavorite },
       createdAt: Date.now()
     });
@@ -1188,11 +1250,18 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const commitMemoryDelete = async (id: string) => {
     setPendingDeleteMemoryId((current) => (current === id ? null : current));
     try {
-      await request<void>(`/api/memories/${id}`, { method: 'DELETE' });
-      await fetchMemories(worldType);
-      await fetchAllMemories();
+      await enqueueAction({
+        clientId: id,
+        type: 'memoryDelete',
+        path: `/api/memories/${id}`,
+        method: 'DELETE',
+        createdAt: Date.now()
+      });
+      flushQueue();
     } catch (error) {
       console.error(error);
+    } finally {
+      setPendingDeletedMemory(null);
     }
   };
 
@@ -1205,7 +1274,16 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       commitMemoryDelete(pendingDeleteMemoryId);
     }
 
+    const target = allMemories.find((entry) => entry.id === id);
+    if (!target) {
+      return;
+    }
+
     setPendingDeleteMemoryId(id);
+    setPendingDeletedMemory(target);
+    setDeletedMemoryIds((current) => new Set(current).add(id));
+    setMemories((current) => current.filter((entry) => entry.id !== id));
+    setAllMemories((current) => current.filter((entry) => entry.id !== id));
     if (memoryDeleteTimerRef.current) {
       window.clearTimeout(memoryDeleteTimerRef.current);
     }
@@ -1219,16 +1297,44 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       window.clearTimeout(memoryDeleteTimerRef.current);
       memoryDeleteTimerRef.current = null;
     }
+    if (pendingDeletedMemory) {
+      setMemories((current) => {
+        if (current.some((entry) => entry.id === pendingDeletedMemory.id)) {
+          return current;
+        }
+        return [pendingDeletedMemory, ...current];
+      });
+      setAllMemories((current) => {
+        if (current.some((entry) => entry.id === pendingDeletedMemory.id)) {
+          return current;
+        }
+        return [pendingDeletedMemory, ...current];
+      });
+      setDeletedMemoryIds((current) => {
+        const next = new Set(current);
+        next.delete(pendingDeletedMemory.id);
+        return next;
+      });
+    }
+    setPendingDeletedMemory(null);
     setPendingDeleteMemoryId(null);
   };
 
   const commitCheckInDelete = async (id: string) => {
     setPendingDeleteCheckInId((current) => (current === id ? null : current));
     try {
-      await request<void>(`/api/check-ins/${id}`, { method: 'DELETE' });
-      await fetchCheckIns();
+      await enqueueAction({
+        clientId: id,
+        type: 'checkInDelete',
+        path: `/api/check-ins/${id}`,
+        method: 'DELETE',
+        createdAt: Date.now()
+      });
+      flushQueue();
     } catch (error) {
       console.error(error);
+    } finally {
+      setPendingDeletedCheckIn(null);
     }
   };
 
@@ -1241,7 +1347,15 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       commitCheckInDelete(pendingDeleteCheckInId);
     }
 
+    const target = checkIns.find((entry) => entry.id === id);
+    if (!target) {
+      return;
+    }
+
     setPendingDeleteCheckInId(id);
+    setPendingDeletedCheckIn(target);
+    setDeletedCheckInIds((current) => new Set(current).add(id));
+    setCheckIns((current) => current.filter((entry) => entry.id !== id));
     if (checkInDeleteTimerRef.current) {
       window.clearTimeout(checkInDeleteTimerRef.current);
     }
@@ -1255,16 +1369,38 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       window.clearTimeout(checkInDeleteTimerRef.current);
       checkInDeleteTimerRef.current = null;
     }
+    if (pendingDeletedCheckIn) {
+      setCheckIns((current) => {
+        if (current.some((entry) => entry.id === pendingDeletedCheckIn.id)) {
+          return current;
+        }
+        return [...current, pendingDeletedCheckIn];
+      });
+      setDeletedCheckInIds((current) => {
+        const next = new Set(current);
+        next.delete(pendingDeletedCheckIn.id);
+        return next;
+      });
+    }
+    setPendingDeletedCheckIn(null);
     setPendingDeleteCheckInId(null);
   };
 
   const commitMissionCompletionDelete = async (id: string) => {
     setPendingDeleteMissionId((current) => (current === id ? null : current));
     try {
-      await request<void>(`/api/missions/completions/${id}`, { method: 'DELETE' });
-      await fetchMissionCompletions();
+      await enqueueAction({
+        clientId: id,
+        type: 'missionCompletionDelete',
+        path: `/api/missions/completions/${id}`,
+        method: 'DELETE',
+        createdAt: Date.now()
+      });
+      flushQueue();
     } catch (error) {
       console.error(error);
+    } finally {
+      setPendingDeletedMissionCompletion(null);
     }
   };
 
@@ -1277,7 +1413,15 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       commitMissionCompletionDelete(pendingDeleteMissionId);
     }
 
+    const target = missionCompletions.find((entry) => entry.id === id);
+    if (!target) {
+      return;
+    }
+
     setPendingDeleteMissionId(id);
+    setPendingDeletedMissionCompletion(target);
+    setDeletedMissionCompletionIds((current) => new Set(current).add(id));
+    setMissionCompletions((current) => current.filter((entry) => entry.id !== id));
     if (missionCompletionDeleteTimerRef.current) {
       window.clearTimeout(missionCompletionDeleteTimerRef.current);
     }
@@ -1291,6 +1435,20 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       window.clearTimeout(missionCompletionDeleteTimerRef.current);
       missionCompletionDeleteTimerRef.current = null;
     }
+    if (pendingDeletedMissionCompletion) {
+      setMissionCompletions((current) => {
+        if (current.some((entry) => entry.id === pendingDeletedMissionCompletion.id)) {
+          return current;
+        }
+        return [...current, pendingDeletedMissionCompletion];
+      });
+      setDeletedMissionCompletionIds((current) => {
+        const next = new Set(current);
+        next.delete(pendingDeletedMissionCompletion.id);
+        return next;
+      });
+    }
+    setPendingDeletedMissionCompletion(null);
     setPendingDeleteMissionId(null);
   };
 

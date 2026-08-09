@@ -1,12 +1,21 @@
 import { get, set, del, keys } from 'idb-keyval';
 
-export type QueueActionType = 'checkIn' | 'missionCompletion' | 'friendship' | 'memory';
+export type QueueActionType =
+  | 'checkIn'
+  | 'missionCompletion'
+  | 'friendship'
+  | 'memory'
+  | 'checkInDelete'
+  | 'missionCompletionDelete'
+  | 'friendshipDelete'
+  | 'memoryDelete';
 
 export interface QueuedAction {
   clientId: string;
   type: QueueActionType;
   path: string;
-  payload: Record<string, unknown>;
+  method: 'POST' | 'DELETE';
+  payload?: Record<string, unknown>;
   createdAt: number;
   attempts: number;
   status: 'pending' | 'syncing' | 'failed';

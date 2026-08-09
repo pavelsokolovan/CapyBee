@@ -278,6 +278,20 @@ a:hover {
   box-shadow: 0 16px 34px rgba(199, 139, 21, 0.26);
 }
 
+.primary-button-disabled,
+.primary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.offline-auth-hint {
+  margin: 2px 0 0;
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
 .secondary-button {
   border: 1px solid rgba(139, 107, 42, 0.2);
   background: rgba(255, 255, 255, 0.55);

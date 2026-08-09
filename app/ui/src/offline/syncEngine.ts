@@ -27,17 +27,26 @@ async function sendOne(action: QueuedAction): Promise<boolean> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const res = await fetch(action.path, {
-      method: 'POST',
+    const method = action.method ?? 'POST';
+    const requestInit: RequestInit = {
+      method,
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: action.clientId, ...action.payload }),
       signal: controller.signal
-    });
+    };
+
+    if (method === 'POST') {
+      requestInit.headers = { 'Content-Type': 'application/json' };
+      requestInit.body = JSON.stringify({ id: action.clientId, ...(action.payload ?? {}) });
+    }
+
+    const res = await fetch(action.path, requestInit);
     clearTimeout(timer);
 
     if (res.status === 401) {
       return false;
+    }
+    if (method === 'DELETE' && res.status === 404) {
+      return true;
     }
     if (!res.ok && res.status !== 409) {
       return false;
