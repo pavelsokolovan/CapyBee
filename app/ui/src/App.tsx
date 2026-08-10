@@ -9,13 +9,17 @@ const authCopy = {
     loading: 'One moment...',
     sessionExpired: "Hey, you're back! Sign in again.",
     signIn: 'Sign in',
-    signInOfflineHint: 'Connect to the internet to sign in.'
+    signInOfflineHint: 'Connect to the internet to sign in.',
+    wakingUp: 'The hive is still waking up...',
+    retry: 'Try again'
   },
   pl: {
     loading: 'Chwileczkę...',
     sessionExpired: 'Hej, wróciłeś! Zaloguj się ponownie.',
     signIn: 'Zaloguj się',
-    signInOfflineHint: 'Połącz się z internetem, aby się zalogować.'
+    signInOfflineHint: 'Połącz się z internetem, aby się zalogować.',
+    wakingUp: 'Ul się jeszcze budzi...',
+    retry: 'Spróbuj ponownie'
   }
 } as const;
 
@@ -112,6 +116,7 @@ function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [authCheckTimedOut, setAuthCheckTimedOut] = useState(false);
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [networkUnavailable, setNetworkUnavailable] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
@@ -141,14 +146,19 @@ function App() {
   }, [isOnline]);
 
   const checkAuthStatus = async () => {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 25_000);
+
     try {
       const res = await fetch('/api/auth-status', {
         credentials: 'include',
-        cache: 'no-store'
+        cache: 'no-store',
+        signal: controller.signal
       });
       if (res.ok) {
         const data = await res.json();
         setUser(data);
+        setAuthCheckTimedOut(false);
         if (!data.authenticated) {
           setSessionExpired(true);
         } else {
@@ -159,7 +169,9 @@ function App() {
       }
     } catch (err) {
       console.error('Failed to check auth status:', err);
+      setAuthCheckTimedOut(true);
     } finally {
+      window.clearTimeout(timeout);
       setLoading(false);
     }
   };
@@ -200,6 +212,12 @@ function App() {
 
   const signInDisabled = !isOnline || networkUnavailable || isSigningIn;
 
+  const retryAuthCheck = () => {
+    setAuthCheckTimedOut(false);
+    setLoading(true);
+    void checkAuthStatus();
+  };
+
   if (loading) {
     return (
       <main className="auth-loading">
@@ -211,6 +229,18 @@ function App() {
 
   if (user?.authenticated) {
     return <AuthenticatedHome user={user} />;
+  }
+
+  if (authCheckTimedOut && !user?.authenticated) {
+    return (
+      <main className="auth-loading">
+        <CapyBeeAvatar src={capyBeeAvatar.waving} size={120} />
+        <CapyBeeBubble text={authText.wakingUp} />
+        <button className="primary-button" type="button" onClick={retryAuthCheck}>
+          {authText.retry}
+        </button>
+      </main>
+    );
   }
 
   if (sessionExpired) {

@@ -34,6 +34,14 @@ export default defineConfig({
                 clientsClaim: true,
                 skipWaiting: true,
                 globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,woff2}'],
+                navigateFallback: '/index.html',
+                navigateFallbackDenylist: [
+                    /^\/api\//,
+                    /^\/oauth2\//,
+                    /^\/login/,
+                    /^\/logout/,
+                    /^\/actuator\//
+                ],
                 runtimeCaching: [
                     {
                         urlPattern: ({ url }) => url.pathname.startsWith('/api/'),

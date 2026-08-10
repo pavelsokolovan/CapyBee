@@ -95,7 +95,9 @@ export function startSyncLoop(): () => void {
   const interval = setInterval(flushQueue, 15_000);
   const onOnline = () => flushQueue();
   const onVisible = () => {
-    if (document.visibilityState === 'visible') flushQueue();
+    if (document.visibilityState === 'visible') {
+      setTimeout(flushQueue, 1500);
+    }
   };
   window.addEventListener('online', onOnline);
   document.addEventListener('visibilitychange', onVisible);
