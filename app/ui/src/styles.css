@@ -898,8 +898,12 @@ a:hover {
 
 .mission-card {
   overflow: hidden;
-  transition: max-height 300ms ease, opacity 300ms ease, padding 300ms ease, margin 300ms ease, border-color 300ms ease;
-  max-height: 420px;
+  transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
+}
+
+.mission-card--expanded {
+  border-color: rgba(139, 107, 42, 0.22);
+  box-shadow: 0 10px 22px rgba(95, 73, 30, 0.08);
 }
 
 .mission-header-row {
@@ -915,6 +919,36 @@ a:hover {
   min-width: 0;
 }
 
+.mission-accordion-header {
+  width: 100%;
+  border: none;
+  background: transparent;
+  min-height: 56px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.mission-accordion-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.mission-accordion-title {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #2d1d04;
+}
+
+.mission-accordion-time-pill,
 .mission-time-pill {
   display: inline-flex;
   width: fit-content;
@@ -924,12 +958,32 @@ a:hover {
   color: #6f5226;
   background: #f9efcd;
   border: 1px solid #eddca4;
+  flex-shrink: 0;
 }
 
-.mission-action-row {
-  margin-top: 12px;
+.mission-accordion-chevron {
+  display: block;
+  width: 16px;
+  height: 16px;
+  color: #7a6240;
+  transition: transform 200ms ease;
+  flex-shrink: 0;
+}
+
+.mission-accordion-body {
+  display: block;
+}
+
+.mission-accordion-body-inner {
+  padding-top: 12px;
+  border-top: 1px solid rgba(139, 107, 42, 0.12);
   display: grid;
-  gap: 4px;
+  gap: 12px;
+}
+
+.mission-accordion-actions {
+  display: grid;
+  gap: 8px;
 }
 
 .mission-primary-button {
@@ -937,6 +991,9 @@ a:hover {
 }
 
 .mission-skip-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 44px;
   min-width: 44px;
   padding: 0;
@@ -947,12 +1004,23 @@ a:hover {
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
   width: fit-content;
+  justify-self: center;
+  cursor: pointer;
+}
+
+.mission-skip-link:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .mission-note-block {
   margin-top: 12px;
   display: grid;
   gap: 10px;
+}
+
+.mission-accordion-note {
+  width: 100%;
 }
 
 .mission-note-actions {

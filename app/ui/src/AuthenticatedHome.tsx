@@ -255,6 +255,112 @@ function localizeMissionTitle(code: string, title: string, locale: 'en' | 'pl'):
   return missionTitleOverridesEn[code] ?? title;
 }
 
+function ChevronIcon({ expanded }: { expanded: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      className="mission-accordion-chevron"
+      style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+    >
+      <path d="M5 7.5L10 12.5L15 7.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+interface MissionAccordionRowProps {
+  mission: Mission;
+  locale: 'en' | 'pl';
+  note: string;
+  isExpanded: boolean;
+  isSaving: boolean;
+  skipPending: boolean;
+  showCheerFace: boolean;
+  prefersReducedMotion: boolean;
+  onToggle: () => void;
+  onNoteChange: (nextValue: string) => void;
+  onComplete: (missionId: string, noteValue: string) => void;
+  onSkip: (missionId: string) => void;
+}
+
+function MissionAccordionRow({
+  mission,
+  locale,
+  note,
+  isExpanded,
+  isSaving,
+  skipPending,
+  showCheerFace,
+  prefersReducedMotion,
+  onToggle,
+  onNoteChange,
+  onComplete,
+  onSkip
+}: MissionAccordionRowProps) {
+  const text = copy[locale];
+  const shouldShowExpandedBody = isExpanded && !isSaving;
+
+  return (
+    <article className={['list-card mission-card', isExpanded ? 'mission-card--expanded' : ''].join(' ').trim()}>
+      <button
+        type="button"
+        className="mission-accordion-header"
+        onClick={onToggle}
+        aria-expanded={isExpanded}
+        aria-controls={`mission-panel-${mission.id}`}
+      >
+        <CapyBeeAvatar src={showCheerFace ? capyBeeAvatar.faceHappy : capyBeeAvatar.faceOkay} size={36} />
+        <div className="mission-accordion-main">
+          <span className="mission-accordion-title">
+            {localizeMissionTitle(mission.code, mission.title, locale)}
+          </span>
+        </div>
+        <span className="mission-accordion-time-pill">{localizeMissionTimeHint(mission.timeHint, locale)}</span>
+        <ChevronIcon expanded={isExpanded} />
+      </button>
+
+      <motion.div
+        id={`mission-panel-${mission.id}`}
+        initial={false}
+        animate={shouldShowExpandedBody ? { opacity: 1, height: 'auto' } : { opacity: 0, height: 0 }}
+        transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.24, ease: 'easeInOut' }}
+        style={{ overflow: 'hidden' }}
+        className="mission-accordion-body"
+      >
+        <div className="mission-accordion-body-inner">
+          <textarea
+            rows={2}
+            className="check-in-note mission-accordion-note"
+            value={note}
+            onChange={(event) => onNoteChange(event.target.value)}
+            placeholder={text.missionOptionalNote}
+          />
+
+          <div className="mission-accordion-actions">
+            <button
+              type="button"
+              className="primary-button mission-primary-button"
+              onClick={() => onComplete(mission.id, note)}
+              disabled={isSaving}
+            >
+              {isSaving ? text.saving : text.markComplete}
+            </button>
+
+            <button
+              type="button"
+              className="mission-skip-link"
+              onClick={() => onSkip(mission.id)}
+              disabled={skipPending || isSaving}
+            >
+              {text.missionNotToday}
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </article>
+  );
+}
+
 const friendshipStageLabelMap = {
   en: {
     noticed: 'Noticed them',
@@ -583,7 +689,7 @@ function pickHomeGreetingIndex() {
 }
 
 export function AuthenticatedHome({ user }: { user: UserProfile }) {
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = Boolean(useReducedMotion());
   const [activeTab, setActiveTab] = useState<TabKey>('home');
   const [profile, setProfile] = useState<ChildProfile | null>(null);
   const [profileMissing, setProfileMissing] = useState(false);
@@ -1134,6 +1240,8 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   };
 
   const completeMission = async (missionId: string, noteValue: string) => {
+    setExpandedMissionId((current) => (current === missionId ? null : current));
+    setSavingMissionId(missionId);
     const clientId = crypto.randomUUID();
     const mission = missions.find((m) => m.id === missionId);
     const optimisticCompletion: MissionCompletion = {
@@ -1176,15 +1284,21 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       setHomeAnimatedCellId(clientId);
     }
 
-    await enqueueAction({
-      clientId,
-      type: 'missionCompletion',
-      path: `/api/missions/${missionId}/completions`,
-      method: 'POST',
-      payload: { note: noteValue },
-      createdAt: Date.now()
-    });
-    flushQueue();
+    try {
+      await enqueueAction({
+        clientId,
+        type: 'missionCompletion',
+        path: `/api/missions/${missionId}/completions`,
+        method: 'POST',
+        payload: { note: noteValue },
+        createdAt: Date.now()
+      });
+      flushQueue();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setSavingMissionId((current) => (current === missionId ? null : current));
+    }
   };
 
   const skipMission = async (missionId: string) => {
@@ -1869,65 +1983,24 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                     const showCheerFace = cheerMissionId === mission.id;
 
                     return (
-                      <article key={mission.id} className={['list-card', 'mission-card'].join(' ').trim()}>
-                        <div className="mission-header-row">
-                          <CapyBeeAvatar
-                            src={showCheerFace ? capyBeeAvatar.faceHappy : capyBeeAvatar.faceOkay}
-                            size={36}
-                          />
-                          <div className="mission-heading-block">
-                            <h3>{localizeMissionTitle(mission.code, mission.title, locale)}</h3>
-                            <span className="mission-time-pill">{localizeMissionTimeHint(mission.timeHint, locale)}</span>
-                          </div>
-                        </div>
-
-                        {!isExpanded ? (
-                          <div className="mission-action-row">
-                            <button
-                              className="primary-button mission-primary-button"
-                              onClick={() => setExpandedMissionId(mission.id)}
-                            >
-                              {text.markComplete}
-                            </button>
-                            <button
-                              className="mission-skip-link"
-                              onClick={() => skipMission(mission.id)}
-                              disabled={skipPendingMissionId !== null || isSaving}
-                            >
-                              {text.missionNotToday}
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="mission-note-block">
-                            <textarea
-                              rows={2}
-                              className="check-in-note"
-                              value={missionNote}
-                              onChange={(event) => setMissionNotes((current) => ({
-                                ...current,
-                                [mission.id]: event.target.value
-                              }))}
-                              placeholder={text.missionOptionalNote}
-                            />
-                            <div className="mission-note-actions">
-                              <button
-                                className="primary-button mission-primary-button"
-                                onClick={() => completeMission(mission.id, missionNote)}
-                                disabled={isSaving}
-                              >
-                                {isSaving ? text.saving : text.missionSave}
-                              </button>
-                              <button
-                                className="secondary-button"
-                                onClick={() => setExpandedMissionId(null)}
-                                disabled={isSaving}
-                              >
-                                {text.missionBack}
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </article>
+                      <MissionAccordionRow
+                        key={mission.id}
+                        mission={mission}
+                        locale={locale}
+                        note={missionNote}
+                        isExpanded={isExpanded}
+                        isSaving={isSaving}
+                        skipPending={skipPendingMissionId !== null}
+                        showCheerFace={showCheerFace}
+                        prefersReducedMotion={prefersReducedMotion}
+                        onToggle={() => setExpandedMissionId((current) => (current === mission.id ? null : mission.id))}
+                        onNoteChange={(nextValue) => setMissionNotes((current) => ({
+                          ...current,
+                          [mission.id]: nextValue
+                        }))}
+                        onComplete={completeMission}
+                        onSkip={skipMission}
+                      />
                     );
                   })}
                 </div>
