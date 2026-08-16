@@ -58,8 +58,8 @@ public class MissionService {
         FamilyProfile profile = childProfileService.getMyProfileEntity(token);
         boolean polish = isPolishLocale(profile.getPreferredLocale());
         List<Mission> missions = Boolean.TRUE.equals(active)
-                ? missionRepository.findTop20ByActiveOrderByCreatedAtDesc(true)
-                : missionRepository.findTop20ByOrderByCreatedAtDesc();
+                ? missionRepository.findByActiveOrderByCreatedAtDesc(true)
+                : missionRepository.findAllByOrderByCreatedAtDesc();
 
         if (Boolean.TRUE.equals(active)) {
             missions = missions.stream()
@@ -203,6 +203,7 @@ public class MissionService {
                 localizedTitle,
                 localizedTimeHint,
                 mission.getDescription(),
+                mission.getCategory(),
                 mission.isActive());
     }
 

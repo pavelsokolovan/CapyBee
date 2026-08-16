@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { CapyBeeAvatar, CapyBeeBubble, capyBeeAvatar, sameCalendarDay } from './capybee';
 import { useCapyBeePhrase } from './hooks/useCapyBeePhrase';
@@ -9,6 +9,14 @@ import { FriendshipStageSelector } from './components/FriendshipStageSelector';
 import { FriendshipToast } from './components/FriendshipToast';
 import { OnboardingTutorial } from './components/OnboardingTutorial';
 import { HomeIcon, MissionsIcon, FriendshipsIcon, MemoriesIcon, ProfileIcon } from './components/NavIcons';
+import {
+  CategoryAllIcon,
+  CategoryExploreIcon,
+  CategoryNewWorldIcon,
+  CategoryOldWorldIcon,
+  CategoryReflectionIcon,
+  CategorySocialIcon,
+} from './components/MissionCategoryIcons';
 import { useHoneycombCells } from './hooks/useHoneycombCells';
 import type { UseHoneycombCellsInput } from './hooks/useHoneycombCells';
 import oldWorldTabImage from './assets/honeycomb/old-world-tab.png';
@@ -46,14 +54,26 @@ interface ChildProfile {
   updatedAt: string;
 }
 
+type MissionCategoryKey = 'all' | 'social' | 'new_world' | 'old_world' | 'reflection' | 'exploration';
+
 interface Mission {
   id: string;
   code: string;
   title: string;
   timeHint: string;
   description: string;
+  category?: string;
   active: boolean;
 }
+
+const missionCategoryOrder: MissionCategoryKey[] = [
+  'all',
+  'social',
+  'new_world',
+  'old_world',
+  'reflection',
+  'exploration'
+];
 
 interface MissionCompletion {
   id: string;
@@ -126,7 +146,27 @@ const missionTitleOverridesPl: Record<string, string> = {
   cook_something_from_home: 'Zaproponuj rodzinie wspólne ugotowanie czegoś z domu',
   find_popular_school_sport: 'Dowiedz się, jaki sport jest popularny w nowej szkole',
   write_one_sentence_today_felt: 'Napisz jedno zdanie o tym, jak naprawdę minął dziś dzień',
-  offer_help_classmate_small: 'Zaproponuj koledze lub koleżance pomoc w czymś drobnym'
+  offer_help_classmate_small: 'Zaproponuj koledze lub koleżance pomoc w czymś drobnym',
+  invite_lunch_sit_together: 'Zaproś kogoś, żeby usiadł z tobą na lunchu',
+  learn_classmate_name: 'Naucz się imienia kogoś z klasy, kogo jeszcze nie znałeś/aś',
+  share_something_funny: 'Podziel się z kimś czymś zabawnym',
+  say_thank_you_helper: 'Podziękuj komuś, kto ci ostatnio pomógł/pomogła',
+  try_good_morning_local_language: 'Spróbuj powiedzieć dzień dobry w nowym języku',
+  find_nearest_park: 'Znajdź najbliższy park lub zielone miejsce blisko domu',
+  notice_new_neighborhood_sound: 'Zauważ jeden dźwięk w nowej okolicy, którego nie było w starej',
+  find_busiest_market_day: 'Dowiedz się, w który dzień lokalny sklep lub targ jest najbardziej ruchliwy',
+  listen_song_reminds_home: 'Posłuchaj piosenki, która przypomina ci dom',
+  write_favorite_holiday_tradition: 'Zapisz swoją ulubioną tradycję świąteczną z domu',
+  describe_old_bedroom_memory: 'Opisz z pamięci swój stary pokój',
+  recall_joke_from_home: 'Przypomnij sobie żart, który ktoś z domu ci opowiadał',
+  name_one_thing_proud_week: 'Wskaż jedną rzecz, z której jesteś dumny/a w tym tygodniu',
+  write_something_surprised_today: 'Zapisz jedną rzecz, która cię dziś zaskoczyła',
+  one_word_today_felt: 'Wymyśl jedno słowo, które opisuje dzisiejszy dzień',
+  notice_small_win_today: 'Zauważ jedną małą rzecz, która poszła lepiej, niż się spodziewałeś/aś',
+  find_nearest_library: 'Dowiedz się, gdzie jest biblioteka blisko domu',
+  look_up_local_holiday: 'Sprawdź jedno święto obchodzone tutaj, którego wcześniej nie znałeś/aś',
+  find_new_walk_route: 'Znajdź nową trasę na spacer lub rower w tym tygodniu',
+  discover_recess_game: 'Dowiedz się, w co bawią się dzieci na przerwie'
 };
 
 const missionTitleOverridesEn: Record<string, string> = {
@@ -154,7 +194,27 @@ const missionTitleOverridesEn: Record<string, string> = {
   cook_something_from_home: 'Ask your family to cook something from home together',
   find_popular_school_sport: 'Find out what sport is popular at your new school',
   write_one_sentence_today_felt: 'Write one sentence about how today actually felt',
-  offer_help_classmate_small: 'Offer to help a classmate with something small'
+  offer_help_classmate_small: 'Offer to help a classmate with something small',
+  invite_lunch_sit_together: 'Invite someone to sit with you at lunch',
+  learn_classmate_name: "Learn one classmate's name you didn't know",
+  share_something_funny: 'Share something funny with someone',
+  say_thank_you_helper: 'Say thank you to someone who helped you this week',
+  try_good_morning_local_language: 'Try saying good morning in the new language',
+  find_nearest_park: 'Find the nearest park or green space near your home',
+  notice_new_neighborhood_sound: "Notice one sound your new neighborhood makes that your old one didn't",
+  find_busiest_market_day: 'Find out what day the local market or store is busiest',
+  listen_song_reminds_home: 'Listen to a song that reminds you of home',
+  write_favorite_holiday_tradition: 'Write down your favorite holiday tradition from home',
+  describe_old_bedroom_memory: 'Describe your old bedroom from memory',
+  recall_joke_from_home: 'Think of a joke someone back home used to tell you',
+  name_one_thing_proud_week: "Name one thing you're proud of from this week",
+  write_something_surprised_today: 'Write down one thing that surprised you today',
+  one_word_today_felt: 'Think of one word that describes how today felt',
+  notice_small_win_today: 'Notice one small thing that went better than you expected',
+  find_nearest_library: 'Find out where the library is near your home',
+  look_up_local_holiday: "Look up one holiday celebrated here that's new to you",
+  find_new_walk_route: 'Find one new route to walk or bike this week',
+  discover_recess_game: 'Discover what game kids play at recess here'
 };
 
 function polishMinutesLabel(minutes: number): string {
@@ -277,6 +337,13 @@ const copy = {
     reactionGood: "That's great! I'm happy with you.",
     missionSuggestion: 'I have a small mission for you today ->',
     missionEmpty: 'No missions right now - check back tomorrow!',
+    missionEmptyCategory: 'Nothing here right now - try another group, or tap All.',
+    missionCategoryAll: 'All',
+    missionCategorySocial: 'People',
+    missionCategoryNewWorld: 'New World',
+    missionCategoryOldWorld: 'Old World',
+    missionCategoryReflection: 'Feelings',
+    missionCategoryExploration: 'Explore',
     missionDone: 'Mission done! A new cell in your hive',
     missionNotToday: 'Not today',
     missionOptionalNote: 'Anything you want to remember? (optional)',
@@ -381,6 +448,13 @@ const copy = {
     reactionGood: 'To świetnie! Cieszę się razem z tobą.',
     missionSuggestion: 'Mam dla ciebie małą misję na dziś ->',
     missionEmpty: 'Teraz nie ma nowych misji. Zajrzyj jutro!',
+    missionEmptyCategory: 'Nic tu teraz nie ma - spróbuj innej grupy albo kliknij Wszystkie.',
+    missionCategoryAll: 'Wszystkie',
+    missionCategorySocial: 'Ludzie',
+    missionCategoryNewWorld: 'Nowy świat',
+    missionCategoryOldWorld: 'Stary świat',
+    missionCategoryReflection: 'Uczucia',
+    missionCategoryExploration: 'Odkrywaj',
     missionDone: 'Misja wykonana! Nowa komórka w ulu.',
     missionNotToday: 'Nie dzisiaj',
     missionOptionalNote: 'Coś, co chcesz zapamiętać? (opcjonalnie)',
@@ -523,6 +597,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const [missionSuggestionVisible, setMissionSuggestionVisible] = useState(false);
 
   const [missions, setMissions] = useState<Mission[]>([]);
+  const [missionCategory, setMissionCategory] = useState<MissionCategoryKey>('all');
   const [missionCompletions, setMissionCompletions] = useState<MissionCompletion[]>([]);
   const [missionNotes, setMissionNotes] = useState<Record<string, string>>({});
   const [expandedMissionId, setExpandedMissionId] = useState<string | null>(null);
@@ -563,6 +638,13 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const [homeGreetingIndex] = useState(() => pickHomeGreetingIndex());
   const [tutorialActive, setTutorialActive] = useState(false);
   const [pendingSync, setPendingSync] = useState(0);
+  const tabScrollPositions = useRef<Record<TabKey, number>>({
+    home: 0,
+    missions: 0,
+    friendships: 0,
+    memories: 0,
+    profile: 0
+  });
 
 
   const [setupNickname, setSetupNickname] = useState('');
@@ -592,6 +674,24 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const profileButtonRef = useRef<HTMLButtonElement>(null);
 
   const text = copy[locale];
+  const missionCategoryIcon: Record<MissionCategoryKey, ComponentType<{ active?: boolean }>> = {
+    all: CategoryAllIcon,
+    social: CategorySocialIcon,
+    new_world: CategoryNewWorldIcon,
+    old_world: CategoryOldWorldIcon,
+    reflection: CategoryReflectionIcon,
+    exploration: CategoryExploreIcon
+  };
+
+  const missionCategoryLabelKey: Record<MissionCategoryKey, keyof typeof text> = {
+    all: 'missionCategoryAll',
+    social: 'missionCategorySocial',
+    new_world: 'missionCategoryNewWorld',
+    old_world: 'missionCategoryOldWorld',
+    reflection: 'missionCategoryReflection',
+    exploration: 'missionCategoryExploration'
+  };
+
   const moodLabels: Record<Mood, string> = {
     heavy: locale === 'pl' ? text.moodHeavy : 'Heavy',
     okay: locale === 'pl' ? text.moodOkay : 'Okay',
@@ -627,6 +727,11 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     }, 4300);
   };
 
+  const changeTab = (nextTab: TabKey) => {
+    tabScrollPositions.current[activeTab] = window.scrollY || window.pageYOffset || 0;
+    setActiveTab(nextTab);
+  };
+
   const moodPoolKey = (value: Mood): CapyBeePhrasePoolKey => {
     if (value === 'heavy') return 'moodHeavy';
     if (value === 'okay') return 'moodOkay';
@@ -658,6 +763,32 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       if (memoryDeleteTimerRef.current) window.clearTimeout(memoryDeleteTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    const saveCurrentScroll = () => {
+      tabScrollPositions.current[activeTab] = window.scrollY || window.pageYOffset || 0;
+    };
+
+    const handleScroll = () => {
+      saveCurrentScroll();
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      saveCurrentScroll();
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [activeTab]);
+
+  useEffect(() => {
+    const initialTop = 0;
+    window.scrollTo({ top: initialTop, behavior: 'auto' });
+  }, []);
+
+  useEffect(() => {
+    const restoreTop = tabScrollPositions.current[activeTab] ?? 0;
+    window.scrollTo({ top: restoreTop, behavior: 'auto' });
+  }, [activeTab]);
 
   useEffect(() => {
     if (profile) {
@@ -714,7 +845,17 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     [checkIns]
   );
 
-  const visibleMissions = useMemo(() => missions, [missions]);
+  const visibleMissions = useMemo(() => {
+    if (missionCategory === 'all') return missions;
+    return missions.filter((mission) => mission.category === missionCategory);
+  }, [missions, missionCategory]);
+
+  useEffect(() => {
+    if (missionCategory === 'all') return;
+    const hasAny = missions.some((mission) => mission.category === missionCategory);
+    if (!hasAny) setMissionCategory('all');
+  }, [missions, missionCategory]);
+
   const sortedFriendships = useMemo(() => {
     return [...friendships]
       .filter((entry) => !deletedFriendshipIds.has(entry.id))
@@ -1006,6 +1147,17 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     };
 
     setMissionCompletions((current) => [...current, optimisticCompletion]);
+    setMissions((current) => {
+      const index = current.findIndex((entry) => entry.id === missionId);
+      if (index === -1) {
+        return current;
+      }
+
+      const next = [...current];
+      const [completedMission] = next.splice(index, 1);
+      next.push(completedMission);
+      return next;
+    });
     setMissionNotes((current) => ({ ...current, [missionId]: '' }));
     setExpandedMissionId(null);
     setCheerMissionId(missionId);
@@ -1536,7 +1688,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
             ref={profileButtonRef}
             type="button"
             className={activeTab === 'profile' ? 'profile-nav-button active' : 'profile-nav-button'}
-            onClick={() => setActiveTab('profile')}
+            onClick={() => changeTab('profile')}
             aria-label={text.profile}
             aria-current={activeTab === 'profile' ? 'page' : undefined}
           >
@@ -1604,7 +1756,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
               </form>
 
               {missionSuggestionVisible ? (
-                <button className="suggestion-card" onClick={() => setActiveTab('missions')}>
+                <button className="suggestion-card" onClick={() => changeTab('missions')}>
                   <CapyBeeAvatar src={capyBeeAvatar.suggesting} size={96} />
                   <span>{text.missionSuggestion}</span>
                 </button>
@@ -1683,10 +1835,30 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                 className="world-tab-header-image"
               />
 
+              <div className="mission-category-row" role="tablist" aria-label={text.missions}>
+                {missionCategoryOrder.map((key) => {
+                  const Icon = missionCategoryIcon[key];
+                  const isActive = missionCategory === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      className={isActive ? 'mission-chip active' : 'mission-chip'}
+                      onClick={() => setMissionCategory(key)}
+                    >
+                      <Icon active={isActive} />
+                      <span>{text[missionCategoryLabelKey[key]]}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
               {visibleMissions.length === 0 ? (
                 <div className="capybee-center-block">
                   <CapyBeeAvatar src={capyBeeAvatar.default} size={120} />
-                  <CapyBeeBubble text={text.missionEmpty} />
+                  <CapyBeeBubble text={missionCategory === 'all' ? text.missionEmpty : text.missionEmptyCategory} />
                 </div>
               ) : (
                 <div className="list-stack">
@@ -2171,7 +2343,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
               ref={navRefByKey[key]}
               type="button"
               className={isActive ? 'nav-item active' : 'nav-item'}
-              onClick={() => setActiveTab(key)}
+              onClick={() => changeTab(key)}
               aria-current={isActive ? 'page' : undefined}
             >
               <Icon active={isActive} />

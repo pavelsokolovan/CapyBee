@@ -34,16 +34,17 @@ class MissionServiceTest {
         mission.setTitle("Test mission");
         mission.setTitleEn("Test mission");
         mission.setDescription("Test description");
+        mission.setCategory("social");
         mission.setActive(true);
 
         MissionRepository missionRepository = (MissionRepository) Proxy.newProxyInstance(
                 MissionRepository.class.getClassLoader(),
                 new Class<?>[]{MissionRepository.class},
                 (proxy, method, args) -> {
-                    if ("findTop20ByActiveOrderByCreatedAtDesc".equals(method.getName())) {
+                    if ("findByActiveOrderByCreatedAtDesc".equals(method.getName())) {
                         return List.of(mission);
                     }
-                    if ("findTop20ByOrderByCreatedAtDesc".equals(method.getName())) {
+                    if ("findAllByOrderByCreatedAtDesc".equals(method.getName())) {
                         return List.of(mission);
                     }
                     return null;
@@ -91,6 +92,7 @@ class MissionServiceTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).id()).isEqualTo(mission.getId());
+        assertThat(result.get(0).category()).isEqualTo("social");
     }
 
     private static void setField(Object target, String fieldName, Object value) {

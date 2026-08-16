@@ -11,9 +11,9 @@ import com.capybee.server.domain.mission.Mission;
 
 public interface MissionRepository extends JpaRepository<Mission, UUID> {
 
-    List<Mission> findTop20ByActiveOrderByCreatedAtDesc(boolean active);
+    List<Mission> findByActiveOrderByCreatedAtDesc(boolean active);
 
-    List<Mission> findTop20ByOrderByCreatedAtDesc();
+    List<Mission> findAllByOrderByCreatedAtDesc();
 
     @Query("select m from Mission m where m.active = :active")
     List<Mission> findActiveMissionsForProfileOrderByLastActionedAt(@Param("profileId") UUID profileId,

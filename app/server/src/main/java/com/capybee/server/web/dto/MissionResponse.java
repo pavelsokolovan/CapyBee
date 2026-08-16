@@ -8,5 +8,6 @@ public record MissionResponse(
         String title,
         String timeHint,
         String description,
+        String category,
         boolean active) {
 }
