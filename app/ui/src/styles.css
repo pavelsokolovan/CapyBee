@@ -27,12 +27,14 @@
 
 html {
   scroll-behavior: smooth;
+  overflow-x: hidden;
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 a {
@@ -506,12 +508,15 @@ a:hover {
 
 
 .app-shell {
-  width: min(980px, calc(100vw - 20px));
+  width: calc(100% - 20px);
+  max-width: 100%;
   margin: 0 auto;
   padding: 16px 0 120px;
 }
 
 .panel {
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid var(--panel-border);
   background: var(--panel);
   box-shadow: var(--shadow);
@@ -644,6 +649,11 @@ a:hover {
   margin-top: 14px;
   display: grid;
   gap: 12px;
+  min-width: 0;
+}
+
+.content-area > .panel {
+  min-width: 0;
 }
 
 .list-stack {
@@ -921,6 +931,7 @@ a:hover {
 
 .mission-accordion-header {
   width: 100%;
+  min-width: 0;
   border: none;
   background: transparent;
   min-height: 56px;
@@ -931,6 +942,22 @@ a:hover {
   text-align: left;
   cursor: pointer;
   color: inherit;
+}
+
+.mission-accordion-icon-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(242, 178, 51, 0.16);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mission-accordion-icon-badge svg {
+  width: 15px;
+  height: 15px;
 }
 
 .mission-accordion-main {
@@ -948,7 +975,18 @@ a:hover {
   color: #2d1d04;
 }
 
-.mission-accordion-time-pill,
+.mission-accordion-time-pill {
+  display: inline-flex;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  color: #6f5226;
+  background: #f9efcd;
+  border: 1px solid #eddca4;
+  flex-shrink: 0;
+}
+
 .mission-time-pill {
   display: inline-flex;
   width: fit-content;
@@ -1056,6 +1094,7 @@ a:hover {
   align-items: center;
   gap: 10px;
   margin-bottom: 12px;
+  min-width: 0;
 }
 
 .title-with-avatar h2 {
@@ -1304,7 +1343,7 @@ a:hover {
 
 .world-tab-header-image {
   width: 100%;
-  max-width: 420px;
+  max-width: 100%;
   height: auto;
   display: block;
   margin: 0 auto 16px;
@@ -1334,12 +1373,17 @@ a:hover {
 
 .mission-category-row {
   display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-wrap: nowrap;
   gap: 8px;
   overflow-x: auto;
   padding: 2px 2px 10px;
   margin-bottom: 4px;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  mask-image: linear-gradient(to right, transparent 0, black 12px, black calc(100% - 24px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0, black 12px, black calc(100% - 24px), transparent 100%);
 }
 
 .mission-category-row::-webkit-scrollbar {
@@ -1347,7 +1391,7 @@ a:hover {
 }
 
 .mission-chip {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1365,6 +1409,16 @@ a:hover {
   background: rgba(242, 178, 51, 0.2);
   border-color: var(--accent-strong);
   color: var(--ink);
+}
+
+.mission-chip--compact {
+  padding: 0;
+  width: 40px;
+  justify-content: center;
+}
+
+.mission-chip--compact span {
+  display: none;
 }
 
 .checkbox-inline {

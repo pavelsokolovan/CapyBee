@@ -44,6 +44,7 @@ server:
       cookie:
         max-age: 30d
         same-site: lax
+        secure: ${SESSION_COOKIE_SECURE:false}
 
 management:
   endpoints:

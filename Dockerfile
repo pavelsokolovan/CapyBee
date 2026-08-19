@@ -5,8 +5,9 @@ RUN npm install
 COPY app/ui/ ./
 RUN npm run build
 
-FROM maven:3.9.9-eclipse-temurin-25 AS server-build
+FROM eclipse-temurin:25-jdk AS server-build
 WORKDIR /workspace
+RUN apt-get update && apt-get install -y --no-install-recommends maven && rm -rf /var/lib/apt/lists/*
 COPY app/server/pom.xml app/server/pom.xml
 COPY app/server/src app/server/src
 COPY --from=ui-build /workspace/app/ui/dist app/server/src/main/resources/static

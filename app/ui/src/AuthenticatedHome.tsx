@@ -75,6 +75,15 @@ const missionCategoryOrder: MissionCategoryKey[] = [
   'exploration'
 ];
 
+const missionCategoryIconMap: Record<MissionCategoryKey, ComponentType<{ active?: boolean }>> = {
+  all: CategoryAllIcon,
+  social: CategorySocialIcon,
+  new_world: CategoryNewWorldIcon,
+  old_world: CategoryOldWorldIcon,
+  reflection: CategoryReflectionIcon,
+  exploration: CategoryExploreIcon
+};
+
 interface MissionCompletion {
   id: string;
   missionId: string;
@@ -248,6 +257,11 @@ function localizeMissionTimeHint(timeHint: string, locale: 'en' | 'pl'): string 
   return timeHint;
 }
 
+function formatMissionTimeHintCompact(timeHint: string): string {
+  const match = timeHint.trim().toLowerCase().match(/(\d+)\s*min/);
+  return match ? `${match[1]} min` : timeHint;
+}
+
 function localizeMissionTitle(code: string, title: string, locale: 'en' | 'pl'): string {
   if (locale === 'pl') {
     return missionTitleOverridesPl[code] ?? title;
@@ -275,7 +289,6 @@ interface MissionAccordionRowProps {
   isExpanded: boolean;
   isSaving: boolean;
   skipPending: boolean;
-  showCheerFace: boolean;
   prefersReducedMotion: boolean;
   onToggle: () => void;
   onNoteChange: (nextValue: string) => void;
@@ -290,7 +303,6 @@ function MissionAccordionRow({
   isExpanded,
   isSaving,
   skipPending,
-  showCheerFace,
   prefersReducedMotion,
   onToggle,
   onNoteChange,
@@ -309,13 +321,18 @@ function MissionAccordionRow({
         aria-expanded={isExpanded}
         aria-controls={`mission-panel-${mission.id}`}
       >
-        <CapyBeeAvatar src={showCheerFace ? capyBeeAvatar.faceHappy : capyBeeAvatar.faceOkay} size={36} />
+        <span className="mission-accordion-icon-badge">
+          {(() => {
+            const Icon = missionCategoryIconMap[(mission.category as MissionCategoryKey) ?? 'all'] ?? CategoryAllIcon;
+            return <Icon active={false} />;
+          })()}
+        </span>
         <div className="mission-accordion-main">
           <span className="mission-accordion-title">
             {localizeMissionTitle(mission.code, mission.title, locale)}
           </span>
         </div>
-        <span className="mission-accordion-time-pill">{localizeMissionTimeHint(mission.timeHint, locale)}</span>
+        <span className="mission-accordion-time-pill">{formatMissionTimeHintCompact(mission.timeHint)}</span>
         <ChevronIcon expanded={isExpanded} />
       </button>
 
@@ -328,6 +345,7 @@ function MissionAccordionRow({
         className="mission-accordion-body"
       >
         <div className="mission-accordion-body-inner">
+          <span className="mission-time-pill">{localizeMissionTimeHint(mission.timeHint, locale)}</span>
           <textarea
             rows={2}
             className="check-in-note mission-accordion-note"
@@ -708,7 +726,6 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const [missionNotes, setMissionNotes] = useState<Record<string, string>>({});
   const [expandedMissionId, setExpandedMissionId] = useState<string | null>(null);
   const [savingMissionId, setSavingMissionId] = useState<string | null>(null);
-  const [cheerMissionId, setCheerMissionId] = useState<string | null>(null);
   const [skipAcknowledgement, setSkipAcknowledgement] = useState<MissionSkipAcknowledgement | null>(null);
   const [skipUndoMissionId, setSkipUndoMissionId] = useState<string | null>(null);
   const [skipPendingMissionId, setSkipPendingMissionId] = useState<string | null>(null);
@@ -751,6 +768,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     memories: 0,
     profile: 0
   });
+  const missionCategoryRowRef = useRef<HTMLDivElement | null>(null);
 
 
   const [setupNickname, setSetupNickname] = useState('');
@@ -764,7 +782,6 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const missionSkipAckTimer = useRef<number | null>(null);
   const missionSkipCollapseTimer = useRef<number | null>(null);
   const missionSkipUndoTimer = useRef<number | null>(null);
-  const missionCheerTimer = useRef<number | null>(null);
   const friendshipDeleteTimer = useRef<number | null>(null);
   const memoryDeleteTimerRef = useRef<number | null>(null);
   const checkInDeleteTimerRef = useRef<number | null>(null);
@@ -780,15 +797,6 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const profileButtonRef = useRef<HTMLButtonElement>(null);
 
   const text = copy[locale];
-  const missionCategoryIcon: Record<MissionCategoryKey, ComponentType<{ active?: boolean }>> = {
-    all: CategoryAllIcon,
-    social: CategorySocialIcon,
-    new_world: CategoryNewWorldIcon,
-    old_world: CategoryOldWorldIcon,
-    reflection: CategoryReflectionIcon,
-    exploration: CategoryExploreIcon
-  };
-
   const missionCategoryLabelKey: Record<MissionCategoryKey, keyof typeof text> = {
     all: 'missionCategoryAll',
     social: 'missionCategorySocial',
@@ -864,7 +872,6 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       if (missionSkipAckTimer.current) window.clearTimeout(missionSkipAckTimer.current);
       if (missionSkipCollapseTimer.current) window.clearTimeout(missionSkipCollapseTimer.current);
       if (missionSkipUndoTimer.current) window.clearTimeout(missionSkipUndoTimer.current);
-      if (missionCheerTimer.current) window.clearTimeout(missionCheerTimer.current);
       if (friendshipDeleteTimer.current) window.clearTimeout(friendshipDeleteTimer.current);
       if (memoryDeleteTimerRef.current) window.clearTimeout(memoryDeleteTimerRef.current);
     };
@@ -894,6 +901,12 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   useEffect(() => {
     const restoreTop = tabScrollPositions.current[activeTab] ?? 0;
     window.scrollTo({ top: restoreTop, behavior: 'auto' });
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'missions' && missionCategoryRowRef.current) {
+      missionCategoryRowRef.current.scrollLeft = 0;
+    }
   }, [activeTab]);
 
   useEffect(() => {
@@ -1268,13 +1281,6 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     });
     setMissionNotes((current) => ({ ...current, [missionId]: '' }));
     setExpandedMissionId(null);
-    setCheerMissionId(missionId);
-    if (missionCheerTimer.current) {
-      window.clearTimeout(missionCheerTimer.current);
-    }
-    missionCheerTimer.current = window.setTimeout(() => {
-      setCheerMissionId((current) => (current === missionId ? null : current));
-    }, 2200);
     triggerFeedback({
       kind: 'mission',
       phrase: pickPhrase('missionComplete'),
@@ -1949,21 +1955,23 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                 className="world-tab-header-image"
               />
 
-              <div className="mission-category-row" role="tablist" aria-label={text.missions}>
+              <div className="mission-category-row" role="tablist" aria-label={text.missions} ref={missionCategoryRowRef}>
                 {missionCategoryOrder.map((key) => {
-                  const Icon = missionCategoryIcon[key];
+                  const Icon = missionCategoryIconMap[key];
                   const isActive = missionCategory === key;
+                  const label = text[missionCategoryLabelKey[key]];
                   return (
                     <button
                       key={key}
                       type="button"
                       role="tab"
                       aria-selected={isActive}
-                      className={isActive ? 'mission-chip active' : 'mission-chip'}
+                      aria-label={label}
+                      className={isActive ? 'mission-chip active' : 'mission-chip mission-chip--compact'}
                       onClick={() => setMissionCategory(key)}
                     >
                       <Icon active={isActive} />
-                      <span>{text[missionCategoryLabelKey[key]]}</span>
+                      {isActive ? <span>{label}</span> : null}
                     </button>
                   );
                 })}
@@ -1980,8 +1988,6 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                     const isExpanded = expandedMissionId === mission.id;
                     const isSaving = savingMissionId === mission.id;
                     const missionNote = missionNotes[mission.id] ?? '';
-                    const showCheerFace = cheerMissionId === mission.id;
-
                     return (
                       <MissionAccordionRow
                         key={mission.id}
@@ -1991,7 +1997,6 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                         isExpanded={isExpanded}
                         isSaving={isSaving}
                         skipPending={skipPendingMissionId !== null}
-                        showCheerFace={showCheerFace}
                         prefersReducedMotion={prefersReducedMotion}
                         onToggle={() => setExpandedMissionId((current) => (current === mission.id ? null : mission.id))}
                         onNoteChange={(nextValue) => setMissionNotes((current) => ({
