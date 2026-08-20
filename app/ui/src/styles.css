@@ -975,6 +975,23 @@ a:hover {
   color: #2d1d04;
 }
 
+.mission-card--expanded .mission-accordion-title {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  overflow-wrap: anywhere;
+}
+
+.mission-card--expanded .mission-accordion-header {
+  align-items: flex-start;
+  padding-top: 2px;
+}
+
+.mission-card--expanded .mission-accordion-time-pill,
+.mission-card--expanded .mission-accordion-chevron {
+  margin-top: 2px;
+}
+
 .mission-accordion-time-pill {
   display: inline-flex;
   width: fit-content;
