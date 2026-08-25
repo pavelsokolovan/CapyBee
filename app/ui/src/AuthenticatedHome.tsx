@@ -26,6 +26,7 @@ import friendshipsTabImage from './assets/honeycomb/friedships-tab.png';
 import { STAGE_META, type FriendshipStage } from './constants/friendshipStages';
 import { enqueueAction } from './offline/queueStore';
 import { flushQueue, startSyncLoop, onSyncStatusChange } from './offline/syncEngine';
+import { getSessionToken, clearSessionToken } from './sessionPersistence';
 
 export interface UserProfile {
   authenticated: boolean;
@@ -1830,7 +1831,24 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
               <option value="pl">PL</option>
             </select>
           </label>
-          <a href="/logout" className="secondary-button logout-button" aria-label={text.logout}>
+          <a
+            href="/logout"
+            className="secondary-button logout-button"
+            aria-label={text.logout}
+            onClick={() => {
+              const token = getSessionToken();
+              clearSessionToken();
+              if (token) {
+                void fetch('/api/session/revoke', {
+                  method: 'POST',
+                  credentials: 'include',
+                  keepalive: true,
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ token })
+                });
+              }
+            }}
+          >
             <span className="logout-label-full">{text.logout}</span>
             <span className="logout-label-short" aria-hidden="true">{locale === 'pl' ? 'Wyj.' : 'Out'}</span>
           </a>

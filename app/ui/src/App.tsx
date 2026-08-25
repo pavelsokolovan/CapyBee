@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { AuthenticatedHome } from './AuthenticatedHome';
 import type { UserProfile } from './AuthenticatedHome';
 import { CapyBeeAvatar, CapyBeeBubble, capyBeeAvatar } from './capybee';
+import { storeSessionToken, getSessionToken, clearSessionToken } from './sessionPersistence';
 
 const authCopy = {
   en: {
@@ -126,6 +127,7 @@ function App() {
   const t = landingCopy[locale];
 
   useEffect(() => {
+    captureSessionTokenFromFragment();
     checkAuthStatus();
   }, []);
 
@@ -157,6 +159,9 @@ function App() {
       });
       if (res.ok) {
         const data = await res.json();
+        if (!data.authenticated && (await restoreSessionFromToken())) {
+          return;
+        }
         setUser(data);
         setAuthCheckTimedOut(false);
         if (!data.authenticated) {
@@ -165,6 +170,9 @@ function App() {
           setSessionExpired(false);
         }
       } else if (res.status === 401) {
+        if (await restoreSessionFromToken()) {
+          return;
+        }
         setSessionExpired(true);
       }
     } catch (err) {
@@ -173,6 +181,57 @@ function App() {
     } finally {
       window.clearTimeout(timeout);
       setLoading(false);
+    }
+  };
+
+  /**
+   * Picks up the one-time restore token Google login redirects back with
+   * (as a URL fragment, never sent to the server) and stores it locally.
+   */
+  const captureSessionTokenFromFragment = () => {
+    const match = /(?:^|#)session_token=([^&]+)/.exec(window.location.hash);
+    if (!match) return;
+    storeSessionToken(decodeURIComponent(match[1]));
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+  };
+
+  /**
+   * Falls back to the localStorage-backed restore token when the session
+   * cookie itself was dropped (e.g. Android PWA killed from recents), so the
+   * user isn't forced to re-authenticate with Google every time.
+   */
+  const restoreSessionFromToken = async (): Promise<boolean> => {
+    const token = getSessionToken();
+    if (!token) return false;
+
+    try {
+      const res = await fetch('/api/session/restore', {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      });
+      if (!res.ok) {
+        clearSessionToken();
+        return false;
+      }
+      const data = await res.json();
+      if (!data.authenticated) {
+        clearSessionToken();
+        return false;
+      }
+      if (data.sessionToken) {
+        storeSessionToken(data.sessionToken);
+      }
+      setUser(data);
+      setSessionExpired(false);
+      setAuthCheckTimedOut(false);
+      setLoading(false);
+      return true;
+    } catch (err) {
+      console.error('Failed to restore session from token:', err);
+      return false;
     }
   };
 

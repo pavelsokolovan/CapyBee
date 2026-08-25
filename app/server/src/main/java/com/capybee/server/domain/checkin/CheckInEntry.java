@@ -76,6 +76,10 @@ public class CheckInEntry {
         this.note = note;
     }
 
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }
