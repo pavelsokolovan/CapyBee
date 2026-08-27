@@ -191,7 +191,8 @@ Without the child realizing it:
 - COPPA compliance mindset — minimal data collection
 - All data encrypted at rest
 - HTTPS only (automatic on Fly.io)
-- JWT authentication via Spring Security
+- Google OAuth2 login via Spring Security, server-side sessions (Spring
+  Session JDBC) with a localStorage restore-token fallback for installed PWAs
 
 ---
 
@@ -199,10 +200,11 @@ Without the child realizing it:
 
 | Layer | Technology |
 |---|---|
-| Backend | Spring Boot 3 + Java 21 |
-| Frontend | React + Tailwind CSS + Framer Motion |
-| Database | PostgreSQL (Fly Postgres) |
-| Authentication | Spring Security + JWT |
+| Backend | Spring Boot 4.1 + Java 25, Maven |
+| Frontend | React 19 + TypeScript + Vite 6 + Tailwind CSS 3 + Framer Motion |
+| PWA | `vite-plugin-pwa` (installable, offline app shell), `idb-keyval` for the offline write queue |
+| Database | PostgreSQL (Fly Postgres), Flyway migrations |
+| Authentication | Google OAuth2 (Spring Security) + server-side sessions (Spring Session JDBC) + localStorage restore-token fallback |
 | Hosting | Fly.io |
 | Container | Docker (single container — backend serves React build) |
 | CI/CD | GitHub Actions → auto deploy to Fly.io |
@@ -226,21 +228,25 @@ All in one Docker container on Fly.io
 
 ## 12. Next Steps to Build
 
-- [ ] Design CapyBee character visually
-- [ ] Wireframe main screens (honeycomb map, check-in, missions, two worlds)
-- [ ] Scaffold Spring Boot project structure
-- [ ] Set up React + Tailwind + Framer Motion frontend
-- [ ] Write Dockerfile (single container)
-- [ ] Deploy skeleton app to Fly.io
-- [ ] Build daily check-in flow
-- [ ] Build honeycomb map component
-- [ ] Build Old World / New World spaces
-- [ ] Add bilingual support (EN/PL)
-- [ ] Build mission system
-- [ ] Build friendship tracker
-- [ ] Parent account + child account auth flow
+- [x] Design CapyBee character visually
+- [x] Wireframe main screens (honeycomb map, check-in, missions, two worlds)
+- [x] Scaffold Spring Boot project structure
+- [x] Set up React + Tailwind + Framer Motion frontend
+- [x] Write Dockerfile (single container)
+- [x] Deploy skeleton app to Fly.io
+- [x] Build daily check-in flow
+- [x] Build honeycomb map component
+- [x] Build Old World / New World spaces
+- [x] Add bilingual support (EN/PL)
+- [x] Build mission system
+- [x] Build friendship tracker
+- [x] Parent account + child account auth flow
 - [ ] Beta test with real kids
 
 ---
 
-*Document generated from initial concept session. Ready to use as reference for development.*
+*Document generated from initial concept session. Tech stack section refreshed
+2026-08-27 to match the implemented codebase — see
+[.github/copilot-instructions.md](../.github/copilot-instructions.md) for
+current coding conventions.*
+

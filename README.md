@@ -1,6 +1,10 @@
 # CapyBee
 
-CapyBee is a Spring Boot + React web app for kids who are adapting to a new country. The first release focuses on Google sign-in, a welcoming landing page, and a small set of database-backed user data.
+CapyBee ("Razem budujemy nowy ul" / "Together we build a new hive") is a
+Spring Boot + React companion app for ~12-year-olds adapting to a new
+country. It pairs a daily mood check-in with small real-world missions, a
+private friendship tracker, and an "Old World / New World" memory space, all
+visualized on a growing honeycomb progress map.
 
 ## Repository Layout
 
@@ -8,19 +12,33 @@ CapyBee is a Spring Boot + React web app for kids who are adapting to a new coun
 - `app/ui` - React frontend, landing page, and app shell
 - `docs` - concept notes and implementation specifications
 
-## Initial Scope
+## Implemented Functionality
 
-- Google account sign-in and account bootstrap
-- First landing page with clear entry points into the app
-- Database storage for user profile, check-ins, and early app activity
-- Fly.io deployment using a single container
+- Google account sign-in (Spring Security OAuth2) with server-side sessions
+  and a localStorage restore-token fallback for installed PWAs
+- Child profile setup (nickname, birth year, locale, avatar)
+- Daily mood check-in (heavy / okay / good) with optional note and bilingual
+  CapyBee responses
+- Honeycomb progress map combining check-ins, missions, friendships, and
+  memories into one growing hive
+- Missions ("Capy Quests") with categories, completion notes, and history
+- Private friendship tracker (noticed / was nice / talked / want to know
+  better) - no social features between users
+- Old World / New World memory space with favorites
+- Full EN/PL bilingual UI
+- Installable PWA with offline app shell and an offline write queue (IndexedDB)
+  that syncs check-ins, missions, friendships, and memories once back online
+- Onboarding tutorial for first-time users
+- Single-container Fly.io deployment with a private Postgres instance
 
 ## Stack
 
-- Backend: Java 21, Spring Boot, Spring Security, Spring Data JPA, Flyway
-- Frontend: React, TypeScript, Vite, Tailwind CSS
+- Backend: Java 25, Spring Boot 4.1, Spring Security (OAuth2 client),
+  Spring Data JPA, Spring Session JDBC, Flyway, Maven
+- Frontend: React 19, TypeScript, Vite 6, Tailwind CSS 3, Framer Motion,
+  `vite-plugin-pwa`, `idb-keyval` (offline queue)
 - Database: PostgreSQL
-- Deployment: Fly.io
+- Deployment: Fly.io (single container, backend serves the React build)
 
 ## Local Development
 
@@ -29,7 +47,7 @@ The project is scaffolded as a mono-repo, so the backend and frontend can be dev
 ### Suggested workflow
 
 1. Copy `.env.example` to `.env` and fill in the Google OAuth and database values.
-2. Run the backend from `app/server` with Java 21 and PostgreSQL available.
+2. Run the backend from `app/server` with Java 25 and PostgreSQL available.
 3. Run the UI from `app/ui` with Node.js and Vite.
 4. Build the Docker image from the repo root and deploy it to Fly.io.
 
