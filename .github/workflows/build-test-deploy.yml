@@ -49,6 +49,10 @@ jobs:
         working-directory: app/ui
         run: npm ci
 
+      - name: Audit UI dependencies
+        working-directory: app/ui
+        run: npm audit --audit-level=high
+
       - name: Run UI tests and coverage gate
         working-directory: app/ui
         run: npm run test:coverage
