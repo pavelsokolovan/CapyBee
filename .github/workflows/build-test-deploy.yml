@@ -49,6 +49,10 @@ jobs:
         working-directory: app/ui
         run: npm ci
 
+      - name: Run UI tests and coverage gate
+        working-directory: app/ui
+        run: npm run test:coverage
+
       - name: Build UI
         working-directory: app/ui
         run: npm run build
@@ -90,6 +94,14 @@ jobs:
         with:
           name: jacoco-report
           path: app/server/target/site/jacoco/
+          retention-days: 30
+
+      - name: Upload UI coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-coverage-report
+          path: app/ui/coverage/
           retention-days: 30
 
   deploy:
