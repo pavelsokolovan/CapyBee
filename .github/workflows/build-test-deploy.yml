@@ -66,7 +66,7 @@ jobs:
 
       - name: Run backend tests
         working-directory: app/server
-        run: mvn -B test
+        run: mvn -B verify
         env:
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/capybee
           SPRING_DATASOURCE_USERNAME: capybee
@@ -82,6 +82,14 @@ jobs:
         with:
           name: test-results
           path: app/server/target/surefire-reports/
+          retention-days: 30
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: app/server/target/site/jacoco/
           retention-days: 30
 
   deploy:
