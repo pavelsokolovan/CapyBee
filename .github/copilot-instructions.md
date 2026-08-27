@@ -99,6 +99,27 @@ Monorepo layout:
   unit-testable and side-effect-free where possible.
 - Cover the happy path and at least one edge/offline-retry case for new
   write operations.
+- Mandatory: any new or modified pure logic outside React components —
+  offline queue (`src/offline/queueStore.ts`), sync engine
+  (`src/offline/syncEngine.ts`), `sessionPersistence.ts`, and similar
+  side-effect-light helpers/hooks — must ship with Vitest unit tests in the
+  same PR (`app/ui/src/**/*.test.ts`), covering the happy path plus at least
+  one failure/retry/edge case. Follow the existing pattern in
+  `queueStore.test.ts` / `syncEngine.test.ts` (happy-dom environment,
+  `idb-keyval` mocked/faked as needed). Run `npm test` (or
+  `npm run test:coverage`) in `app/ui` before considering frontend work done.
+- Mandatory: any new or modified method in `app/server/.../service/` must
+  ship with unit tests in the same PR — cover the success path plus every
+  validation/error branch (400/404/409/403 `ResponseStatusException`s,
+  idempotent-create-by-id branches, ownership checks). Follow the existing
+  Mockito pattern (`@ExtendWith(MockitoExtension.class)`, `@Mock` on
+  repositories/collaborators, `@InjectMocks` on the service under test) —
+  see `CheckInServiceTest`, `ChildProfileServiceTest`,
+  `MissionServiceCompletionTest` for the reference style.
+- `app/server/pom.xml` enforces a JaCoCo line-coverage gate (currently 70%)
+  on `com.capybee.server.service.*` via `mvn verify` (also run in CI). Do
+  not lower this threshold to make a build pass — add the missing tests
+  instead. Run `mvn verify` locally before considering backend work done.
 
 ## Build & workflow notes
 
