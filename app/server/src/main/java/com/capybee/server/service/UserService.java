@@ -12,6 +12,8 @@ import com.capybee.server.repository.UserAccountRepository;
 @Service
 public class UserService {
 
+    private static final int AVATAR_URL_MAX_LENGTH = 2048;
+
     private final UserAccountRepository userAccountRepository;
 
     public UserService(UserAccountRepository userAccountRepository) {
@@ -36,9 +38,17 @@ public class UserService {
         newUser.setGoogleSubject(googleSubject);
         newUser.setEmail(email);
         newUser.setDisplayName(displayName);
-        newUser.setAvatarUrl(avatarUrl);
+        // Family Link (supervised child) accounts can return avatar URLs longer than the column limit
+        newUser.setAvatarUrl(truncate(avatarUrl, AVATAR_URL_MAX_LENGTH));
         newUser.setLocale("en");
         return userAccountRepository.save(newUser);
+    }
+
+    private static String truncate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength);
     }
 
     public UserAccount getCurrentUser(OAuth2AuthenticationToken token) {

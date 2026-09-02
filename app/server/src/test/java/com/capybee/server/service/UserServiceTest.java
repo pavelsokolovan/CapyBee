@@ -78,4 +78,18 @@ class UserServiceTest {
 
         assertEquals("google-1", result.getGoogleSubject());
     }
+
+    @Test
+    void findOrCreateFromOAuth2TruncatesOverlongAvatarUrl() {
+        when(userAccountRepository.findByGoogleSubject("google-child")).thenReturn(Optional.empty());
+        when(userAccountRepository.save(any(UserAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        String overlongPicture = "http://pic/" + "a".repeat(3000);
+
+        UserAccount result = userService.findOrCreateFromOAuth2(
+                tokenFor("google-child", "child@family.com", "Child", overlongPicture));
+
+        assertEquals(2048, result.getAvatarUrl().length());
+        assertTrue(overlongPicture.startsWith(result.getAvatarUrl()));
+    }
 }

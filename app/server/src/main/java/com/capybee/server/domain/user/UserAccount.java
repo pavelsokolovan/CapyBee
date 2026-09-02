@@ -29,7 +29,7 @@ public class UserAccount {
     @Column(name = "display_name", nullable = false, length = 255)
     private String displayName;
 
-    @Column(name = "avatar_url", length = 512)
+    @Column(name = "avatar_url", length = 2048)
     private String avatarUrl;
 
     @Column(length = 64)
