@@ -3,6 +3,9 @@ import { listQueuedActions, updateAction, removeAction, type QueuedAction } from
 const MAX_ATTEMPTS = 8;
 const REQUEST_TIMEOUT_MS = 45_000;
 const BASE_BACKOFF_MS = 3_000;
+const SYNC_INTERVAL_MS = 15_000;
+const IDLE_SYNC_TIMEOUT_MS = 5 * 60_000;
+const USER_ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'touchstart', 'scroll'] as const;
 
 type SyncListener = (pendingCount: number) => void;
 const listeners = new Set<SyncListener>();
@@ -91,19 +94,64 @@ export async function flushQueue(): Promise<void> {
 }
 
 export function startSyncLoop(): () => void {
+  let lastUserActivityAt = Date.now();
+  let activityFlushQueued = false;
+  let activityFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const shouldFlushPeriodically = () => {
+    return document.visibilityState === 'visible' && Date.now() - lastUserActivityAt < IDLE_SYNC_TIMEOUT_MS;
+  };
+
+  const flushIfActive = () => {
+    if (shouldFlushPeriodically()) {
+      void flushQueue();
+    }
+  };
+
+  const queueActivityFlush = () => {
+    if (activityFlushQueued) return;
+    activityFlushQueued = true;
+    activityFlushTimer = setTimeout(() => {
+      activityFlushQueued = false;
+      activityFlushTimer = null;
+      void flushQueue();
+    }, 0);
+  };
+
+  const markUserActive = () => {
+    const wasIdle = !shouldFlushPeriodically();
+    lastUserActivityAt = Date.now();
+    if (document.visibilityState === 'visible' && wasIdle) {
+      queueActivityFlush();
+    }
+  };
+
   flushQueue();
-  const interval = setInterval(flushQueue, 15_000);
-  const onOnline = () => flushQueue();
+  const interval = setInterval(flushIfActive, SYNC_INTERVAL_MS);
+  const onOnline = () => {
+    markUserActive();
+    flushIfActive();
+  };
   const onVisible = () => {
     if (document.visibilityState === 'visible') {
+      markUserActive();
       setTimeout(flushQueue, 1500);
     }
   };
   window.addEventListener('online', onOnline);
   document.addEventListener('visibilitychange', onVisible);
+  USER_ACTIVITY_EVENTS.forEach((eventName) => {
+    window.addEventListener(eventName, markUserActive, { passive: true });
+  });
   return () => {
     clearInterval(interval);
+    if (activityFlushTimer) {
+      clearTimeout(activityFlushTimer);
+    }
     window.removeEventListener('online', onOnline);
     document.removeEventListener('visibilitychange', onVisible);
+    USER_ACTIVITY_EVENTS.forEach((eventName) => {
+      window.removeEventListener(eventName, markUserActive);
+    });
   };
 }

@@ -153,4 +153,23 @@ describe('offline sync engine', () => {
     expect(queueStore.listQueuedActions).toHaveBeenCalledTimes(6);
     cleanup();
   });
+
+  it('pauses periodic flushing after foreground inactivity and resumes on user activity', async () => {
+    vi.useFakeTimers();
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+
+    const cleanup = startSyncLoop();
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+
+    const callsAfterIdleTimeout = queueStore.listQueuedActions.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(queueStore.listQueuedActions).toHaveBeenCalledTimes(callsAfterIdleTimeout);
+
+    window.dispatchEvent(new PointerEvent('pointerdown'));
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(queueStore.listQueuedActions.mock.calls.length).toBeGreaterThan(callsAfterIdleTimeout);
+    cleanup();
+  });
 });
