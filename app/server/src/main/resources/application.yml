@@ -5,6 +5,13 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/capybee}
     username: ${SPRING_DATASOURCE_USERNAME:capybee}
     password: ${SPRING_DATASOURCE_PASSWORD:capybee}
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 0
+      max-lifetime: 10m
+      keepalive-time: 2m
+      connection-timeout: 30s
+      validation-timeout: 5s
   jpa:
     hibernate:
       ddl-auto: validate
