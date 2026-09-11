@@ -2,6 +2,9 @@
 
 This folder collects the implementation-facing documents that turn the product concept into buildable pieces.
 
+Before you spec something
+For anything substantial (new screen, new feature, data model change), write a short intent note first — see intent/README.md. Numbered specs below should always trace back to one.
+
 ## Foundational Documents
 
 - `00-overview.md` - product scope, first page, auth flow, data model, and deployment path
