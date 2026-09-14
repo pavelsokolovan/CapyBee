@@ -1,0 +1,402 @@
+---
+# JaCoCo Coverage Gate Troubleshooting — CapyBee
+
+This reference explains the JaCoCo line-coverage gate, how to diagnose failures, and how to improve coverage.
+
+## Overview
+
+**CapyBee enforces:** 70% line coverage on `com.capybee.server.service.*` package via JaCoCo.
+
+**Run locally:**
+```bash
+cd app/server
+mvn verify
+```
+
+**Expected output (pass):**
+```
+[INFO] Building execution data file ...
+[INFO] Coverage report generated at target/site/jacoco/index.html
+[INFO] Line coverage: 93% (390/421 lines)
+[INFO] [INFO] CHECK PASSED: Line coverage (93%) >= 70%
+```
+
+**Failed output:**
+```
+[ERROR] **CHECK FAILED** - Line coverage (65%) < threshold (70%)
+[ERROR] Please add tests for uncovered methods.
+```
+
+## Configuration
+
+**Location:** `app/server/pom.xml`
+
+```xml
+<plugin>
+  <groupId>org.jacoco</groupId>
+  <artifactId>jacoco-maven-plugin</artifactId>
+  <version>0.8.15</version> <!-- Java 26 support; bump if JDK updated -->
+  
+  <executions>
+    <execution>
+      <goals>
+        <goal>prepare-agent</goal>
+      </goals>
+    </execution>
+
+    <execution>
+      <id>report</id>
+      <phase>test</phase>
+      <goals>
+        <goal>report</goal>
+      </goals>
+    </execution>
+
+    <execution>
+      <id>coverage-check</id>
+      <phase>verify</phase>
+      <goals>
+        <goal>check</goal>
+      </goals>
+      <configuration>
+        <rules>
+          <rule>
+            <element>PACKAGE</element>
+            <includes>
+              <include>com.capybee.server.service.*</include>
+            </includes>
+            <limits>
+              <limit>
+                <counter>LINE</counter>
+                <value>COVEREDRATIO</value>
+                <minimum>0.70</minimum> <!-- 70% threshold -->
+              </limit>
+            </limits>
+          </rule>
+        </rules>
+      </configuration>
+    </execution>
+  </executions>
+</plugin>
+```
+
+## Diagnosing Coverage Failures
+
+### Step 1: Run mvn verify and Capture Output
+```bash
+cd app/server
+mvn clean verify 2>&1 | tee coverage-report.txt
+```
+
+**Look for:**
+- Current coverage percentage
+- Which package/class failed
+- Message: "Please add tests for uncovered methods"
+
+### Step 2: Open the Coverage Report
+```bash
+# On Windows
+start target/site/jacoco/index.html
+
+# Or open in VS Code
+code target/site/jacoco/index.html
+```
+
+**Report shows:**
+- Overall service package coverage (e.g., 65% / 70%)
+- Breakdown by class (e.g., YourService 50%, AnotherService 90%)
+- Drill into class → see which methods/lines are uncovered
+
+### Step 3: Identify Uncovered Lines
+Click a service class in the report. Green = covered, red = uncovered.
+
+**Common uncovered patterns:**
+- Exception message constructors: `"Record not found"` string literal
+- Null checks: `if (object == null)`
+- Unreachable branches: `else` clause in defensive code
+- Getter/setter bodies (rarely tested in service layer)
+
+**Example (CheckInService):**
+```java
+public CheckInResponse getCheckIn(UUID id, UUID childProfileId) {
+  var entity = repository.findByIdAndChildProfile_Id(id, childProfileId)
+    .filter(e -> e.getDeletedAt() == null)
+    .orElseThrow(() ->
+      // ← This string is rarely covered (exception path not always tested)
+      new ResponseStatusException(HttpStatus.NOT_FOUND, "CheckIn not found")
+    );
+  return CheckInResponse.fromEntity(entity);
+}
+```
+
+### Step 4: Count Uncovered Lines
+```bash
+# Extract coverage CSV
+cat target/site/jacoco/jacoco.csv | grep "com.capybee.server.service" | awk -F, '{
+  covered += $5;
+  missed += $6;
+  total = covered + missed;
+}
+END {
+  coverage = (covered / total) * 100;
+  printf "Coverage: %d/%d (%.1f%%)\n", covered, total, coverage;
+  printf "Uncovered lines: %d\n", missed;
+}'
+```
+
+Output example:
+```
+Coverage: 390/421 (92.6%)
+Uncovered lines: 31
+```
+
+## Common Gaps & How to Fix
+
+### Gap 1: Exception Messages Uncovered
+**Problem:** Tests for 404/403 paths exist, but the exception message string is uncovered (JaCoCo counts string literals separately).
+
+**Why:** The exception is thrown, but the message is only used if the exception is logged/displayed.
+
+**Fix:** Accept this gap; it's low-value to test. Message strings are minor.
+
+**Workaround (if needed):**
+```java
+@Test
+void getCheckIn_notFound_throwsWithMessage() {
+  when(repository.findByIdAndChildProfile_Id(id, childProfileId))
+    .thenReturn(Optional.empty());
+
+  var exception = assertThrows(ResponseStatusException.class, () ->
+    service.getCheckIn(id, childProfileId)
+  );
+
+  assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+  assertThat(exception.getReason()).contains("CheckIn not found"); // Message test
+}
+```
+
+But this is often skipped because status code is sufficient.
+
+### Gap 2: Getter/Setter Methods
+**Problem:** Entity getters and setters are uncovered.
+
+**Why:** Service tests pass entity fields through DTOs, not directly to getters.
+
+**Fix:** These are usually intentionally untested (trivial, auto-generated by IDE). Accept as uncovered.
+
+**Alternative:** If absolutely necessary:
+```java
+@Test
+void entity_gettersAndSetters() {
+  var entity = new YourEntity(id, profile, "test");
+  assertEquals("test", entity.getFieldName());
+  
+  entity.setFieldName("updated");
+  assertEquals("updated", entity.getFieldName());
+}
+```
+
+### Gap 3: Complex Branching Logic
+**Problem:** A service method has multiple branches, but tests only cover one.
+
+**Example:**
+```java
+public List<CheckInResponse> getCheckIns(UUID childProfileId) {
+  var entities = repository.findByChildProfile_IdAndDeletedAtIsNullOrderByCreatedAtDesc(childProfileId);
+  return entities.isEmpty() ? List.of() : entities.stream().map(...).toList();
+  //                ^^^^^^ uncovered
+}
+```
+
+**Fix:** Add a test for the empty list case:
+```java
+@Test
+void getCheckIns_empty_returnsEmptyList() {
+  when(repository.findByChildProfile_IdAndDeletedAtIsNullOrderByCreatedAtDesc(childProfileId))
+    .thenReturn(List.of());
+
+  var responses = service.getCheckIns(childProfileId);
+
+  assertTrue(responses.isEmpty());
+}
+```
+
+### Gap 4: Filtering Logic (Soft-Delete)
+**Problem:** Service filters soft-deleted records, but tests don't verify the filter.
+
+**Example:**
+```java
+public CheckInResponse getCheckIn(UUID id, UUID childProfileId) {
+  var entity = repository.findByIdAndChildProfile_Id(id, childProfileId)
+    .filter(e -> e.getDeletedAt() == null) // ← Uncovered if no test for deleted case
+    .orElseThrow(...);
+  return CheckInResponse.fromEntity(entity);
+}
+```
+
+**Fix:** Add a test for the deleted case:
+```java
+@Test
+void getCheckIn_deleted_throws404() {
+  var deleted = new CheckIn(id, profile, "heavy");
+  deleted.setDeletedAt(Instant.now());
+
+  when(repository.findByIdAndChildProfile_Id(id, childProfileId))
+    .thenReturn(Optional.of(deleted));
+
+  assertThrows(ResponseStatusException.class, () ->
+    service.getCheckIn(id, childProfileId)
+  );
+}
+```
+
+## Improving Coverage: Step-by-Step
+
+### Phase 1: Identify the Service Under Test
+```bash
+# Which service needs more coverage?
+cat target/site/jacoco/jacoco.csv | grep "YourService" | awk -F, '{
+  covered = $5;
+  missed = $6;
+  total = covered + missed;
+  coverage = (covered / total) * 100;
+  printf "%s: %d/%d (%.1f%%)\n", $1, covered, total, coverage;
+}'
+```
+
+### Phase 2: List Uncovered Methods
+Open `target/site/jacoco/index.html`, click the service class, and note red lines.
+
+**Typical uncovered methods:**
+- `get*` methods with error paths (404, ownership)
+- `create*` with validation/dedup branches
+- `delete*` with soft-delete or ownership checks
+
+### Phase 3: Write Tests for Uncovered Methods
+For each uncovered method, add tests:
+
+1. Happy path (success case)
+2. Error paths (all throw branches: 404, 403, 400, 409)
+3. Edge cases (empty lists, soft-delete, duplicate ids)
+
+**Template:**
+```java
+@Test
+void methodName_scenario_expectedResult() {
+  // Arrange: mock repo behavior
+  when(repository.findByIdAndChildProfile_Id(id, childProfileId))
+    .thenReturn(Optional.of(entity)); // or .empty() for 404
+
+  // Act: call service
+  var result = service.method(id, childProfileId);
+
+  // Assert: verify result and mock calls
+  assertEquals(expectedValue, result.field());
+  verify(repository).method(id, childProfileId);
+}
+```
+
+### Phase 4: Run mvn verify Again
+```bash
+cd app/server
+mvn clean verify
+```
+
+Check if coverage improved. If still below 70%, repeat phases 2–3.
+
+## Version Compatibility Note
+
+**JaCoCo & Java version mismatch:**
+```
+[ERROR] Unsupported class file major version 70
+```
+
+This error means JaCoCo version is too old for the JDK.
+
+**Fix:** Bump jacoco-maven-plugin to match JDK:
+- Java 26: jacoco 0.8.15+
+- Java 25: jacoco 0.8.14+
+- Java 21: jacoco 0.8.8+
+
+**Check current version:**
+```bash
+grep -A 2 "jacoco-maven-plugin" app/server/pom.xml | grep version
+```
+
+**Update if needed:**
+```xml
+<version>0.8.15</version> <!-- Bump here -->
+```
+
+## Accepting Coverage Gaps
+
+Not every line needs to be tested. **Acceptable gaps:**
+1. **Exception message strings** — tested indirectly via status code
+2. **Trivial getters/setters** — auto-generated, rarely have bugs
+3. **Configuration defaults** — tested via integration tests, not units
+4. **Log statements** — rarely worth unit-testing
+
+**Document accepted gaps in comments:**
+```java
+// JACOCO: Exception message not tested (status code tested, message is secondary)
+.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "..."))
+```
+
+## CI/CD Gate
+
+In GitHub Actions or Fly Deploy, `mvn verify` will:
+- Run all tests
+- Generate JaCoCo report
+- **Fail the build** if coverage < 70%
+
+This prevents merging code that drops coverage.
+
+**Locally, before pushing:**
+```bash
+mvn clean verify
+# Must pass with >= 70% before `git push`
+```
+
+## Troubleshooting Unexpected Failures
+
+### "Module not found" or "Cannot find class"
+```
+[ERROR] Rule violation for class com.capybee.server.service.YourService
+```
+
+**Cause:** JaCoCo can't load the class (wrong package name, not compiled).
+
+**Fix:**
+```bash
+mvn clean compile # Ensure code compiles
+mvn test          # Ensure tests find the class
+mvn verify        # Re-run JaCoCo
+```
+
+### "Coverage report generated at target/site/jacoco/index.html" but file doesn't exist
+**Cause:** Test failed before report generation.
+
+**Fix:** Run tests first:
+```bash
+mvn clean test -DskipFailingTests=false # Force all tests to run
+mvn jacoco:report
+```
+
+### Stale Report
+**Cause:** Report is cached from a previous run.
+
+**Fix:**
+```bash
+mvn clean    # Removes target/ including old reports
+mvn verify   # Regenerates fresh report
+```
+
+## Summary
+
+1. **Run `mvn verify`** — generates coverage report
+2. **Open `target/site/jacoco/index.html`** — identify uncovered lines
+3. **Add tests** for uncovered methods (error paths, edge cases)
+4. **Verify coverage >= 70%** before committing
+5. **Accept minor gaps** (messages, trivial getters, config) if justified
+
+**Goal:** Confidence that service logic is tested, not 100% coverage.
