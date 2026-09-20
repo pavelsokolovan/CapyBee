@@ -37,6 +37,11 @@ Pollen Match selected as the first to build).
   REST pattern, `requireOAuth2(authentication)` helper.
 - `app/server/src/main/resources/db/migration/` — latest applied migration
   is `V10__widen_avatar_url.sql`; this feature adds `V11`.
+- Uploaded screenshot of the live app's authenticated Home screen —
+  confirms current bottom nav is exactly `Start / Misje / Relacje /
+  Wspomnienia` with the active-tab amber outline, matching
+  `12-navigation-redesign-instruction.md` as already implemented; used as
+  ground truth for the 5th-tab addition in §1.
 
 ## Constraints (from house rules)
 
@@ -52,33 +57,100 @@ Pollen Match selected as the first to build).
 
 ## 1. UX flow
 
-### Entry point: one "Play" button → a hub, not one card per game
+### Entry point: revised — a real 5th bottom-nav tab, "Play" (Graj)
 
-**Decision (per Pavlo): a single "Play" entry point, opening a hub screen
-that lists every available mini-game.** This replaces the earlier
-one-card-per-game idea so the Home screen doesn't grow a new card every
-time a mini-game ships.
+**Decision (per Pavlo, confirmed against the real app screenshot showing
+`Start / Misje / Relacje / Wspomnienia`): add a 5th bottom-nav button,
+"Graj" / "Play", instead of a Home-panel button opening an overlay.** This
+replaces the earlier "Home panel button + overlay hub" design entirely —
+Play becomes a first-class tab like Missions/Friendships/Memories, not
+something launched from inside Home.
 
-A single new panel is added to Home (`SCR-03`), directly after the existing
-hive section (`hiveSectionRef`) and before check-in history
-(`checkInHistorySectionRef`):
+Ground truth added for this revision: the uploaded screenshot of the live
+app confirms the current bottom nav exactly matches
+`12-navigation-redesign-instruction.md`'s 4-tab result (`Start`, `Misje`,
+`Relacje`, `Wspomnienia`, icon-over-label, the active tab shown with an
+amber outline pill — see `.nav-item.active` in `styles.css` ~L1595).
+
+**Important nav-crowding note, carried over from spec 12:** that spec
+existed specifically to fix a *5-tabs-forced-into-a-narrow-grid* bug. Going
+from 4 to 5 equal columns re-introduces some of that pressure, just less
+severely (it's now 5-equal-columns by design, not 5-items-crammed-into-a-
+3-column-grid like the old bug). At 360px width, each tab's available
+width drops from roughly 76px to roughly 60px. The existing
+`.nav-item span` rule already has `overflow: hidden; text-overflow:
+ellipsis; white-space: nowrap`, so nothing breaks — longer labels
+(`Wspomnienia`, `Relacje`) will simply truncate a bit more eagerly than
+today. Flagged as something to eyeball on a real 360px device once built,
+not a blocker.
+
+### Changes to `AuthenticatedHome.tsx`
+
+`TabKey` gains one value:
 
 ```tsx
-<section className="panel" ref={playSectionRef}>
-  <h3>{text.playTitle}</h3>
-  <button className="suggestion-card" onClick={() => setPlayHubOpen(true)}>
-    <CapyBeeAvatar src={capyBeeAvatar.suggesting} size={96} />
-    <span>{text.playHubPrompt}</span>
-  </button>
-</section>
+type TabKey = 'home' | 'missions' | 'friendships' | 'memories' | 'profile' | 'play';
 ```
 
-Reuses the existing `.suggestion-card` style — no new CSS for the entry
-point itself.
+`bottomNavItems` gains one entry (placed last, after Memories, to keep the
+diff minimal against the existing four — reorder later if Pavlo wants Play
+positioned differently, e.g. right after Home):
 
-Tapping it opens the **Play hub** (`PlayHub.tsx`), a full-screen overlay
-(same elevation/close-button pattern as the game overlay below) listing
-every mini-game as a row: icon, name, one-line blurb, tap to start.
+```tsx
+const bottomNavItems = [
+  { key: 'home' as const, label: text.home, Icon: HomeIcon },
+  { key: 'missions' as const, label: text.missions, Icon: MissionsIcon },
+  { key: 'friendships' as const, label: text.friendships, Icon: FriendshipsIcon },
+  { key: 'memories' as const, label: text.memories, Icon: MemoriesIcon },
+  { key: 'play' as const, label: text.play, Icon: PlayIcon }
+];
+```
+
+A new tab-content block renders when `activeTab === 'play'`, following the
+exact same conditional-render pattern already used for the Missions /
+Friendships / Memories tab bodies elsewhere in this file — this is a new
+screen, not a modal triggered from Home.
+
+### New icon: `PlayIcon`
+
+Added to `components/NavIcons.tsx`, matching the existing line-icon style
+exactly (24×24 viewBox, 22×22 rendered, `stroke={strokeColor(active)}`,
+`strokeWidth="1.8"`, round caps/joins) — a small hexagon with a play
+triangle inside, so it reads as "play" while still nodding at the hive
+shape rather than using a generic isolated triangle:
+
+```tsx
+export function PlayIcon({ active }: NavIconProps) {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+      stroke={strokeColor(active)} strokeWidth="1.8"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 2.5l8 4.5v10l-8 4.5-8-4.5v-10z" />
+      <path d="M10 9l5 3-5 3z" fill={strokeColor(active)} stroke="none" />
+    </svg>
+  );
+}
+```
+
+### CSS change
+
+One-line change in `styles.css`:
+
+```css
+.bottom-nav {
+  grid-template-columns: repeat(5, minmax(0, 1fr)); /* was repeat(4, ...) */
+}
+```
+
+No other rule needs to change — `.nav-item` sizing and the ellipsis
+handling already scale to whatever column count the grid gives them.
+
+### The Play tab screen
+
+Content of the new tab (replaces the earlier `PlayHub.tsx`-as-overlay
+idea — same list design, now rendered as a plain tab body instead of a
+dismissible overlay, so it needs no close button and behaves like every
+other tab):
 
 ```tsx
 const games: PlayHubEntry[] = [
@@ -88,24 +160,23 @@ const games: PlayHubEntry[] = [
 ];
 ```
 
+Tapping an `available` row opens the actual game (`PollenMatchGame.tsx`)
+as a full-screen overlay on top of the Play tab, with its own close (×)
+button as already speced below — closing it returns to the Play tab list,
+not to Home. Unavailable rows (future games not yet built) render dimmed
+and non-interactive, labeled `text.comingSoon`.
+
 In v1 only Pollen Match is `available: true`; the list component itself
 doesn't need to change when the second game ships — only this array grows.
 
-**Nav note:** the bottom nav is intentionally fixed at 4 equal tabs
-(`12-navigation-redesign-instruction.md` explicitly fixed a 5-tab crowding
-bug) — the Play hub is deliberately **not** a 5th bottom-nav tab, it's a
-Home-launched overlay, like the game itself. If a "Play" tab in the bottom
-nav is actually wanted instead, that's a nav change outside this spec's
-scope and should be its own intent note, since it reopens a decision spec
-12 already closed once.
-
 ### Game view
 
-Tapping the card opens the game as a full-screen overlay (same elevation
-pattern as other modals in this app — fixed, `z-index: 60`, dismissible via
-a close (×) button top-right, not a back-gesture trap). It is **not** a new
-route; it is local component state (`gameOpen: boolean`) so closing it
-never loses the child's place in the app.
+Tapping a game row in the Play tab opens that game as a full-screen
+overlay on top of the Play tab (same elevation pattern as other modals in
+this app — fixed, `z-index: 60`, dismissible via a close (×) button
+top-right, not a back-gesture trap). It is **not** a new route; it is
+local component state (`gameOpen: boolean`, scoped to the Play tab) so
+closing it returns to the Play tab's game list, never to Home.
 
 States, in order:
 
@@ -133,10 +204,9 @@ States, in order:
 
 ### Where it is NOT
 
-Not a new bottom-nav tab, not a new top-level screen/route, not part of the
-Missions catalog (missions are DB-driven prompts; this is a fixed
-interaction) — kept as a Home-panel entry to match its "light daily extra"
-role rather than a core loop.
+Not a new route (it's a tab, not a URL-addressable screen, matching how
+Missions/Friendships/Memories already work), not part of the Missions
+catalog (missions are DB-driven prompts; this is a fixed interaction).
 
 ## 2. Visual design
 
@@ -335,6 +405,8 @@ change needed — this is not `/api/health`).
 
 New files:
 
+- `src/components/PlayTab.tsx` — the Play tab body: renders the game list
+  (`games` array from §1), handles which game is currently open.
 - `src/components/PollenMatchGame.tsx` — the game overlay: intro / playing
   / complete states, tile grid, flip logic, calls `onComplete(result)` when
   finished.
@@ -342,15 +414,25 @@ New files:
   state machine, match detection, flip/duration counters) with **no**
   DOM/React-specific side effects beyond `useState`/`useReducer` — this is
   the file that needs Vitest coverage per the testing rule below.
+- `src/components/NavIcons.tsx` — add the new `PlayIcon` export (per §1),
+  alongside the existing `HomeIcon` / `MissionsIcon` / `FriendshipsIcon` /
+  `MemoriesIcon`.
 
 Modified files:
 
 - `AuthenticatedHome.tsx`:
-  - `gameOpen` state + `playSectionRef` panel (per §1).
+  - `TabKey` gains `'play'`; `bottomNavItems` gains the Play entry (per
+    §1); a new conditional render block for `activeTab === 'play'` renders
+    `<PlayTab />`, following the existing per-tab render pattern.
   - `submitGameResult` function, same shape as `submitCheckIn`:
-    optimistic local append → `enqueueAction` → `flushQueue()`.
+    optimistic local append → `enqueueAction` → `flushQueue()`. Owned by
+    `AuthenticatedHome.tsx` (or lifted into `PlayTab.tsx` if that keeps
+    `AuthenticatedHome.tsx` from growing further, per the existing
+    "extract when self-contained" rule in `ui.instructions.md`).
   - Fetch `GET /api/games/results` alongside the other `initialize()` calls
     so game history feeds the honeycomb hook.
+- `styles.css`: `.bottom-nav` grid-template-columns `repeat(4, ...)` →
+  `repeat(5, ...)` (per §1). No other rule changes.
 - `hooks/useHoneycombCells.ts`:
   - Add `'game'` to `HoneycombCellType`.
   - Add a `gameKey?: string` field to `HoneycombCellData` (only populated
@@ -498,9 +580,9 @@ solve here.
 
 | Key | EN | PL |
 |---|---|---|
-| `playTitle` | Quick play | Szybka zabawa |
-| `playHubPrompt` | Play a quick game | Zagraj w krótką grę |
+| `play` | Play | Graj |
 | `playHubTitle` | Choose a game | Wybierz grę |
+| `comingSoon` | Coming soon | Wkrótce |
 | `pollenMatchTitle` | Pollen Match | Zbieranie Pyłku |
 | `pollenMatchBlurb` | Find the matching pairs | Znajdź pasujące pary |
 | `pollenMatchIntro` | Flip two tiles at a time. No rush, no wrong answers. | Odkrywaj po dwa kafelki. Bez pośpiechu, bez złych odpowiedzi. |
@@ -532,14 +614,15 @@ than guessing.
 
 ## 9. Open questions for Pavlo
 
-Resolved: generic `metrics` JSONB (not per-game columns); single "Play"
-hub entry point (not one card per game, not a 5th nav tab); individual
-icon per game, shared color for the `game` cell type; daily cap of one
-game-earned hive cell per calendar day, enforced client-side via the
-existing `sameCalendarDay` pattern; progress = honeycomb cell only, no
+Resolved: generic `metrics` JSONB (not per-game columns); 5th bottom-nav
+tab "Graj"/"Play" as the entry point (confirmed against the real
+4-tab screenshot, superseding the earlier Home-panel-overlay idea);
+individual icon per game, shared color for the `game` cell type; daily cap
+of one game-earned hive cell per calendar day, enforced client-side via
+the existing `sameCalendarDay` pattern; progress = honeycomb cell only, no
 stars/unlocks system; 3×3 grid with a decorative center CapyBee tile.
 
-Still open — one fact to check, one thing to watch for later:
+Still open — one fact to check, two things to watch for later:
 
 1. Confirm actual FK target/name for `users` vs `user_accounts` in
    `V1__init.sql` before finalizing `V11`'s migration SQL above. This is a
@@ -548,3 +631,7 @@ Still open — one fact to check, one thing to watch for later:
    Tap / Pollen Drift / Balloon Breath get speced, their icons need to
    stay visually distinct from Pollen Match's 🌼🍯🍃🌻 (and from each
    other) in the Play hub list and the honeycomb.
+3. Tab order: this spec places "Graj" last (`Start / Misje / Relacje /
+   Wspomnienia / Graj`) to keep the diff against the current nav minimal.
+   Confirm that's the wanted position — it's a one-line reorder in
+   `bottomNavItems` if not.

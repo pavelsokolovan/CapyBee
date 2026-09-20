@@ -23,6 +23,7 @@ import com.capybee.server.domain.user.UserAccount;
 import com.capybee.server.service.ChildProfileService;
 import com.capybee.server.service.CheckInService;
 import com.capybee.server.service.FriendshipService;
+import com.capybee.server.service.GameService;
 import com.capybee.server.service.MemoryService;
 import com.capybee.server.service.MissionService;
 import com.capybee.server.service.UserService;
@@ -31,9 +32,11 @@ import com.capybee.server.web.dto.ChildProfileResponse;
 import com.capybee.server.web.dto.CreateChildProfileRequest;
 import com.capybee.server.web.dto.CreateCheckInRequest;
 import com.capybee.server.web.dto.CreateFriendshipRequest;
+import com.capybee.server.web.dto.CreateGameResultRequest;
 import com.capybee.server.web.dto.CreateMemoryRequest;
 import com.capybee.server.web.dto.CreateMissionCompletionRequest;
 import com.capybee.server.web.dto.FriendshipResponse;
+import com.capybee.server.web.dto.GameResultResponse;
 import com.capybee.server.web.dto.MemoryResponse;
 import com.capybee.server.web.dto.MissionCompletionResponse;
 import com.capybee.server.web.dto.MissionInteractionResponse;
@@ -50,6 +53,7 @@ public class ApiController {
 
     private final UserService userService;
     private final CheckInService checkInService;
+    private final GameService gameService;
     private final ChildProfileService childProfileService;
     private final MissionService missionService;
     private final FriendshipService friendshipService;
@@ -57,12 +61,14 @@ public class ApiController {
 
     public ApiController(UserService userService,
             CheckInService checkInService,
+            GameService gameService,
             ChildProfileService childProfileService,
             MissionService missionService,
             FriendshipService friendshipService,
             MemoryService memoryService) {
         this.userService = userService;
         this.checkInService = checkInService;
+        this.gameService = gameService;
         this.childProfileService = childProfileService;
         this.missionService = missionService;
         this.friendshipService = friendshipService;
@@ -134,6 +140,22 @@ public class ApiController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteCheckIn(Authentication authentication, @PathVariable UUID checkInId) {
         checkInService.deleteCheckIn(requireOAuth2(authentication), checkInId);
+    }
+
+    @PostMapping("/games/results")
+    @ResponseStatus(HttpStatus.CREATED)
+    public GameResultResponse createGameResult(
+            Authentication authentication,
+            @RequestBody CreateGameResultRequest request) {
+        return gameService.createGameResult(requireOAuth2(authentication), request);
+    }
+
+    @GetMapping("/games/results")
+    public List<GameResultResponse> listGameResults(
+            Authentication authentication,
+            @RequestParam(required = false) String gameKey,
+            @RequestParam(defaultValue = "20") int limit) {
+        return gameService.getMyGameResults(requireOAuth2(authentication), gameKey, limit);
     }
 
     @PostMapping("/child-profile")

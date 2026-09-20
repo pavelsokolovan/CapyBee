@@ -76,6 +76,27 @@ export function MemoriesIcon({ active }: NavIconProps) {
   );
 }
 
+export function PlayIcon({ active }: NavIconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="22"
+      height="22"
+      fill="none"
+      stroke={strokeColor(active)}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 3.5c2.3 0 4.2 1.9 4.2 4.2 0 1.6-.8 2.9-2.2 3.8l-.7.4v1.4c0 .7-.6 1.3-1.3 1.3s-1.3-.6-1.3-1.3v-1.4l-.7-.4A4.2 4.2 0 0 1 7.8 7.7C7.8 5.4 9.7 3.5 12 3.5z" />
+      <path d="M12 14.6v4.9" />
+      <path d="M9.7 19.5h4.6" />
+      <path d="M17.5 8.4c1.6.2 2.8 1.6 2.8 3.3 0 1.9-1.5 3.4-3.4 3.4" />
+    </svg>
+  );
+}
+
 export function ProfileIcon({ active }: NavIconProps) {
   return (
     <svg

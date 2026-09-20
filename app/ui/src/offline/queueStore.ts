@@ -5,6 +5,7 @@ export type QueueActionType =
   | 'missionCompletion'
   | 'friendship'
   | 'memory'
+  | 'gameResult'
   | 'checkInDelete'
   | 'missionCompletionDelete'
   | 'friendshipDelete'

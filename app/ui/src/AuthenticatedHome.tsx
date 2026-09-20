@@ -8,7 +8,8 @@ import { HoneycombMap } from './components/HoneycombMap';
 import { FriendshipStageSelector } from './components/FriendshipStageSelector';
 import { FriendshipToast } from './components/FriendshipToast';
 import { OnboardingTutorial } from './components/OnboardingTutorial';
-import { HomeIcon, MissionsIcon, FriendshipsIcon, MemoriesIcon, ProfileIcon } from './components/NavIcons';
+import { HomeIcon, MissionsIcon, FriendshipsIcon, MemoriesIcon, PlayIcon, ProfileIcon } from './components/NavIcons';
+import { createPollenMatchBoard, evaluateTurn, type PollenMatchTile } from './hooks/usePollenMatchGame';
 import {
   CategoryAllIcon,
   CategoryExploreIcon,
@@ -117,7 +118,7 @@ interface MemoryEntry {
 }
 
 type Mood = 'heavy' | 'okay' | 'good';
-type TabKey = 'home' | 'missions' | 'friendships' | 'memories' | 'profile';
+type TabKey = 'home' | 'missions' | 'friendships' | 'memories' | 'play' | 'profile';
 type FeedbackKind = 'checkin' | 'mission' | 'friendship' | 'memory';
 
 interface MissionSkipAcknowledgement {
@@ -448,9 +449,23 @@ const copy = {
     missions: 'Missions',
     friendships: 'Friendships',
     memories: 'Memories',
+    play: 'Play',
     profile: 'Profile',
     home: 'Home',
     navLabel: 'Main navigation',
+    pollenMatchTitle: 'Pollen Match',
+    pollenMatchBlurb: 'Flip the flowers and match the pairs.',
+    pollenMatchIntro: 'Can you find the matching flowers?',
+    pollenMatchStart: 'Start',
+    pollenMatchDone: 'Nice work! You found them all.',
+    pollenMatchRoundSummary: 'Round summary',
+    pollenMatchFlips: 'Flips',
+    addToHive: 'Add to my hive',
+    nice: 'Nice!',
+    ready: 'Ready',
+    close: 'Close',
+    comingSoon: 'Coming soon',
+    playGameListTitle: 'Pick a game',
     oldWorld: 'Old World',
     newWorld: 'New World',
     language: 'Language',
@@ -559,9 +574,23 @@ const copy = {
     missions: 'Misje',
     friendships: 'Relacje',
     memories: 'Wspomnienia',
+    play: 'Graj',
     profile: 'Profil',
     home: 'Start',
     navLabel: 'Główna nawigacja',
+    pollenMatchTitle: 'Pollen Match',
+    pollenMatchBlurb: 'Odkryj kwiaty i dopasuj pary.',
+    pollenMatchIntro: 'Czy uda ci się znaleźć pasujące kwiaty?',
+    pollenMatchStart: 'Start',
+    pollenMatchDone: 'Dobra robota! Wszystkie pary znalazłeś.',
+    pollenMatchRoundSummary: 'Podsumowanie rundy',
+    pollenMatchFlips: 'Obroty',
+    addToHive: 'Dodaj do ula',
+    nice: 'Super!',
+    ready: 'Gotowe',
+    close: 'Zamknij',
+    comingSoon: 'Wkrótce',
+    playGameListTitle: 'Wybierz grę',
     oldWorld: 'Stary Świat',
     newWorld: 'Nowy Świat',
     language: 'Język',
@@ -758,6 +787,15 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const [pendingDeleteMemoryId, setPendingDeleteMemoryId] = useState<string | null>(null);
   const [deletedMemoryIds, setDeletedMemoryIds] = useState<Set<string>>(new Set());
   const [pendingDeletedMemory, setPendingDeletedMemory] = useState<MemoryEntry | null>(null);
+  const [gameOpen, setGameOpen] = useState(false);
+  const [selectedGameKey, setSelectedGameKey] = useState<'pollen_match' | null>(null);
+  const [pollenMatchStage, setPollenMatchStage] = useState<'intro' | 'playing' | 'complete'>('intro');
+  const [pollenMatchTiles, setPollenMatchTiles] = useState<PollenMatchTile[]>(() => createPollenMatchBoard());
+  const [pollenMatchSelection, setPollenMatchSelection] = useState<string[]>([]);
+  const [pollenMatchFlips, setPollenMatchFlips] = useState(0);
+  const [pollenMatchStartedAt, setPollenMatchStartedAt] = useState<number | null>(null);
+  const [pollenMatchLocked, setPollenMatchLocked] = useState(false);
+  const [pollenMatchSaved, setPollenMatchSaved] = useState(false);
   const [homeAnimatedCellId, setHomeAnimatedCellId] = useState<string | null>(null);
   const [homeGreetingIndex] = useState(() => pickHomeGreetingIndex());
   const [tutorialActive, setTutorialActive] = useState(false);
@@ -767,6 +805,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     missions: 0,
     friendships: 0,
     memories: 0,
+    play: 0,
     profile: 0
   });
   const missionCategoryRowRef = useRef<HTMLDivElement | null>(null);
@@ -817,7 +856,8 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     { key: 'home' as const, label: text.home, Icon: HomeIcon },
     { key: 'missions' as const, label: text.missions, Icon: MissionsIcon },
     { key: 'friendships' as const, label: text.friendships, Icon: FriendshipsIcon },
-    { key: 'memories' as const, label: text.memories, Icon: MemoriesIcon }
+    { key: 'memories' as const, label: text.memories, Icon: MemoriesIcon },
+    { key: 'play' as const, label: text.play, Icon: PlayIcon }
   ];
   const navRefByKey: Partial<Record<TabKey, typeof missionsNavRef>> = {
     missions: missionsNavRef,
@@ -845,6 +885,108 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const changeTab = (nextTab: TabKey) => {
     tabScrollPositions.current[activeTab] = window.scrollY || window.pageYOffset || 0;
     setActiveTab(nextTab);
+  };
+
+  const openPollenMatch = () => {
+    setSelectedGameKey('pollen_match');
+    setGameOpen(true);
+    setPollenMatchStage('intro');
+    setPollenMatchTiles(createPollenMatchBoard());
+    setPollenMatchSelection([]);
+    setPollenMatchFlips(0);
+    setPollenMatchStartedAt(null);
+    setPollenMatchLocked(false);
+    setPollenMatchSaved(false);
+  };
+
+  const startPollenMatch = () => {
+    setPollenMatchStage('playing');
+    setPollenMatchTiles(createPollenMatchBoard());
+    setPollenMatchSelection([]);
+    setPollenMatchFlips(0);
+    setPollenMatchStartedAt(Date.now());
+    setPollenMatchLocked(false);
+    setPollenMatchSaved(false);
+  };
+
+  const closePollenMatch = () => {
+    setGameOpen(false);
+    setSelectedGameKey(null);
+    setPollenMatchStage('intro');
+    setPollenMatchSelection([]);
+    setPollenMatchLocked(false);
+  };
+
+  const handlePollenMatchClick = (tileId: string) => {
+    if (pollenMatchStage !== 'playing' || pollenMatchLocked) {
+      return;
+    }
+
+    const tile = pollenMatchTiles.find((entry) => entry.id === tileId);
+    if (!tile || tile.flipped || tile.matched || tile.kind === 'wildcard') {
+      return;
+    }
+
+    const nextSelection = [...pollenMatchSelection, tileId];
+    const flippedBoard = pollenMatchTiles.map((entry) => (entry.id === tileId ? { ...entry, flipped: true } : entry));
+    setPollenMatchTiles(flippedBoard);
+
+    if (nextSelection.length === 1) {
+      setPollenMatchSelection(nextSelection);
+      return;
+    }
+
+    setPollenMatchSelection([]);
+    setPollenMatchFlips((current) => current + 1);
+    const [firstId, secondId] = nextSelection;
+    const evaluatedBoard = evaluateTurn(flippedBoard, firstId, secondId);
+    setPollenMatchTiles(evaluatedBoard);
+
+    const firstTile = evaluatedBoard.find((entry) => entry.id === firstId);
+    const secondTile = evaluatedBoard.find((entry) => entry.id === secondId);
+    const isMatch = Boolean(firstTile && secondTile && firstTile.matched && secondTile.matched);
+
+    if (!isMatch) {
+      setPollenMatchLocked(true);
+      window.setTimeout(() => {
+        setPollenMatchTiles((current) => current.map((entry) => (
+          entry.id === firstId || entry.id === secondId ? { ...entry, flipped: false } : entry
+        )));
+        setPollenMatchLocked(false);
+      }, 700);
+      return;
+    }
+
+    const allPairsMatched = evaluatedBoard.every((entry) => entry.kind === 'wildcard' || entry.matched);
+    if (allPairsMatched) {
+      setPollenMatchStage('complete');
+    }
+  };
+
+  const savePollenMatchResult = async () => {
+    if (!pollenMatchStartedAt || pollenMatchSaved) return;
+
+    const resultId = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `pollen-match-${Date.now()}`;
+    const durationMs = Date.now() - pollenMatchStartedAt;
+
+    await enqueueAction({
+      clientId: resultId,
+      type: 'gameResult',
+      path: '/api/games/results',
+      method: 'POST',
+      createdAt: Date.now(),
+      payload: {
+        gameKey: 'pollen_match',
+        durationMs,
+        metrics: {
+          flips: pollenMatchFlips,
+          pairsTotal: 4
+        }
+      }
+    });
+
+    flushQueue();
+    setPollenMatchSaved(true);
   };
 
   const moodPoolKey = (value: Mood): CapyBeePhrasePoolKey => {
@@ -2087,6 +2229,40 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
           </>
         ) : null}
 
+        {activeTab === 'play' ? (
+          <>
+            <section className="panel">
+              <div className="title-with-avatar">
+                <CapyBeeAvatar src={capyBeeAvatar.waving} size={96} />
+                <h2>{text.play}</h2>
+              </div>
+
+              <div className="play-list">
+                <button
+                  type="button"
+                  className="play-game-row"
+                  onClick={openPollenMatch}
+                >
+                  <span className="play-game-icon" aria-hidden="true">🌼</span>
+                  <span className="play-game-copy">
+                    <strong>{text.pollenMatchTitle}</strong>
+                    <small>{text.pollenMatchBlurb}</small>
+                  </span>
+                  <span className="play-game-arrow" aria-hidden="true">→</span>
+                </button>
+                <button type="button" className="play-game-row disabled" disabled>
+                  <span className="play-game-icon" aria-hidden="true">🐝</span>
+                  <span className="play-game-copy">
+                    <strong>{locale === 'pl' ? 'Budowniczy Ul' : 'Hive Builder'}</strong>
+                    <small>{text.comingSoon}</small>
+                  </span>
+                  <span className="play-game-arrow" aria-hidden="true">…</span>
+                </button>
+              </div>
+            </section>
+          </>
+        ) : null}
+
         {activeTab === 'friendships' ? (
           <>
             <section className="panel">
@@ -2394,6 +2570,74 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       ) : null}
 
       <FriendshipToast toast={friendshipToast} onDismiss={() => setFriendshipToast(null)} />
+
+      {gameOpen && selectedGameKey === 'pollen_match' ? (
+        <div className="game-overlay" role="dialog" aria-modal="true" aria-label={text.pollenMatchTitle}>
+          <div className="game-panel">
+            <button type="button" className="game-close-button" onClick={closePollenMatch} aria-label={text.close}>×</button>
+
+            {pollenMatchStage === 'intro' ? (
+              <div className="game-intro-panel">
+                <CapyBeeAvatar src={capyBeeAvatar.waving} size={120} />
+                <h3>{text.pollenMatchTitle}</h3>
+                <p>{text.pollenMatchIntro}</p>
+                <button type="button" className="primary-button" onClick={startPollenMatch}>{text.pollenMatchStart}</button>
+              </div>
+            ) : null}
+
+            {pollenMatchStage === 'playing' ? (
+              <div className="game-playing-panel">
+                <div className="game-header-row">
+                  <div>
+                    <h3>{text.pollenMatchTitle}</h3>
+                    <p>{text.pollenMatchRoundSummary}</p>
+                  </div>
+                  <span className="game-flip-count">{text.pollenMatchFlips}: {pollenMatchFlips}</span>
+                </div>
+
+                <div className="pollen-match-grid" aria-label={text.pollenMatchTitle}>
+                  {pollenMatchTiles.map((tile) => {
+                    const faceUp = tile.flipped || tile.matched;
+                    const className = [
+                      'pollen-tile',
+                      faceUp ? 'flipped' : '',
+                      tile.matched ? 'matched' : '',
+                      tile.kind === 'wildcard' ? 'wildcard' : ''
+                    ].filter(Boolean).join(' ');
+
+                    return (
+                      <button
+                        key={tile.id}
+                        type="button"
+                        className={className}
+                        onClick={() => handlePollenMatchClick(tile.id)}
+                        disabled={tile.kind === 'wildcard' || tile.flipped || tile.matched || pollenMatchLocked}
+                        aria-label={faceUp ? `${tile.value}` : text.ready}
+                      >
+                        <span aria-hidden="true">{faceUp ? tile.value : '✦'}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
+            {pollenMatchStage === 'complete' ? (
+              <div className="game-complete-panel">
+                <CapyBeeAvatar src={capyBeeAvatar.celebrating} size={120} />
+                <h3>{text.pollenMatchDone}</h3>
+                <p>
+                  {text.pollenMatchRoundSummary}: {pollenMatchFlips} {text.pollenMatchFlips.toLowerCase()} · {Math.max(1, Math.round((Date.now() - (pollenMatchStartedAt ?? Date.now())) / 1000))}s
+                </p>
+                <button type="button" className="primary-button" onClick={savePollenMatchResult}>
+                  {pollenMatchSaved ? text.nice : text.addToHive}
+                </button>
+                <button type="button" className="secondary-button" onClick={closePollenMatch}>{text.close}</button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       {pendingDeleteId ? (
         <aside className="skip-undo-toast" role="status" aria-live="polite">
