@@ -117,6 +117,15 @@ interface MemoryEntry {
   updatedAt: string;
 }
 
+interface GameResultEntry {
+  id: string;
+  gameKey: string;
+  durationMs: number;
+  flips: number;
+  pairsTotal: number;
+  completedAt: string;
+}
+
 type Mood = 'heavy' | 'okay' | 'good';
 type TabKey = 'home' | 'missions' | 'friendships' | 'memories' | 'play' | 'profile';
 type FeedbackKind = 'checkin' | 'mission' | 'friendship' | 'memory';
@@ -461,6 +470,8 @@ const copy = {
     pollenMatchRoundSummary: 'Round summary',
     pollenMatchFlips: 'Flips',
     addToHive: 'Add to my hive',
+    playMore: 'Play more',
+    justPlay: 'Just play',
     nice: 'Nice!',
     ready: 'Ready',
     close: 'Close',
@@ -578,7 +589,7 @@ const copy = {
     profile: 'Profil',
     home: 'Start',
     navLabel: 'Główna nawigacja',
-    pollenMatchTitle: 'Pollen Match',
+    pollenMatchTitle: 'Zbieranie pyłku',
     pollenMatchBlurb: 'Odkryj kwiaty i dopasuj pary.',
     pollenMatchIntro: 'Czy uda ci się znaleźć pasujące kwiaty?',
     pollenMatchStart: 'Start',
@@ -586,6 +597,8 @@ const copy = {
     pollenMatchRoundSummary: 'Podsumowanie rundy',
     pollenMatchFlips: 'Obroty',
     addToHive: 'Dodaj do ula',
+    playMore: 'Graj dalej',
+    justPlay: 'Po prostu graj',
     nice: 'Super!',
     ready: 'Gotowe',
     close: 'Zamknij',
@@ -781,6 +794,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const [worldType, setWorldType] = useState<'old_world' | 'new_world'>('old_world');
   const [memories, setMemories] = useState<MemoryEntry[]>([]);
   const [allMemories, setAllMemories] = useState<MemoryEntry[]>([]);
+  const [gameResults, setGameResults] = useState<GameResultEntry[]>([]);
   const [memoryTitle, setMemoryTitle] = useState('');
   const [memoryText, setMemoryText] = useState('');
   const [memoryFavorite, setMemoryFavorite] = useState(false);
@@ -968,6 +982,18 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
 
     const resultId = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `pollen-match-${Date.now()}`;
     const durationMs = Date.now() - pollenMatchStartedAt;
+    const result: GameResultEntry = {
+      id: resultId,
+      gameKey: 'pollen_match',
+      durationMs,
+      flips: pollenMatchFlips,
+      pairsTotal: 4,
+      completedAt: new Date().toISOString()
+    };
+
+    setGameResults((current) => [...current, result]);
+    setPollenMatchSaved(true);
+    closePollenMatch();
 
     await enqueueAction({
       clientId: resultId,
@@ -986,7 +1012,6 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     });
 
     flushQueue();
-    setPollenMatchSaved(true);
   };
 
   const moodPoolKey = (value: Mood): CapyBeePhrasePoolKey => {
@@ -1155,12 +1180,17 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const homeGreeting = capybeePhrases.homeGreeting[homeGreetingIndex] ?? capybeePhrases.homeGreeting[0];
   const homeAvatar = hasCheckInToday ? capyBeeAvatar.default : capyBeeAvatar.waving;
   const homeAvatarBubble = locale === 'pl' ? (homeGreeting?.pl ?? homeGreeting?.en ?? '') : (homeGreeting?.en ?? homeGreeting?.pl ?? '');
+  const hasGameResultToday = useMemo(
+    () => gameResults.some((entry) => entry.gameKey === 'pollen_match' && sameCalendarDay(new Date(entry.completedAt), new Date())),
+    [gameResults]
+  );
 
   const homeHoneycombCells = useHoneycombCells({
     checkIns,
     missions: missionCompletions,
     friendships,
     memories: allMemories,
+    games: gameResults,
     locale
   } satisfies UseHoneycombCellsInput);
 
@@ -1294,6 +1324,15 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     }
   };
 
+  const fetchGameResults = async () => {
+    try {
+      const data = await request<GameResultEntry[]>('/api/games/results');
+      setGameResults(data);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const fetchAllMemories = async () => {
     try {
       const [oldWorldMemories, newWorldMemories] = await Promise.all([
@@ -1368,6 +1407,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       await fetchMissionCompletions();
       await fetchFriendships();
       await fetchMemories(worldType);
+      await fetchGameResults();
     } catch (error) {
       console.error(error);
     } finally {
@@ -2629,10 +2669,19 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                 <p>
                   {text.pollenMatchRoundSummary}: {pollenMatchFlips} {text.pollenMatchFlips.toLowerCase()} · {Math.max(1, Math.round((Date.now() - (pollenMatchStartedAt ?? Date.now())) / 1000))}s
                 </p>
-                <button type="button" className="primary-button" onClick={savePollenMatchResult}>
-                  {pollenMatchSaved ? text.nice : text.addToHive}
-                </button>
-                <button type="button" className="secondary-button" onClick={closePollenMatch}>{text.close}</button>
+
+                {hasGameResultToday ? (
+                  <>
+                    <button type="button" className="primary-button" onClick={startPollenMatch}>{text.playMore}</button>
+                    <button type="button" className="secondary-button" onClick={closePollenMatch}>{text.close}</button>
+                  </>
+                ) : (
+                  <>
+                    <button type="button" className="primary-button" onClick={savePollenMatchResult}>{text.addToHive}</button>
+                    <button type="button" className="secondary-button" onClick={startPollenMatch}>{text.playMore}</button>
+                    <button type="button" className="secondary-button" onClick={closePollenMatch}>{text.close}</button>
+                  </>
+                )}
               </div>
             ) : null}
           </div>

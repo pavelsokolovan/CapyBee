@@ -43,12 +43,20 @@ function emptyCell(index: number): HoneycombCellData {
 function getCellColors(cell: HoneycombCellData) {
   if (cell.empty) return { fill: '#EDE8DF', stroke: '#C4B99A', iconColor: null, dashed: true };
   if (cell.type === 'checkin') return { fill: '#F5C842', stroke: '#C8952A', iconColor: '#3d2b00', dashed: false };
+  if (cell.type === 'game') return { fill: '#FBE7B8', stroke: '#E09A1E', iconColor: '#5E3500', dashed: false };
   if (cell.world === 'old_world') return { fill: '#EDD28A', stroke: '#B8922A', iconColor: '#3d2b00', dashed: false };
   if (cell.world === 'new_world') return { fill: '#A8D5A2', stroke: '#5A9B52', iconColor: '#1a4718', dashed: false };
   return { fill: '#F5C842', stroke: '#C8952A', iconColor: '#3d2b00', dashed: false };
 }
 
-function getCellIcon(type: HoneycombCellData['type']): string {
+function getCellIcon(type: HoneycombCellData['type'], gameKey?: string): string {
+  if (type === 'game') {
+    const icons: Record<string, string> = {
+      pollen_match: '🌼'
+    };
+    return icons[gameKey ?? ''] ?? '🧩';
+  }
+
   const icons: Record<string, string> = {
     mission: '⭐',
     memory: '📷',
@@ -291,7 +299,7 @@ export function HoneycombMap({
         >
           {positions.map(({ cell, x, y }) => {
             const colors = getCellColors(cell);
-            const icon = getCellIcon(cell.type);
+            const icon = getCellIcon(cell.type, cell.gameKey);
             const shouldAnimate = animState?.id === cell.id;
             const phase = shouldAnimate ? animState?.phase : null;
 
@@ -359,7 +367,7 @@ export function HoneycombMap({
       {tooltip ? (
         <HoneycombTooltip
           cell={tooltip.cell}
-          icon={getCellIcon(tooltip.cell.type)}
+          icon={getCellIcon(tooltip.cell.type, tooltip.cell.gameKey)}
           x={tooltip.x}
           y={tooltip.y}
         />

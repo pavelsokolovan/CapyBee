@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-export type HoneycombCellType = 'mission' | 'memory' | 'checkin' | 'friendship' | 'empty';
+export type HoneycombCellType = 'mission' | 'memory' | 'checkin' | 'friendship' | 'game' | 'empty';
 export type HoneycombWorld = 'old_world' | 'new_world' | null;
 
 export interface HoneycombCellData {
@@ -11,6 +11,7 @@ export interface HoneycombCellData {
   date: string;
   empty: boolean;
   timestamp: number;
+  gameKey?: string;
 }
 
 interface CheckInLike {
@@ -40,11 +41,21 @@ interface MemoryLike {
   createdAt: string;
 }
 
+interface GameResultLike {
+  id: string;
+  gameKey: string;
+  completedAt: string;
+  durationMs: number;
+  flips: number;
+  pairsTotal: number;
+}
+
 export interface UseHoneycombCellsInput {
   checkIns: CheckInLike[];
   missions: MissionCompletionLike[];
   friendships: FriendshipLike[];
   memories: MemoryLike[];
+  games: GameResultLike[];
   locale: 'en' | 'pl';
   worldFilter?: 'old_world' | 'new_world';
 }
@@ -72,10 +83,15 @@ export function useHoneycombCells({
   missions,
   friendships,
   memories,
+  games,
   locale,
   worldFilter
 }: UseHoneycombCellsInput): HoneycombCellData[] {
   return useMemo(() => {
+    const labelByGame = {
+      pollen_match: locale === 'pl' ? 'Zbieranie Pyłku' : 'Pollen Match'
+    } as const;
+
     const normalized: HoneycombCellData[] = [
       ...checkIns.map((entry) => ({
         id: entry.id,
@@ -112,6 +128,16 @@ export function useHoneycombCells({
         date: formatHoneycombDate(entry.createdAt, locale),
         empty: false,
         timestamp: toTimestamp(entry.createdAt)
+      })),
+      ...games.map((entry) => ({
+        id: entry.id,
+        type: 'game' as const,
+        world: null,
+        title: labelByGame[entry.gameKey as keyof typeof labelByGame] ?? 'Game',
+        date: formatHoneycombDate(entry.completedAt, locale),
+        empty: false,
+        timestamp: toTimestamp(entry.completedAt),
+        gameKey: entry.gameKey
       }))
     ].sort((a, b) => a.timestamp - b.timestamp);
 
@@ -122,5 +148,5 @@ export function useHoneycombCells({
     }
 
     return normalized;
-  }, [checkIns, missions, friendships, memories, locale, worldFilter]);
+  }, [checkIns, missions, friendships, memories, games, locale, worldFilter]);
 }
