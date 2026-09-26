@@ -16,6 +16,12 @@ coverage/
 # Only .gitkeep is tracked to preserve the empty directory
 app/server/src/main/resources/static/assets/
 app/server/src/main/resources/static/index.html
+app/server/src/main/resources/static/sw.js
+app/server/src/main/resources/static/workbox-*.js
+app/server/src/main/resources/static/registerSW.js
+
+# Local dev runtime state
+.dev/
 
 # Environment files
 .env

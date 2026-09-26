@@ -48,11 +48,25 @@ function Copy-BuildArtifacts {
 
   # Clean old static directories to remove stale assets
   Write-Host '[sync] Cleaning old static directories...'
-  if (Test-Path $serverStaticResourcePath) {
-    Remove-Item -Path $serverStaticResourcePath -Recurse -Force | Out-Null
-  }
-  if (Test-Path $serverStaticClassesPath) {
-    Remove-Item -Path $serverStaticClassesPath -Recurse -Force | Out-Null
+  foreach ($staticPath in @($serverStaticResourcePath, $serverStaticClassesPath)) {
+    if (-not (Test-Path $staticPath)) {
+      continue
+    }
+
+    try {
+      Get-ChildItem -LiteralPath $staticPath -Force -Recurse -ErrorAction SilentlyContinue |
+        ForEach-Object {
+          try {
+            Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
+          } catch {
+            Write-Host "[sync] Ignored cleanup error for $($_.FullName): $($_.Exception.Message)"
+          }
+        }
+
+      Remove-Item -LiteralPath $staticPath -Recurse -Force -ErrorAction SilentlyContinue
+    } catch {
+      Write-Host "[sync] Ignored directory cleanup error for ${staticPath}: $($_.Exception.Message)"
+    }
   }
 
   New-DirectoryIfMissing -Path $serverStaticResourcePath
@@ -117,8 +131,18 @@ function Stop-ManagedProcess {
     return
   }
 
+  $allowedNames = @('java', 'node', 'npm', 'cmd', 'powershell')
+  if ($proc.ProcessName -notin $allowedNames) {
+    Write-Host "[stop] Ignoring stale $Name PID $ProcessId (actual process: $($proc.ProcessName))."
+    return
+  }
+
   Write-Host "[stop] Stopping $Name process $ProcessId..."
-  Stop-Process -Id $ProcessId -Force
+  try {
+    Stop-Process -Id $ProcessId -Force -ErrorAction Stop
+  } catch {
+    Write-Host "[stop] Could not stop ${Name} process ${ProcessId}: $($_.Exception.Message)"
+  }
 }
 
 function Stop-DevProcesses {
