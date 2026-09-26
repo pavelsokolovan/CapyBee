@@ -10,6 +10,8 @@ import { FriendshipToast } from './components/FriendshipToast';
 import { OnboardingTutorial } from './components/OnboardingTutorial';
 import { HomeIcon, MissionsIcon, FriendshipsIcon, MemoriesIcon, PlayIcon, ProfileIcon } from './components/NavIcons';
 import { createPollenMatchBoard, evaluateTurn, type PollenMatchTile } from './hooks/usePollenMatchGame';
+import { createHiveBuilderTapSequence, type HiveBuilderTapTile } from './hooks/useHiveBuilderTapGame';
+import { HiveBuilderTapGame } from './components/HiveBuilderTapGame';
 import {
   CategoryAllIcon,
   CategoryExploreIcon,
@@ -469,6 +471,12 @@ const copy = {
     pollenMatchDone: 'Nice work! You found them all.',
     pollenMatchRoundSummary: 'Round summary',
     pollenMatchFlips: 'Flips',
+    hiveBuilderTapTitle: 'Hive Builder',
+    hiveBuilderTapBlurb: 'Remember the sequence.',
+    hiveBuilderTapIntro: 'Watch the hive light up, then tap each tile in the same order. No rush — you control the pace.',
+    hiveBuilderTapDone: 'You got to {longestSequence}!',
+    hiveBuilderTapRoundSummary: 'Longest sequence',
+    hiveBuilderTapStart: 'Start',
     addToHive: 'Add to my hive',
     playMore: 'Play more',
     justPlay: 'Just play',
@@ -596,6 +604,12 @@ const copy = {
     pollenMatchDone: 'Dobra robota! Wszystkie pary znalazłeś.',
     pollenMatchRoundSummary: 'Podsumowanie rundy',
     pollenMatchFlips: 'Obroty',
+    hiveBuilderTapTitle: 'Budowniczy Ul',
+    hiveBuilderTapBlurb: 'Zapamiętaj sekwencję.',
+    hiveBuilderTapIntro: 'Obserwuj, jak ul się świeci. Potem stuknij każdy kafelek w tej samej kolejności. Bez pośpiechu — ty kontrolujesz tempo.',
+    hiveBuilderTapDone: 'Dotarłeś/aś do {longestSequence}!',
+    hiveBuilderTapRoundSummary: 'Najdłuższa sekwencja',
+    hiveBuilderTapStart: 'Start',
     addToHive: 'Dodaj do ula',
     playMore: 'Graj dalej',
     justPlay: 'Po prostu graj',
@@ -802,7 +816,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const [deletedMemoryIds, setDeletedMemoryIds] = useState<Set<string>>(new Set());
   const [pendingDeletedMemory, setPendingDeletedMemory] = useState<MemoryEntry | null>(null);
   const [gameOpen, setGameOpen] = useState(false);
-  const [selectedGameKey, setSelectedGameKey] = useState<'pollen_match' | null>(null);
+  const [selectedGameKey, setSelectedGameKey] = useState<'pollen_match' | 'hive_builder_tap' | null>(null);
   const [pollenMatchStage, setPollenMatchStage] = useState<'intro' | 'playing' | 'complete'>('intro');
   const [pollenMatchTiles, setPollenMatchTiles] = useState<PollenMatchTile[]>(() => createPollenMatchBoard());
   const [pollenMatchSelection, setPollenMatchSelection] = useState<string[]>([]);
@@ -810,6 +824,14 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const [pollenMatchStartedAt, setPollenMatchStartedAt] = useState<number | null>(null);
   const [pollenMatchLocked, setPollenMatchLocked] = useState(false);
   const [pollenMatchSaved, setPollenMatchSaved] = useState(false);
+  const [hiveBuilderTapStage, setHiveBuilderTapStage] = useState<'intro' | 'playing' | 'complete'>('intro');
+  const [hiveBuilderTapSequence, setHiveBuilderTapSequence] = useState<string[]>(() => createHiveBuilderTapSequence(1));
+  const [hiveBuilderTapPosition, setHiveBuilderTapPosition] = useState(0);
+  const [hiveBuilderTapLongestSequence, setHiveBuilderTapLongestSequence] = useState(0);
+  const [hiveBuilderTapTotalTapsAttempted, setHiveBuilderTapTotalTapsAttempted] = useState(0);
+  const [hiveBuilderTapStartedAt, setHiveBuilderTapStartedAt] = useState<number | null>(null);
+  const [hiveBuilderTapLocked, setHiveBuilderTapLocked] = useState(false);
+  const [hiveBuilderTapSaved, setHiveBuilderTapSaved] = useState(false);
   const [homeAnimatedCellId, setHomeAnimatedCellId] = useState<string | null>(null);
   const [homeGreetingIndex] = useState(() => pickHomeGreetingIndex());
   const [tutorialActive, setTutorialActive] = useState(false);
@@ -913,6 +935,19 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     setPollenMatchSaved(false);
   };
 
+  const openHiveBuilderTap = () => {
+    setSelectedGameKey('hive_builder_tap');
+    setGameOpen(true);
+    setHiveBuilderTapStage('intro');
+    setHiveBuilderTapSequence(createHiveBuilderTapSequence(1));
+    setHiveBuilderTapPosition(0);
+    setHiveBuilderTapLongestSequence(0);
+    setHiveBuilderTapTotalTapsAttempted(0);
+    setHiveBuilderTapStartedAt(null);
+    setHiveBuilderTapLocked(false);
+    setHiveBuilderTapSaved(false);
+  };
+
   const startPollenMatch = () => {
     setPollenMatchStage('playing');
     setPollenMatchTiles(createPollenMatchBoard());
@@ -923,12 +958,32 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     setPollenMatchSaved(false);
   };
 
+  const startHiveBuilderTap = () => {
+    setHiveBuilderTapStage('playing');
+    setHiveBuilderTapSequence(createHiveBuilderTapSequence(1));
+    setHiveBuilderTapPosition(0);
+    setHiveBuilderTapLongestSequence(0);
+    setHiveBuilderTapTotalTapsAttempted(0);
+    setHiveBuilderTapStartedAt(Date.now());
+    setHiveBuilderTapLocked(false);
+    setHiveBuilderTapSaved(false);
+  };
+
   const closePollenMatch = () => {
     setGameOpen(false);
     setSelectedGameKey(null);
     setPollenMatchStage('intro');
     setPollenMatchSelection([]);
     setPollenMatchLocked(false);
+  };
+
+  const closeHiveBuilderTap = () => {
+    setGameOpen(false);
+    setSelectedGameKey(null);
+    setHiveBuilderTapStage('intro');
+    setHiveBuilderTapSequence(createHiveBuilderTapSequence(1));
+    setHiveBuilderTapPosition(0);
+    setHiveBuilderTapLocked(false);
   };
 
   const handlePollenMatchClick = (tileId: string) => {
@@ -1007,6 +1062,74 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
         metrics: {
           flips: pollenMatchFlips,
           pairsTotal: 4
+        }
+      }
+    });
+
+    flushQueue();
+  };
+
+  const handleHiveBuilderTapClick = (tileId: string) => {
+    if (hiveBuilderTapStage !== 'playing' || hiveBuilderTapLocked) {
+      return;
+    }
+
+    const expectedTile = hiveBuilderTapSequence[hiveBuilderTapPosition];
+    if (tileId !== expectedTile) {
+      setHiveBuilderTapTotalTapsAttempted((current) => current + 1);
+      setHiveBuilderTapPosition(0);
+      setHiveBuilderTapLocked(true);
+      window.setTimeout(() => setHiveBuilderTapLocked(false), 260);
+      return;
+    }
+
+    const nextPosition = hiveBuilderTapPosition + 1;
+    setHiveBuilderTapTotalTapsAttempted((current) => current + 1);
+    setHiveBuilderTapPosition(nextPosition);
+
+    if (nextPosition >= hiveBuilderTapSequence.length) {
+      const nextLongest = Math.max(hiveBuilderTapLongestSequence, hiveBuilderTapSequence.length);
+      setHiveBuilderTapLongestSequence(nextLongest);
+      setHiveBuilderTapStage('complete');
+    }
+  };
+
+  const finishHiveBuilderTapRound = () => {
+    setHiveBuilderTapStage('complete');
+    setHiveBuilderTapLongestSequence((current) => Math.max(current, hiveBuilderTapSequence.length));
+  };
+
+  const saveHiveBuilderTapResult = async () => {
+    if (!hiveBuilderTapStartedAt || hiveBuilderTapSaved) return;
+
+    const resultId = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `hive-builder-${Date.now()}`;
+    const durationMs = Date.now() - hiveBuilderTapStartedAt;
+    const longestSequence = Math.max(hiveBuilderTapLongestSequence, hiveBuilderTapSequence.length);
+    const result: GameResultEntry = {
+      id: resultId,
+      gameKey: 'hive_builder_tap',
+      durationMs,
+      flips: hiveBuilderTapTotalTapsAttempted,
+      pairsTotal: longestSequence,
+      completedAt: new Date().toISOString()
+    };
+
+    setGameResults((current) => [...current, result]);
+    setHiveBuilderTapSaved(true);
+    closeHiveBuilderTap();
+
+    await enqueueAction({
+      clientId: resultId,
+      type: 'gameResult',
+      path: '/api/games/results',
+      method: 'POST',
+      createdAt: Date.now(),
+      payload: {
+        gameKey: 'hive_builder_tap',
+        durationMs,
+        metrics: {
+          longestSequence,
+          totalTapsAttempted: hiveBuilderTapTotalTapsAttempted
         }
       }
     });
@@ -2290,13 +2413,17 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                   </span>
                   <span className="play-game-arrow" aria-hidden="true">→</span>
                 </button>
-                <button type="button" className="play-game-row disabled" disabled>
+                <button
+                  type="button"
+                  className="play-game-row"
+                  onClick={openHiveBuilderTap}
+                >
                   <span className="play-game-icon" aria-hidden="true">🐝</span>
                   <span className="play-game-copy">
-                    <strong>{locale === 'pl' ? 'Budowniczy Ul' : 'Hive Builder'}</strong>
-                    <small>{text.comingSoon}</small>
+                    <strong>{text.hiveBuilderTapTitle}</strong>
+                    <small>{text.hiveBuilderTapBlurb}</small>
                   </span>
-                  <span className="play-game-arrow" aria-hidden="true">…</span>
+                  <span className="play-game-arrow" aria-hidden="true">→</span>
                 </button>
               </div>
             </section>
@@ -2686,6 +2813,25 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
             ) : null}
           </div>
         </div>
+      ) : null}
+
+      {gameOpen && selectedGameKey === 'hive_builder_tap' ? (
+        <HiveBuilderTapGame
+          locale={locale}
+          text={text}
+          stage={hiveBuilderTapStage}
+          sequence={hiveBuilderTapSequence}
+          position={hiveBuilderTapPosition}
+          longestSequence={hiveBuilderTapLongestSequence}
+          totalTapsAttempted={hiveBuilderTapTotalTapsAttempted}
+          startedAt={hiveBuilderTapStartedAt}
+          hasGameHexToday={hasGameResultToday}
+          onClose={closeHiveBuilderTap}
+          onStart={startHiveBuilderTap}
+          onFinish={finishHiveBuilderTapRound}
+          onSave={saveHiveBuilderTapResult}
+          onTileClick={handleHiveBuilderTapClick}
+        />
       ) : null}
 
       {pendingDeleteId ? (

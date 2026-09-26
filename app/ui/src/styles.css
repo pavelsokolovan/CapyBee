@@ -1774,6 +1774,79 @@ a:hover {
   box-shadow: inset 0 0 0 2px rgba(90, 155, 82, 0.8);
 }
 
+.hive-builder-board {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  width: min(100%, 270px);
+  margin: 8px auto 0;
+  padding: 10px 8px;
+}
+
+.hive-builder-tile {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border: none;
+  background: transparent;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 180ms ease, filter 180ms ease;
+  cursor: pointer;
+}
+
+.hive-builder-tile__svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  filter: drop-shadow(0 4px 8px rgba(139, 107, 42, 0.15));
+}
+
+.hive-builder-tile__svg polygon {
+  fill: #fbe7b8;
+  stroke: #e09a1e;
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+.hive-builder-tile.current .hive-builder-tile__svg polygon,
+.hive-builder-tile.lit .hive-builder-tile__svg polygon {
+  fill: #f8d684;
+  filter: brightness(1.05);
+}
+
+.hive-builder-tile__dot {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(1.2rem, 3vw, 1.9rem);
+}
+
+.game-meta-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-top: 10px;
+}
+
+.capybee-avatar-inline {
+  display: grid;
+  place-items: center;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(242, 178, 51, 0.12);
+  font-size: 4rem;
+}
+
 .onboarding-mask {
   position: fixed;
   inset: 0;
