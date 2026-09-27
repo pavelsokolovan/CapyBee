@@ -1,16 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import {
+  advance,
   createHiveBuilderTapSequence,
   evaluateHiveBuilderTap,
   getHiveBuilderTapLayout,
+  startHiveBuilderTap,
   type HiveBuilderTapTile
 } from './useHiveBuilderTapGame';
 
 describe('useHiveBuilderTapGame', () => {
+  it('starts each round with a single tile sequence', () => {
+    expect(startHiveBuilderTap()).toEqual(['hex-0']);
+  });
+
   it('creates a short sequence with the correct tile count', () => {
     const sequence = createHiveBuilderTapSequence(4);
     expect(sequence).toHaveLength(4);
     expect(new Set(sequence).size).toBe(4);
+  });
+
+  it('appends the next tile number when the round advances', () => {
+    expect(advance(['hex-0', 'hex-1'])).toEqual(['hex-0', 'hex-1', 'hex-2']);
   });
 
   it('accepts the expected tap and advances the index', () => {

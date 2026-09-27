@@ -825,6 +825,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const [pollenMatchLocked, setPollenMatchLocked] = useState(false);
   const [pollenMatchSaved, setPollenMatchSaved] = useState(false);
   const [hiveBuilderTapStage, setHiveBuilderTapStage] = useState<'intro' | 'playing' | 'complete'>('intro');
+  const [hiveBuilderTapPhase, setHiveBuilderTapPhase] = useState<'showing-sequence' | 'waiting-for-input'>('showing-sequence');
   const [hiveBuilderTapSequence, setHiveBuilderTapSequence] = useState<string[]>(() => createHiveBuilderTapSequence(1));
   const [hiveBuilderTapPosition, setHiveBuilderTapPosition] = useState(0);
   const [hiveBuilderTapLongestSequence, setHiveBuilderTapLongestSequence] = useState(0);
@@ -959,14 +960,24 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   };
 
   const startHiveBuilderTap = () => {
+    const nextSequence = createHiveBuilderTapSequence(1);
     setHiveBuilderTapStage('playing');
-    setHiveBuilderTapSequence(createHiveBuilderTapSequence(1));
+    setHiveBuilderTapPhase('showing-sequence');
+    setHiveBuilderTapSequence(nextSequence);
     setHiveBuilderTapPosition(0);
     setHiveBuilderTapLongestSequence(0);
     setHiveBuilderTapTotalTapsAttempted(0);
     setHiveBuilderTapStartedAt(Date.now());
     setHiveBuilderTapLocked(false);
     setHiveBuilderTapSaved(false);
+
+    window.setTimeout(() => {
+      setHiveBuilderTapPosition(nextSequence.length - 1);
+      window.setTimeout(() => {
+        setHiveBuilderTapPhase('waiting-for-input');
+        setHiveBuilderTapPosition(0);
+      }, 520);
+    }, 160);
   };
 
   const closePollenMatch = () => {
@@ -981,6 +992,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     setGameOpen(false);
     setSelectedGameKey(null);
     setHiveBuilderTapStage('intro');
+    setHiveBuilderTapPhase('showing-sequence');
     setHiveBuilderTapSequence(createHiveBuilderTapSequence(1));
     setHiveBuilderTapPosition(0);
     setHiveBuilderTapLocked(false);
@@ -1070,7 +1082,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   };
 
   const handleHiveBuilderTapClick = (tileId: string) => {
-    if (hiveBuilderTapStage !== 'playing' || hiveBuilderTapLocked) {
+    if (hiveBuilderTapStage !== 'playing' || hiveBuilderTapLocked || hiveBuilderTapPhase !== 'waiting-for-input') {
       return;
     }
 
@@ -1079,7 +1091,13 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       setHiveBuilderTapTotalTapsAttempted((current) => current + 1);
       setHiveBuilderTapPosition(0);
       setHiveBuilderTapLocked(true);
-      window.setTimeout(() => setHiveBuilderTapLocked(false), 260);
+      setHiveBuilderTapPhase('showing-sequence');
+      window.setTimeout(() => {
+        setHiveBuilderTapSequence(createHiveBuilderTapSequence(1));
+        setHiveBuilderTapPosition(0);
+        setHiveBuilderTapPhase('waiting-for-input');
+        setHiveBuilderTapLocked(false);
+      }, 500);
       return;
     }
 
@@ -1089,8 +1107,19 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
 
     if (nextPosition >= hiveBuilderTapSequence.length) {
       const nextLongest = Math.max(hiveBuilderTapLongestSequence, hiveBuilderTapSequence.length);
+      const nextSequence = [...hiveBuilderTapSequence, `hex-${hiveBuilderTapSequence.length}`];
       setHiveBuilderTapLongestSequence(nextLongest);
-      setHiveBuilderTapStage('complete');
+      setHiveBuilderTapPhase('showing-sequence');
+      setHiveBuilderTapSequence(nextSequence);
+      setHiveBuilderTapPosition(0);
+
+      window.setTimeout(() => {
+        setHiveBuilderTapPosition(nextSequence.length - 1);
+        window.setTimeout(() => {
+          setHiveBuilderTapPhase('waiting-for-input');
+          setHiveBuilderTapPosition(0);
+        }, 520);
+      }, 160);
     }
   };
 
@@ -2820,6 +2849,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
           locale={locale}
           text={text}
           stage={hiveBuilderTapStage}
+          phase={hiveBuilderTapPhase}
           sequence={hiveBuilderTapSequence}
           position={hiveBuilderTapPosition}
           longestSequence={hiveBuilderTapLongestSequence}

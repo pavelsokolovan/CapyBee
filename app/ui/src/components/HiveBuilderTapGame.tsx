@@ -4,6 +4,7 @@ export interface HiveBuilderTapGameProps {
   locale: 'en' | 'pl';
   text: Record<string, string>;
   stage: 'intro' | 'playing' | 'complete';
+  phase: 'showing-sequence' | 'waiting-for-input';
   sequence: string[];
   position: number;
   longestSequence: number;
@@ -51,6 +52,7 @@ export function HiveBuilderTapGame({
   locale,
   text,
   stage,
+  phase,
   sequence,
   position,
   longestSequence,
@@ -65,6 +67,7 @@ export function HiveBuilderTapGame({
 }: HiveBuilderTapGameProps) {
   const displayLongest = Math.max(longestSequence, sequence.length);
   const durationSeconds = startedAt ? Math.max(1, Math.round((Date.now() - startedAt) / 1000)) : 1;
+  const isSequencePlayback = phase === 'showing-sequence';
 
   if (stage === 'intro') {
     return (
@@ -128,7 +131,7 @@ export function HiveBuilderTapGame({
                 key={tileId}
                 id={tileId}
                 isCurrent={index === position}
-                isLit={index <= position}
+                isLit={isSequencePlayback ? index <= position : index < position}
                 onClick={() => onTileClick(tileId)}
               />
             ))}
@@ -137,6 +140,7 @@ export function HiveBuilderTapGame({
           <div className="game-meta-row">
             <span>{locale === 'pl' ? 'Próby' : 'Attempts'}: {totalTapsAttempted}</span>
             <span>{locale === 'pl' ? 'Najdłużej' : 'Best'}: {displayLongest}</span>
+            <span>{isSequencePlayback ? (locale === 'pl' ? 'Pokaż sekwencję' : 'Show sequence') : (locale === 'pl' ? 'Odtwórz sekwencję' : 'Repeat the sequence')}</span>
           </div>
         </div>
       </div>

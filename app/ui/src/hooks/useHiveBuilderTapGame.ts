@@ -5,6 +5,8 @@ export type HiveBuilderTapTile = {
   active: boolean;
 };
 
+export type HiveBuilderTapSequencePhase = 'showing-sequence' | 'waiting-for-input';
+
 export interface HiveBuilderTapProgress {
   correct: boolean;
   nextIndex: number;
@@ -19,6 +21,18 @@ export function createHiveBuilderTapSequence(length: number): string[] {
     next.push(id);
   }
   return next;
+}
+
+export function startHiveBuilderTap(): string[] {
+  return createHiveBuilderTapSequence(1);
+}
+
+export function advance(sequence: string[]): string[] {
+  return [...sequence, `hex-${sequence.length}`];
+}
+
+export function advanceHiveBuilderTapSequence(sequence: string[]): string[] {
+  return advance(sequence);
 }
 
 export function getHiveBuilderTapLayout(length: number): HiveBuilderTapTile[] {
