@@ -14,13 +14,27 @@ export interface HiveBuilderTapProgress {
   longestSequence: number;
 }
 
-export function createHiveBuilderTapSequence(length: number): string[] {
-  const next: string[] = [];
-  for (let index = 0; index < length; index += 1) {
-    const id = `hex-${index}`;
-    next.push(id);
+export function createHiveBuilderTapSequence(
+  length: number,
+  previousSequence?: string[]
+): string[] {
+  const maxTileCount = 7;
+  const tileIds = Array.from({ length: maxTileCount }, (_, index) => `hex-${index}`);
+
+  if (previousSequence && previousSequence.length > 0) {
+    const usedTiles = new Set(previousSequence);
+    const availableTiles = tileIds.filter((id) => !usedTiles.has(id));
+
+    if (availableTiles.length === 0) {
+      return previousSequence;
+    }
+
+    const randomTile = availableTiles[Math.floor(Math.random() * availableTiles.length)];
+    return [...previousSequence, randomTile];
   }
-  return next;
+
+  const firstTile = tileIds[Math.floor(Math.random() * tileIds.length)];
+  return length > 1 ? [firstTile] : [firstTile];
 }
 
 export function startHiveBuilderTap(): string[] {

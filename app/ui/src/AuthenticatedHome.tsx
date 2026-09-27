@@ -960,7 +960,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   };
 
   const startHiveBuilderTap = () => {
-    const nextSequence = createHiveBuilderTapSequence(1);
+    const nextSequence = createHiveBuilderTapSequence(1, hiveBuilderTapSequence);
     setHiveBuilderTapStage('playing');
     setHiveBuilderTapPhase('showing-sequence');
     setHiveBuilderTapSequence(nextSequence);
@@ -1107,7 +1107,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
 
     if (nextPosition >= hiveBuilderTapSequence.length) {
       const nextLongest = Math.max(hiveBuilderTapLongestSequence, hiveBuilderTapSequence.length);
-      const nextSequence = [...hiveBuilderTapSequence, `hex-${hiveBuilderTapSequence.length}`];
+      const nextSequence = createHiveBuilderTapSequence(hiveBuilderTapSequence.length + 1, hiveBuilderTapSequence);
       setHiveBuilderTapLongestSequence(nextLongest);
       setHiveBuilderTapPhase('showing-sequence');
       setHiveBuilderTapSequence(nextSequence);

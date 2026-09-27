@@ -9,14 +9,33 @@ import {
 } from './useHiveBuilderTapGame';
 
 describe('useHiveBuilderTapGame', () => {
-  it('starts each round with a single tile sequence', () => {
-    expect(startHiveBuilderTap()).toEqual(['hex-0']);
+  it('starts each round with a single random tile sequence', () => {
+    const previousRandom = Math.random;
+    Math.random = () => 0.2;
+
+    try {
+      const sequence = startHiveBuilderTap();
+      expect(sequence).toHaveLength(1);
+      expect(sequence[0]).toMatch(/^hex-[0-6]$/);
+    } finally {
+      Math.random = previousRandom;
+    }
   });
 
-  it('creates a short sequence with the correct tile count', () => {
-    const sequence = createHiveBuilderTapSequence(4);
-    expect(sequence).toHaveLength(4);
-    expect(new Set(sequence).size).toBe(4);
+  it('extends an existing sequence by one new random tile', () => {
+    const previousRandom = Math.random;
+    Math.random = () => 0.7;
+
+    try {
+      const sequence = createHiveBuilderTapSequence(2, ['hex-1', 'hex-3']);
+      expect(sequence).toHaveLength(3);
+      expect(sequence.slice(0, 2)).toEqual(['hex-1', 'hex-3']);
+      expect(sequence[2]).not.toBe('hex-1');
+      expect(sequence[2]).not.toBe('hex-3');
+      expect(sequence[2]).toMatch(/^hex-[0-6]$/);
+    } finally {
+      Math.random = previousRandom;
+    }
   });
 
   it('appends the next tile number when the round advances', () => {
