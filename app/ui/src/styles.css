@@ -1776,18 +1776,16 @@ a:hover {
 
 .hive-builder-board {
   position: relative;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
   width: min(100%, 270px);
+  height: 280px;
   margin: 8px auto 0;
   padding: 10px 8px;
 }
 
 .hive-builder-tile {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 1;
+  position: absolute;
+  width: 70px;
+  height: 78px;
   border: none;
   background: transparent;
   padding: 0;

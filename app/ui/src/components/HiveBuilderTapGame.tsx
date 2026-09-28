@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import { getHiveBuilderTapLayout } from '../hooks/useHiveBuilderTapGame';
 
 export interface HiveBuilderTapGameProps {
   locale: 'en' | 'pl';
@@ -22,13 +24,23 @@ function HexTile({
   id,
   isCurrent,
   isLit,
-  onClick
+  onClick,
+  x,
+  y
 }: {
   id: string;
   isCurrent: boolean;
   isLit: boolean;
   onClick: () => void;
+  x: number;
+  y: number;
 }) {
+  const hexWidth = 70;
+  const hexHeight = 78;
+  const offsetX = x * (hexWidth * 0.75);
+  const offsetY = y * (hexHeight * 0.5);
+  const shiftRight = y % 2 === 1 ? hexWidth * 0.375 : 0;
+
   return (
     <button
       type="button"
@@ -36,6 +48,9 @@ function HexTile({
       onClick={onClick}
       aria-label={id}
       style={{
+        position: 'absolute',
+        left: `${offsetX + shiftRight}px`,
+        top: `${offsetY}px`,
         transform: isLit ? 'scale(1.04)' : 'scale(1)',
         boxShadow: isLit ? '0 0 0 2px rgba(224, 154, 30, 0.7), 0 0 20px rgba(242, 178, 51, 0.42)' : undefined
       }}
@@ -67,6 +82,44 @@ export function HiveBuilderTapGame({
 }: HiveBuilderTapGameProps) {
   const displayLongest = Math.max(longestSequence, sequence.length);
   const durationSeconds = startedAt ? Math.max(1, Math.round((Date.now() - startedAt) / 1000)) : 1;
+  const [activePlaybackIndex, setActivePlaybackIndex] = useState<number>(-1);
+
+  useEffect(() => {
+    if (stage !== 'playing' || position !== 0) {
+      setActivePlaybackIndex(-1);
+      return;
+    }
+
+    let currentIndex = 0;
+    let timerId: number | undefined;
+
+    const playNextTile = () => {
+      if (currentIndex >= sequence.length) {
+        setActivePlaybackIndex(-1);
+        return;
+      }
+
+      const tileId = sequence[currentIndex];
+      console.log(`🎮 Highlighting [${currentIndex}/${sequence.length}]: ${tileId} | Full sequence: [${sequence.join(', ')}]`);
+      setActivePlaybackIndex(currentIndex);
+      timerId = window.setTimeout(() => {
+        currentIndex += 1;
+        playNextTile();
+      }, 1050);
+    };
+
+    const startTimer = window.setTimeout(() => {
+      playNextTile();
+    }, 490);
+
+    return () => {
+      window.clearTimeout(startTimer);
+      if (timerId) {
+        window.clearTimeout(timerId);
+      }
+    };
+  }, [stage, position, sequence.length]);
+
   const isSequencePlayback = phase === 'showing-sequence';
 
   if (stage === 'intro') {
@@ -126,15 +179,26 @@ export function HiveBuilderTapGame({
           </div>
 
           <div className="hive-builder-board" aria-label={text.hiveBuilderTapTitle}>
-            {sequence.map((tileId, index) => (
-              <HexTile
-                key={tileId}
-                id={tileId}
-                isCurrent={index === position}
-                isLit={isSequencePlayback ? index <= position : index < position}
-                onClick={() => onTileClick(tileId)}
-              />
-            ))}
+            {sequence.map((tileId, index) => {
+              const tileIndex = parseInt(tileId.replace('hex-', ''), 10);
+              const layout = getHiveBuilderTapLayout(7);
+              const tile = layout[tileIndex];
+              const isLitValue = phase === 'showing-sequence' ? index === activePlaybackIndex : index < position;
+              if (isLitValue) {
+                console.log(`  💡 LIGHTING: index=${index}, tileId=${tileId}, pos=(${tile.x},${tile.y})`);
+              }
+              return (
+                <HexTile
+                  key={tileId}
+                  id={tileId}
+                  isCurrent={index === position}
+                  isLit={isLitValue}
+                  onClick={() => onTileClick(tileId)}
+                  x={tile.x}
+                  y={tile.y}
+                />
+              );
+            })}
           </div>
 
           <div className="game-meta-row">
@@ -155,3 +219,6 @@ function CapyBeeAvatarInline() {
     </div>
   );
 }
+
+
+

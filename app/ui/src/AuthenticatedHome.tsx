@@ -826,7 +826,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const [pollenMatchSaved, setPollenMatchSaved] = useState(false);
   const [hiveBuilderTapStage, setHiveBuilderTapStage] = useState<'intro' | 'playing' | 'complete'>('intro');
   const [hiveBuilderTapPhase, setHiveBuilderTapPhase] = useState<'showing-sequence' | 'waiting-for-input'>('showing-sequence');
-  const [hiveBuilderTapSequence, setHiveBuilderTapSequence] = useState<string[]>(() => createHiveBuilderTapSequence(1));
+  const [hiveBuilderTapSequence, setHiveBuilderTapSequence] = useState<string[]>(() => createHiveBuilderTapSequence());
   const [hiveBuilderTapPosition, setHiveBuilderTapPosition] = useState(0);
   const [hiveBuilderTapLongestSequence, setHiveBuilderTapLongestSequence] = useState(0);
   const [hiveBuilderTapTotalTapsAttempted, setHiveBuilderTapTotalTapsAttempted] = useState(0);
@@ -940,7 +940,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     setSelectedGameKey('hive_builder_tap');
     setGameOpen(true);
     setHiveBuilderTapStage('intro');
-    setHiveBuilderTapSequence(createHiveBuilderTapSequence(1));
+    setHiveBuilderTapSequence(createHiveBuilderTapSequence());
     setHiveBuilderTapPosition(0);
     setHiveBuilderTapLongestSequence(0);
     setHiveBuilderTapTotalTapsAttempted(0);
@@ -960,7 +960,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   };
 
   const startHiveBuilderTap = () => {
-    const nextSequence = createHiveBuilderTapSequence(1, hiveBuilderTapSequence);
+    const nextSequence = createHiveBuilderTapSequence();
     setHiveBuilderTapStage('playing');
     setHiveBuilderTapPhase('showing-sequence');
     setHiveBuilderTapSequence(nextSequence);
@@ -970,15 +970,20 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     setHiveBuilderTapStartedAt(Date.now());
     setHiveBuilderTapLocked(false);
     setHiveBuilderTapSaved(false);
-
-    window.setTimeout(() => {
-      setHiveBuilderTapPosition(nextSequence.length - 1);
-      window.setTimeout(() => {
-        setHiveBuilderTapPhase('waiting-for-input');
-        setHiveBuilderTapPosition(0);
-      }, 520);
-    }, 160);
   };
+
+  useEffect(() => {
+    if (hiveBuilderTapStage !== 'playing' || hiveBuilderTapPhase !== 'showing-sequence') {
+      return;
+    }
+
+    const playbackDelayMs = Math.max(1800, hiveBuilderTapSequence.length * 1400);
+    const timer = window.setTimeout(() => {
+      setHiveBuilderTapPhase('waiting-for-input');
+    }, playbackDelayMs);
+
+    return () => window.clearTimeout(timer);
+  }, [hiveBuilderTapStage, hiveBuilderTapPhase, hiveBuilderTapSequence.length]);
 
   const closePollenMatch = () => {
     setGameOpen(false);
@@ -993,7 +998,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
     setSelectedGameKey(null);
     setHiveBuilderTapStage('intro');
     setHiveBuilderTapPhase('showing-sequence');
-    setHiveBuilderTapSequence(createHiveBuilderTapSequence(1));
+    setHiveBuilderTapSequence(createHiveBuilderTapSequence());
     setHiveBuilderTapPosition(0);
     setHiveBuilderTapLocked(false);
   };
@@ -1093,7 +1098,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
       setHiveBuilderTapLocked(true);
       setHiveBuilderTapPhase('showing-sequence');
       window.setTimeout(() => {
-        setHiveBuilderTapSequence(createHiveBuilderTapSequence(1));
+        setHiveBuilderTapSequence(createHiveBuilderTapSequence());
         setHiveBuilderTapPosition(0);
         setHiveBuilderTapPhase('waiting-for-input');
         setHiveBuilderTapLocked(false);
@@ -1107,19 +1112,11 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
 
     if (nextPosition >= hiveBuilderTapSequence.length) {
       const nextLongest = Math.max(hiveBuilderTapLongestSequence, hiveBuilderTapSequence.length);
-      const nextSequence = createHiveBuilderTapSequence(hiveBuilderTapSequence.length + 1, hiveBuilderTapSequence);
+      const nextSequence = createHiveBuilderTapSequence(hiveBuilderTapSequence);
       setHiveBuilderTapLongestSequence(nextLongest);
       setHiveBuilderTapPhase('showing-sequence');
       setHiveBuilderTapSequence(nextSequence);
       setHiveBuilderTapPosition(0);
-
-      window.setTimeout(() => {
-        setHiveBuilderTapPosition(nextSequence.length - 1);
-        window.setTimeout(() => {
-          setHiveBuilderTapPhase('waiting-for-input');
-          setHiveBuilderTapPosition(0);
-        }, 520);
-      }, 160);
     }
   };
 

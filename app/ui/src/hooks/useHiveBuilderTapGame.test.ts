@@ -22,23 +22,36 @@ describe('useHiveBuilderTapGame', () => {
     }
   });
 
-  it('extends an existing sequence by one new random tile', () => {
-    const previousRandom = Math.random;
-    Math.random = () => 0.7;
+  it('extends an existing sequence by one new random tile and reshuffles', () => {
+    const previousSequence = ['hex-1', 'hex-3'];
+    const sequence1 = createHiveBuilderTapSequence(previousSequence);
 
-    try {
-      const sequence = createHiveBuilderTapSequence(2, ['hex-1', 'hex-3']);
-      expect(sequence).toHaveLength(3);
-      expect(sequence.slice(0, 2)).toEqual(['hex-1', 'hex-3']);
-      expect(sequence[2]).not.toBe('hex-1');
-      expect(sequence[2]).not.toBe('hex-3');
-      expect(sequence[2]).toMatch(/^hex-[0-6]$/);
-    } finally {
-      Math.random = previousRandom;
-    }
+    expect(sequence1).toHaveLength(3);
+    expect(new Set(sequence1).size).toBe(3);
+    expect(sequence1).toContain('hex-1');
+    expect(sequence1).toContain('hex-3');
+
+    const newTile = sequence1.find((id) => !previousSequence.includes(id));
+    expect(newTile).toBeDefined();
   });
 
-  it('appends the next tile number when the round advances', () => {
+  it('produces different sequences on repeated calls (randomization verification)', () => {
+    const previousSequence = ['hex-2', 'hex-4'];
+    const sequences = [
+      createHiveBuilderTapSequence(previousSequence),
+      createHiveBuilderTapSequence(previousSequence),
+      createHiveBuilderTapSequence(previousSequence),
+      createHiveBuilderTapSequence(previousSequence),
+      createHiveBuilderTapSequence(previousSequence)
+    ];
+
+    const seqStrings = sequences.map((s) => s.join(','));
+    const uniqueSeqs = new Set(seqStrings);
+
+    expect(uniqueSeqs.size).toBeGreaterThan(1);
+  });
+
+  it('creates a fresh random round when the next sequence grows', () => {
     expect(advance(['hex-0', 'hex-1'])).toEqual(['hex-0', 'hex-1', 'hex-2']);
   });
 

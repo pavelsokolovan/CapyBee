@@ -14,31 +14,36 @@ export interface HiveBuilderTapProgress {
   longestSequence: number;
 }
 
-export function createHiveBuilderTapSequence(
-  length: number,
-  previousSequence?: string[]
-): string[] {
-  const maxTileCount = 7;
-  const tileIds = Array.from({ length: maxTileCount }, (_, index) => `hex-${index}`);
+export function createHiveBuilderTapSequence(previousSequence: string[] = []): string[] {
+  const availableTiles = ['hex-0', 'hex-1', 'hex-2', 'hex-3', 'hex-4', 'hex-5', 'hex-6'];
 
-  if (previousSequence && previousSequence.length > 0) {
-    const usedTiles = new Set(previousSequence);
-    const availableTiles = tileIds.filter((id) => !usedTiles.has(id));
-
-    if (availableTiles.length === 0) {
-      return previousSequence;
-    }
-
-    const randomTile = availableTiles[Math.floor(Math.random() * availableTiles.length)];
-    return [...previousSequence, randomTile];
+  if (previousSequence.length === 0) {
+    const firstTile = availableTiles[Math.floor(Math.random() * availableTiles.length)];
+    console.log('🎲 [Round 1] New sequence:', [firstTile]);
+    return [firstTile];
   }
 
-  const firstTile = tileIds[Math.floor(Math.random() * tileIds.length)];
-  return length > 1 ? [firstTile] : [firstTile];
+  if (previousSequence.length >= availableTiles.length) {
+    return previousSequence;
+  }
+
+  const usedTiles = new Set(previousSequence);
+  const unusedTiles = availableTiles.filter((id) => !usedTiles.has(id));
+  const newTile = unusedTiles[Math.floor(Math.random() * unusedTiles.length)];
+  const nextSequence = [...previousSequence, newTile];
+
+  const shuffledSequence = [...nextSequence];
+  for (let index = shuffledSequence.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffledSequence[index], shuffledSequence[swapIndex]] = [shuffledSequence[swapIndex], shuffledSequence[index]];
+  }
+
+  console.log(`🎲 [Round ${shuffledSequence.length}] Previous: [${previousSequence.join(', ')}] → Added: ${newTile} → Shuffled: [${shuffledSequence.join(', ')}]`);
+  return shuffledSequence;
 }
 
 export function startHiveBuilderTap(): string[] {
-  return createHiveBuilderTapSequence(1);
+  return createHiveBuilderTapSequence();
 }
 
 export function advance(sequence: string[]): string[] {
