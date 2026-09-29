@@ -4,6 +4,7 @@ import {
   createHiveBuilderTapSequence,
   evaluateHiveBuilderTap,
   getHiveBuilderTapLayout,
+  shouldHighlightHiveBuilderTapTile,
   startHiveBuilderTap,
   type HiveBuilderTapTile
 } from './useHiveBuilderTapGame';
@@ -77,5 +78,29 @@ describe('useHiveBuilderTapGame', () => {
     const layout = getHiveBuilderTapLayout(7);
     expect(layout.length).toBe(7);
     expect(layout.every((tile: HiveBuilderTapTile) => tile.id.startsWith('hex-'))).toBe(true);
+    expect(new Set(layout.map((tile) => `${tile.x}:${tile.y}`)).size).toBe(layout.length);
+  });
+
+  it('does not show a hint while the player is waiting for input', () => {
+    expect(shouldHighlightHiveBuilderTapTile({
+      phase: 'waiting-for-input',
+      index: 0,
+      position: 1,
+      activePlaybackIndex: 0
+    })).toBe(false);
+
+    expect(shouldHighlightHiveBuilderTapTile({
+      phase: 'waiting-for-input',
+      index: 1,
+      position: 2,
+      activePlaybackIndex: 1
+    })).toBe(false);
+
+    expect(shouldHighlightHiveBuilderTapTile({
+      phase: 'showing-sequence',
+      index: 1,
+      position: 0,
+      activePlaybackIndex: 1
+    })).toBe(true);
   });
 });

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { getHiveBuilderTapLayout } from '../hooks/useHiveBuilderTapGame';
+import { getHiveBuilderTapLayout, shouldHighlightHiveBuilderTapTile } from '../hooks/useHiveBuilderTapGame';
 
 export interface HiveBuilderTapGameProps {
   locale: 'en' | 'pl';
@@ -37,6 +37,8 @@ function HexTile({
 }) {
   const hexWidth = 70;
   const hexHeight = 78;
+  const boardCenterX = 118;
+  const boardCenterY = 104;
   const offsetX = x * (hexWidth * 0.75);
   const offsetY = y * (hexHeight * 0.5);
   const shiftRight = y % 2 === 1 ? hexWidth * 0.375 : 0;
@@ -49,8 +51,8 @@ function HexTile({
       aria-label={id}
       style={{
         position: 'absolute',
-        left: `${offsetX + shiftRight}px`,
-        top: `${offsetY}px`,
+        left: `${boardCenterX + offsetX + shiftRight}px`,
+        top: `${boardCenterY + offsetY}px`,
         transform: isLit ? 'scale(1.04)' : 'scale(1)',
         boxShadow: isLit ? '0 0 0 2px rgba(224, 154, 30, 0.7), 0 0 20px rgba(242, 178, 51, 0.42)' : undefined
       }}
@@ -99,8 +101,6 @@ export function HiveBuilderTapGame({
         return;
       }
 
-      const tileId = sequence[currentIndex];
-      console.log(`🎮 Highlighting [${currentIndex}/${sequence.length}]: ${tileId} | Full sequence: [${sequence.join(', ')}]`);
       setActivePlaybackIndex(currentIndex);
       timerId = window.setTimeout(() => {
         currentIndex += 1;
@@ -121,6 +121,7 @@ export function HiveBuilderTapGame({
   }, [stage, position, sequence.length]);
 
   const isSequencePlayback = phase === 'showing-sequence';
+  const layout = getHiveBuilderTapLayout(7);
 
   if (stage === 'intro') {
     return (
@@ -181,17 +182,20 @@ export function HiveBuilderTapGame({
           <div className="hive-builder-board" aria-label={text.hiveBuilderTapTitle}>
             {sequence.map((tileId, index) => {
               const tileIndex = parseInt(tileId.replace('hex-', ''), 10);
-              const layout = getHiveBuilderTapLayout(7);
               const tile = layout[tileIndex];
-              const isLitValue = phase === 'showing-sequence' ? index === activePlaybackIndex : index < position;
-              if (isLitValue) {
-                console.log(`  💡 LIGHTING: index=${index}, tileId=${tileId}, pos=(${tile.x},${tile.y})`);
-              }
+              const isCurrentTile = phase === 'showing-sequence' && index === activePlaybackIndex;
+              const isLitValue = shouldHighlightHiveBuilderTapTile({
+                phase,
+                index,
+                position,
+                activePlaybackIndex
+              });
+
               return (
                 <HexTile
                   key={tileId}
                   id={tileId}
-                  isCurrent={index === position}
+                  isCurrent={isCurrentTile}
                   isLit={isLitValue}
                   onClick={() => onTileClick(tileId)}
                   x={tile.x}

@@ -54,6 +54,24 @@ export function advanceHiveBuilderTapSequence(sequence: string[]): string[] {
   return advance(sequence);
 }
 
+export function shouldHighlightHiveBuilderTapTile({
+  phase,
+  index,
+  position,
+  activePlaybackIndex
+}: {
+  phase: HiveBuilderTapSequencePhase;
+  index: number;
+  position: number;
+  activePlaybackIndex: number;
+}): boolean {
+  if (phase !== 'showing-sequence') {
+    return false;
+  }
+
+  return index === activePlaybackIndex && position === 0;
+}
+
 export function getHiveBuilderTapLayout(length: number): HiveBuilderTapTile[] {
   const positions: { x: number; y: number }[] = [
     { x: 0, y: 0 },
