@@ -25,6 +25,7 @@ Rules:
 - Service methods contain validation, ownership checks, and business decisions.
 - Repositories do not contain business rule logic.
 - Domain entities are not API DTOs.
+- Return correct HTTP status codes (201 Create, 204 No Content, 400/404/409 for validation).
 
 ## Service design
 
@@ -32,7 +33,7 @@ Rules:
 - Validate all state transitions before persisting changes.
 - Use exceptions to signal business-level failures and let handlers map them to HTTP responses.
 - Make behavior explicit and easy to test.
-- Handle duplicate create attempts and idempotent retries intentionally.
+- Handle duplicate create attempts and idempotent retries intentionally (pattern: optional client-supplied `id` on create DTOs, checked before insert — see `CheckInService`, `MissionService`).
 
 ## DTO and API patterns
 
@@ -49,14 +50,20 @@ Rules:
 - Only allow public endpoints when truly required.
 - Protect child-specific resources with ownership validation.
 
-## Testing rules
+## Testing rules — MANDATORY
+
+**Mandatory: any new or modified method in `.../service/` must ship with unit tests in the same PR.**
 
 - Put tests under `app/server/src/test/java`, mirroring package structure.
-- Prefer unit tests for service logic using JUnit 5 and Mockito.
-- Use `@ExtendWith(MockitoExtension.class)`, `@Mock`, and `@InjectMocks` in the project’s standard unit-test pattern.
-- Cover success paths and failure branches, including validation errors and ownership checks.
-- Include duplicate-create or idempotent-create cases when applicable.
-- Do not lower the JaCoCo threshold to satisfy a build.
+- Use JUnit 5 and Mockito pattern: `@ExtendWith(MockitoExtension.class)`, `@Mock` on repositories/collaborators, `@InjectMocks` on the service under test.
+- Cover success paths AND every failure branch:
+  - Validation errors (`ResponseStatusException`s with 400/404/409/403)
+  - Idempotent-create-by-id branches (including when the id already exists)
+  - Ownership checks (deny access to other child's resources)
+  - Edge cases (empty input, boundary conditions)
+- See reference style: `CheckInServiceTest`, `ChildProfileServiceTest`, `MissionServiceCompletionTest`.
+- **JaCoCo gate:** `pom.xml` enforces 70% line coverage on `com.capybee.server.service.*` via `mvn verify` (CI runs this too). Do not lower this threshold — add the missing tests instead.
+- Run `mvn verify` locally before considering backend work done.
 
 ## Build and verification
 
@@ -69,7 +76,8 @@ Rules:
 - Field injection via `@Autowired`.
 - Business logic leaking into controllers.
 - Direct repository usage from web layer code.
-- Returning entities to the client.
+- Returning entities to the client (use DTOs).
 - Broad catch-all exceptions that hide real validation errors.
 - Adding schema changes without a Flyway migration.
 - Creating endpoints without explicit authorization configuration.
+- Service tests that don't cover failure branches and ownership validation.

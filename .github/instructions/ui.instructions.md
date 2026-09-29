@@ -4,8 +4,8 @@ applyTo: "app/ui/src/**/*.ts,app/ui/src/**/*.tsx"
 
 # UI and frontend standards
 
-Product-level safety/privacy/tone rules live in `copilot-instructions.md` —
-this file covers UI implementation specifics only.
+Product-level safety/privacy rules live in `copilot-instructions.md` — this
+file covers UI implementation and tone specifics.
 
 ## Frontend stack and architecture
 
@@ -17,9 +17,16 @@ this file covers UI implementation specifics only.
 - Use mobile-first styling, target ~360px width; prefer Tailwind utilities, only add custom CSS in `styles.css` when no utility fits.
 - Extract a section out of `AuthenticatedHome.tsx` into `src/components/` once it becomes self-contained; don't keep growing that file.
 
-## Copy and localization
+## Copy, tone, and localization
 
-- Follow the existing bilingual (EN/PL) copy-object pattern already used in the app; never hardcode a single-language string.
+**CapyBee (the character) speaks warmly and casually, never clinical or clinical:**
+- Short sentences, validates feelings first
+- Never says "it'll get better" or frames homesickness as a problem to fix
+- Old and new memories coexist as valid
+- Bilingual (EN/PL) always — use the existing copy-object pattern in `AuthenticatedHome.tsx`
+- Never hardcode a single-language string; provide both EN and PL for every user-facing text
+
+Example: missions, check-in responses, empty states, notifications all follow this voice.
 
 ## Offline-first and data mutation rules
 
@@ -29,6 +36,7 @@ this file covers UI implementation specifics only.
 ## Testing expectations
 
 - Any new or modified pure logic outside React components (queue logic, sync engine, session persistence helpers, etc.) must include Vitest unit tests: happy path plus at least one retry/failure/edge case, following the existing `queueStore.test.ts` / `syncEngine.test.ts` pattern (happy-dom, `idb-keyval` mocked/faked).
+- Run `npm test` (or `npm run test:coverage`) in `app/ui` before considering frontend work done.
 
 ## Build and verification
 

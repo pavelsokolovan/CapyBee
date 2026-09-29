@@ -4,33 +4,36 @@ applyTo: "**/*.{md,java,ts,tsx,sql,yml,yaml}"
 
 # CapyBee project overview
 
-Quick orientation for any file in this repo. Detailed rules live in the
-always-loaded root `copilot-instructions.md` and in the scoped
+Full orientation for any file in this repo. Scoped rules live in
 `java-server.instructions.md` / `ui.instructions.md` / `api.instructions.md` /
-`database.instructions.md` files — this file intentionally does not repeat
-them, so check those before assuming a rule is missing here.
+`database.instructions.md` / `build-workflow.instructions.md` — check those
+before assuming rules are missing.
 
 ## Product intent
 
-CapyBee is a children's companion app for kids who have moved to a new
-country: daily check-ins, small real-world missions, a private friendship
-tracker, a honeycomb progress map, and memory-based reflection on both old
-and new worlds.
+CapyBee ("Razem budujemy nowy ul" / "Together we build a new hive") is a children's companion app for ~12-year-olds who have relocated to a new country. It helps them process homesickness ("My Old World") while gently building a new life ("My New World"), through daily check-ins, small real-world missions, a private friendship tracker, and a honeycomb progress map.
 
-Read [docs/CapyBee_concept.md](../../docs/CapyBee_concept.md) and
-[docs/specifications](../../docs/specifications) before implementing features
-that change user-facing behavior, data model, onboarding, or emotional
-experience.
+**Read [`docs/CapyBee_concept.md`](../../docs/CapyBee_concept.md) and [`docs/specifications`](../../docs/specifications) before implementing features that change product behavior, data model, onboarding, or emotional experience.**
 
-## Core architecture
+## Monorepo structure
 
-- Backend: Spring Boot 4.1 / Java 25 / Maven — package root `com.capybee.server`, layers `config`, `domain`, `repository`, `service`, `web`.
-- Frontend: React 19 + TypeScript + Vite 6 + Tailwind CSS 3 — app source in `app/ui/src`.
-- Database migrations: `app/server/src/main/resources/db/migration` (Flyway).
-- Deployment: single container — UI build copied into Spring Boot static resources, served as one Fly.io app with a private Postgres instance.
+- **`app/server`** — Spring Boot 4.1 (Java 25), Maven build.
+  - Package root: `com.capybee.server`
+  - Layers: `config/`, `domain/`, `repository/`, `service/`, `web/`
+  - Flyway migrations: `src/main/resources/db/migration/`
+- **`app/ui`** — React 19 + TypeScript + Vite 6, Tailwind CSS 3, Framer Motion.
+  - Main screens: `AuthenticatedHome.tsx`
+  - Reusable UI: `src/components/`
+  - Offline queue: `src/offline/` (queueStore, syncEngine, idb-keyval)
+  - PWA service worker: `vite-plugin-pwa`
+- **Deployment:** Single container. UI build (`npm run build` → `dist/`) copied into Spring Boot static resources; entire app runs as one Fly.io instance with private Postgres.
 
-## Non-negotiables
+## Product and technical non-negotiables
 
-Safety/privacy, bilingual EN/PL copy, offline-first writes, and strict
-backend layering are hard requirements for every change in this repo, not
-just recommendations — see `copilot-instructions.md` for the full list.
+Read [`copilot-instructions.md`](../../copilot-instructions.md) for complete constraints. Key points:
+
+- **Safety & privacy first:** no inter-child data sharing, minimal PII (nicknames only), no analytics SDKs.
+- **Auth:** Google OAuth2 + server sessions; `sessionPersistence.ts` for PWA restore-token fallback.
+- **Tone:** warm, casual (never clinical), validates feelings, bilingual EN/PL always.
+- **Offline-first:** all mutations through offline queue + sync engine.
+- **Strict layering:** `web` → `service` → `repository` → `domain`. Controllers never touch repos directly.
