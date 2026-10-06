@@ -20,7 +20,7 @@ Stack: Spring Boot 4.1 (Java 25) + React 19/TypeScript + Vite 6 + Tailwind 3. Si
 
 ## Copilot's approach
 
-- **Be concise.** Explain reasoning in simple English for non-trivial changes.
+- **Be concise.** Use simple English; after edits, summarize changes and checks without repeating code.
 - **Read scoped instructions** (`.github/instructions/`) for layering rules, testing patterns, API design, schema rules, UI conventions.
 - **Follow existing patterns** before proposing new ones: check-in service, mission service, offline queue, copy localization.
 - **Quality gates before done:** `mvn verify` (backend), `npm test` (frontend), build-copy workflow sync.
