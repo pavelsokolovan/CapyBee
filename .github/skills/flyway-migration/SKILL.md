@@ -1,103 +1,28 @@
 ---
 name: flyway-migration
-description: Safe database migration authoring for CapyBee using Flyway. Use this skill when adding new tables, modifying schema, or setting up indexes. Covers naming conventions, never-edit rules, migration checklist, local verification, and troubleshooting. Triggers on "add database migration", "create migration", "update schema", "add database table".
+description: "Use when creating a Flyway migration, adding a database table, changing schema, or adding indexes in CapyBee. Covers safe authoring and non-destructive verification."
 ---
 
-# Flyway Migration Safety & Patterns
+# Flyway Migration
 
-## When to Use
+Use for new tables, indexes, constraints, and column changes. Policy lives in the [database instructions](../../instructions/database.instructions.md); do not edit applied migrations.
 
-- Creating a new SQL migration file for a schema change
-- Adding tables, indexes, or constraints
-- Modifying column types or constraints
+## Procedure
+1. Read the relevant product specification, current entity, and nearby migrations. Confirm ownership, existing names, and the required change.
+2. Inspect existing migration versions; choose the next unused `V<N>__<lowercase_description>.sql` under `app/server/src/main/resources/db/migration/`. Flyway orders by version, not commit order.
+3. Author only the necessary Postgres changes. Match existing UUID, timestamp, relationship, and soft-delete conventions where applicable. Choose cascade behavior and indexes for actual access patterns, not mechanically for every column.
+4. Check data compatibility: backfills, defaults, constraints on existing rows, and references only to objects available at this version. Correct deployed schema with a new forward migration, not an assumed undo migration.
+5. Add the matching persistence changes and service tests for affected validation, ownership, and duplicate-create behavior.
+6. Verify against an explicitly disposable database using the project's configured Spring Boot/Flyway startup. Test upgrade from the previous schema and startup from an empty database; inspect migration history and affected constraints.
 
-## Key Principles
-
-1. **Never Edit Applied Migrations** — Once a migration has run against any environment, create a new migration to fix it.
-2. **Explicit Naming** — Use clear, descriptive V-numbers: `V<N>__<description>.sql`
-3. **Ordered in Git** — Migrations applied in version order; commit order determines test order.
-4. **Safe Rollback** — CapyBee uses "undo" migrations only; design migrations to be downgrade-safe.
-
-## File Naming
-
-**Location:** `app/server/src/main/resources/db/migration/`
-
-**Pattern:** `V<N>__<description>.sql`
-
-Examples:
-- `V1__base_schema.sql`
-- `V2__add_friendships_and_memories.sql`
-- `V4__add_avatar_url_length.sql`
-
-**Checklist:**
-- [ ] Version number is sequential (no gaps, no duplicates)
-- [ ] Description uses underscores, lowercase, specific ("add_friendships" not "updates")
-- [ ] File is in correct location
-
-## SQL Patterns & Conventions
-
-### Creating Tables
-
-**Template:**
-```sql
-CREATE TABLE entity_names (
-  id UUID PRIMARY KEY,
-  child_profile_id UUID NOT NULL REFERENCES child_profiles(id) ON DELETE CASCADE,
-  field_name VARCHAR(255) NOT NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted_at TIMESTAMP NULL
-);
-```
-
-### 2. Add Indexes
-```sql
-CREATE INDEX idx_entity_names_child_profile_id ON entity_names(child_profile_id);
-CREATE INDEX idx_entity_names_deleted_at ON entity_names(deleted_at);
-```
-
-### 3. Modify Schema
-```sql
-ALTER TABLE entity_names ADD COLUMN new_field VARCHAR(255) DEFAULT '';
-ALTER TABLE entity_names ALTER COLUMN field_name TYPE TEXT;
-```
-
-### 4. Seed Data (Optional)
-```sql
-INSERT INTO missions (id, title, created_at, updated_at)
-VALUES (gen_random_uuid(), 'Title', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-```
-
-## Verification
-
-**Test locally:**
-```bash
-cd app/server
-mvn clean flyway:clean flyway:migrate -DskipTests
-mvn spring-boot:run
-curl http://localhost:8080/api/health
-```
-
-## Pre-Commit Checklist
-
-- [ ] File name: `V<N>__<description>.sql` (sequential, no gaps)
-- [ ] Location: `app/server/src/main/resources/db/migration/`
-- [ ] All FK use `ON DELETE CASCADE`
-- [ ] Indexes on FK + soft-delete columns
-- [ ] No unguarded UPDATE/DELETE
-- [ ] Migration tested locally
-- [ ] Spring Boot starts after migration
-- [ ] All tests pass
-
-## Common Mistakes & Quick Fixes
-
-- **Editing applied migrations** → Checksum mismatch. Create a new migration instead.
-- **Missing indexes on FK/soft-delete** → Slow queries. Always index.
-- **Bulk UPDATE/DELETE without WHERE** → Accidental wipe. Always be explicit.
-- **Referencing tables from future migrations** → Flyway fails. Create in order.
+## Verification And Checklist
+- Never run `flyway:clean` or reset a shared/production database as a routine check.
+- Confirm the verification datasource before startup; do not alter the user's database configuration silently.
+- If a disposable database is unavailable, report migration runtime verification as blocked rather than substituting a destructive command.
+- Run the backend gate from the [build guide](../../instructions/build-workflow.instructions.md).
+- Confirm a unique version, no edits to applied migrations, ownership-aware relationships, appropriate indexes, explicit data-change predicates, and successful migration/startup checks.
 
 ## References
-
-See `references/` for detailed patterns:
-- `schema-conventions.md` — CapyBee schema diagram, data type guidance
-- `data-types.md` — Postgres type recommendations
+Open only the reference needed, and verify examples against the current schema:
+- [Schema conventions](./references/schema-conventions.md): relationships, timestamps, indexes, and example SQL.
+- [Postgres data types](./references/data-types.md): field types and constraints.

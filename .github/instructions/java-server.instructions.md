@@ -1,4 +1,5 @@
 ---
+description: "Use when implementing Java backend code, Spring services, controllers, authorization, or service unit tests."
 applyTo: "app/server/**/*.java"
 ---
 
@@ -25,7 +26,7 @@ Rules:
 - Service methods contain validation, ownership checks, and business decisions.
 - Repositories do not contain business rule logic.
 - Domain entities are not API DTOs.
-- Return correct HTTP status codes (201 Create, 204 No Content, 400/404/409 for validation).
+- Follow the [API contract rules](api.instructions.md) for DTO contracts, HTTP responses, and idempotency.
 
 ## Service design
 
@@ -33,13 +34,12 @@ Rules:
 - Validate all state transitions before persisting changes.
 - Use exceptions to signal business-level failures and let handlers map them to HTTP responses.
 - Make behavior explicit and easy to test.
-- Handle duplicate create attempts and idempotent retries intentionally (pattern: optional client-supplied `id` on create DTOs, checked before insert — see `CheckInService`, `MissionService`).
+- Implement the API's idempotent-create contract using nearby `CheckInService` / `MissionService` patterns; preserve ownership checks on retries.
 
 ## DTO and API patterns
 
 - Use Java records for request and response DTOs.
-- Keep DTOs minimal and tied to specific endpoint contracts.
-- Do not pass entities directly across component boundaries.
+- Do not expose persistence entities as API payloads.
 - Ensure controller return types reflect the API contract rather than persistence internals.
 
 ## Security and auth
@@ -61,23 +61,6 @@ Rules:
   - Idempotent-create-by-id branches (including when the id already exists)
   - Ownership checks (deny access to other child's resources)
   - Edge cases (empty input, boundary conditions)
-- See reference style: `CheckInServiceTest`, `ChildProfileServiceTest`, `MissionServiceCompletionTest`.
-- **JaCoCo gate:** `pom.xml` enforces 70% line coverage on `com.capybee.server.service.*` via `mvn verify` (CI runs this too). Do not lower this threshold — add the missing tests instead.
-- Run `mvn verify` locally before considering backend work done.
-
-## Build and verification
-
-- Run the relevant Maven verification commands for changed backend code.
-- For service-level changes, prefer focused verification rather than unrelated full-suite runs when the goal is a precise fix.
-- When modifying backend behavior, ensure the project still passes the repository’s required verification gate.
-
-## Common mistakes to avoid
-
-- Field injection via `@Autowired`.
-- Business logic leaking into controllers.
-- Direct repository usage from web layer code.
-- Returning entities to the client (use DTOs).
-- Broad catch-all exceptions that hide real validation errors.
-- Adding schema changes without a Flyway migration.
-- Creating endpoints without explicit authorization configuration.
-- Service tests that don't cover failure branches and ownership validation.
+- Follow `CheckInServiceTest`, `ChildProfileServiceTest`, and `MissionServiceCompletionTest`; use the [service-test skill](../skills/service-unit-test-scaffold/SKILL.md) for scaffolding or coverage troubleshooting.
+- Do not lower the service coverage threshold; add missing tests. Run a focused test during iteration and the required final backend gate in the [build guide](build-workflow.instructions.md).
+- For persistence changes, also follow [database rules](database.instructions.md).

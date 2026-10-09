@@ -1,12 +1,11 @@
 ---
+description: "Use when changing persistence models, Postgres schema, Flyway migrations, indexes, constraints, or database configuration."
 applyTo: "app/server/**/*.java,app/server/src/main/resources/**/*.sql,app/server/src/main/resources/**/*.yml,app/server/src/main/resources/**/*.yaml"
 ---
 
 # Database and persistence standards
 
-Backend layering, DTO/entity separation, and the standard test pattern live
-in `java-server.instructions.md` — this file covers schema/migration-specific
-rules only.
+Owns schema and migration policy. See [Java standards](java-server.instructions.md) for layering and tests; use the [Flyway skill](../skills/flyway-migration/SKILL.md) when authoring a migration.
 
 ## Schema change policy
 
@@ -30,14 +29,8 @@ rules only.
 
 ## Data privacy
 
-- Store only the minimal data needed for the feature; no fields exposing a child's real identity or precise location (see `copilot-instructions.md` for full safety/privacy rules).
+- Apply the [root privacy rules](../copilot-instructions.md) to schema fields; store only data needed by the feature.
 
 ## Tests for persistence changes
 
-- Cover validation branches, duplicate-create protection, and ownership errors introduced by the change in the corresponding service test (standard pattern in `java-server.instructions.md`).
-
-## Common mistakes to avoid
-
-- Editing historical SQL migration files.
-- Broad schema changes without a matching feature requirement.
-- Adding fields for analytics, social features, or location tracking without a clear need.
+- Cover validation branches, duplicate-create protection, and ownership errors introduced by the change in the corresponding service test, following [Java testing rules](java-server.instructions.md).

@@ -1,11 +1,11 @@
 ---
-applyTo: "app/ui/src/**/*.ts,app/ui/src/**/*.tsx"
+description: "Use when changing React components, frontend logic, CSS, mobile layout, EN/PL copy, or optimistic offline mutations."
+applyTo: "app/ui/src/**/*.ts,app/ui/src/**/*.tsx,app/ui/src/**/*.css"
 ---
 
 # UI and frontend standards
 
-Product-level safety/privacy rules live in `copilot-instructions.md` — this
-file covers UI implementation and tone specifics.
+Owns UI implementation and copy details; universal constraints live in the [root guidance](../copilot-instructions.md).
 
 ## Frontend stack and architecture
 
@@ -19,12 +19,11 @@ file covers UI implementation and tone specifics.
 
 ## Copy, tone, and localization
 
-**CapyBee (the character) speaks warmly and casually, never clinical or clinical:**
+**CapyBee's voice is never clinical:**
 - Short sentences, validates feelings first
 - Never says "it'll get better" or frames homesickness as a problem to fix
 - Old and new memories coexist as valid
-- Bilingual (EN/PL) always — use the existing copy-object pattern in `AuthenticatedHome.tsx`
-- Never hardcode a single-language string; provide both EN and PL for every user-facing text
+- Implement EN/PL copy with the existing copy-object pattern in `AuthenticatedHome.tsx`; never hardcode single-language user-facing strings.
 
 Example: missions, check-in responses, empty states, notifications all follow this voice.
 
@@ -36,15 +35,4 @@ Example: missions, check-in responses, empty states, notifications all follow th
 ## Testing expectations
 
 - Any new or modified pure logic outside React components (queue logic, sync engine, session persistence helpers, etc.) must include Vitest unit tests: happy path plus at least one retry/failure/edge case, following the existing `queueStore.test.ts` / `syncEngine.test.ts` pattern (happy-dom, `idb-keyval` mocked/faked).
-- Run `npm test` (or `npm run test:coverage`) in `app/ui` before considering frontend work done.
-
-## Build and verification
-
-- After UI changes, run the build workflow and copy `dist/*` into both Spring Boot static resource folders before manual verification — a stale copy is a common source of "missing feature" bugs.
-- Verify changes in the integrated Spring Boot + Vite setup, not only the Vite dev server.
-
-## Common mistakes to avoid
-
-- Hardcoded single-language user strings.
-- Mutating server state directly without going through the offline queue.
-- One-off UI patterns that bypass existing conventions (component structure, copy pattern, offline queue).
+- Run frontend tests and sync the built UI before integrated manual verification, following the [build guide](build-workflow.instructions.md). Check the Spring Boot-served UI, not only Vite, to catch stale static files.

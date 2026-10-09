@@ -3,6 +3,8 @@
 
 This reference documents how layers integrate when implementing a new CRUD feature in CapyBee.
 
+Examples are illustrative, not ready-to-copy APIs. Verify methods and authenticated profile resolution against nearby code. The [API contract](../../../instructions/api.instructions.md) requires ownership validation before returning a record on an idempotent retry, even when its ID was found globally.
+
 ## Request Flow — Create Operation
 
 When a client creates a record (e.g., new check-in):
@@ -20,7 +22,7 @@ When a client creates a record (e.g., new check-in):
 3. Service (CheckInService)
    ├─ if request.id is present:
    │  └─ check repository.findById(id)
-   │     ├─ if found: return existing (dedup)
+  │     ├─ if found: validate ownership, then return existing (dedup)
    │     └─ if not found: create new with that id
    ├─ else: generate new UUID
    ├─ create entity with childProfile, fields, timestamps
@@ -81,7 +83,7 @@ Client submits: POST /api/check-ins {
 Service logic:
 1. If request.id is not null:
    └─ query.findById(request.id)
-   ├─ if exists: return it (dedup, don't re-insert)
+  ├─ if exists: validate ownership, then return it (dedup, don't re-insert)
    └─ if not exists: create new with that id
 2. Else (request.id is null):
    └─ generate new UUID
@@ -89,6 +91,8 @@ Service logic:
 ```
 
 **Test this:**
+The existing record must belong to the requesting child. Also test that a foreign-owned duplicate ID is rejected without returning the record or inserting a replacement.
+
 ```java
 @Test
 void createCheckIn_clientSuppliedId_deduplicatesOnRetry() {

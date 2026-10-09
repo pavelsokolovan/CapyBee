@@ -1,39 +1,22 @@
 ---
-applyTo: "**/*.{md,java,ts,tsx,sql,yml,yaml}"
+description: "Use when changing CapyBee product behavior, data models, onboarding, emotional experience, requirements, or architecture. Provides product context and project orientation."
 ---
 
-# CapyBee project overview
+# CapyBee Project Overview
 
-Full orientation for any file in this repo. Scoped rules live in
-`java-server.instructions.md` / `ui.instructions.md` / `api.instructions.md` /
-`database.instructions.md` / `build-workflow.instructions.md` — check those
-before assuming rules are missing.
+CapyBee helps relocated children around age 12 process homesickness (My Old World) and build a new life (My New World), through check-ins, real-world missions, a private friendship tracker, and a honeycomb progress map.
 
-## Product intent
+Before changing product behavior, data models, onboarding, or emotional experience, read the [concept](../../docs/CapyBee_concept.md) and the relevant [specifications](../../docs/specifications/). Universal constraints live in the [root guidance](../copilot-instructions.md).
 
-CapyBee ("Razem budujemy nowy ul" / "Together we build a new hive") is a children's companion app for ~12-year-olds who have relocated to a new country. It helps them process homesickness ("My Old World") while gently building a new life ("My New World"), through daily check-ins, small real-world missions, a private friendship tracker, and a honeycomb progress map.
+## Project Map
+- `app/server`: Spring Boot, Java, Maven; package `com.capybee.server`, with `config`, `web`, `service`, `repository`, and `domain` layers. Flyway migrations live in `src/main/resources/db/migration/`.
+- `app/ui`: React, TypeScript, Vite, Tailwind, Framer Motion; screens in `src/AuthenticatedHome.tsx`, reusable UI in `src/components/`, offline writes in `src/offline/`, PWA via `vite-plugin-pwa`. Check manifests for current versions.
+- Deployment: one container serves the backend and built UI. See the [build guide](build-workflow.instructions.md) for workflow and deployment details.
 
-**Read [`docs/CapyBee_concept.md`](../../docs/CapyBee_concept.md) and [`docs/specifications`](../../docs/specifications) before implementing features that change product behavior, data model, onboarding, or emotional experience.**
+## Implementation Owners
+- [Java](java-server.instructions.md): layering, dependency injection, authorization, service testing.
+- [API](api.instructions.md): HTTP contracts and idempotency.
+- [Database](database.instructions.md): persistence models and migrations.
+- [UI](ui.instructions.md): components, mobile layout, localized copy, offline integration.
 
-## Monorepo structure
-
-- **`app/server`** — Spring Boot 4.1 (Java 25), Maven build.
-  - Package root: `com.capybee.server`
-  - Layers: `config/`, `domain/`, `repository/`, `service/`, `web/`
-  - Flyway migrations: `src/main/resources/db/migration/`
-- **`app/ui`** — React 19 + TypeScript + Vite 6, Tailwind CSS 3, Framer Motion.
-  - Main screens: `AuthenticatedHome.tsx`
-  - Reusable UI: `src/components/`
-  - Offline queue: `src/offline/` (queueStore, syncEngine, idb-keyval)
-  - PWA service worker: `vite-plugin-pwa`
-- **Deployment:** Single container. UI build (`npm run build` → `dist/`) copied into Spring Boot static resources; entire app runs as one Fly.io instance with private Postgres.
-
-## Product and technical non-negotiables
-
-Read [`copilot-instructions.md`](../../copilot-instructions.md) for complete constraints. Key points:
-
-- **Safety & privacy first:** no inter-child data sharing, minimal PII (nicknames only), no analytics SDKs.
-- **Auth:** Google OAuth2 + server sessions; `sessionPersistence.ts` for PWA restore-token fallback.
-- **Tone:** warm, casual (never clinical), validates feelings, bilingual EN/PL always.
-- **Offline-first:** all mutations through offline queue + sync engine.
-- **Strict layering:** `web` → `service` → `repository` → `domain`. Controllers never touch repos directly.
+Read only the owners relevant to the task; use existing implementations as examples.

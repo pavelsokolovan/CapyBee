@@ -1,13 +1,11 @@
 ---
+description: "Use when designing or changing REST endpoints, DTO payloads, HTTP errors, or client-server contracts, including offline retries and idempotency."
 applyTo: "app/server/**/*.java,app/ui/src/**/*.ts,app/ui/src/**/*.tsx"
 ---
 
 # API and integration contract standards
 
-This file covers the HTTP contract between frontend and backend only.
-Backend implementation details (layering, DI, security config, testing
-pattern) live in `java-server.instructions.md`; UI implementation details
-live in `ui.instructions.md` — avoid restating those here.
+Owns HTTP contracts. See [Java standards](java-server.instructions.md) for server implementation and [UI standards](ui.instructions.md) for client integration.
 
 ## REST design principles
 
@@ -24,15 +22,10 @@ live in `ui.instructions.md` — avoid restating those here.
 
 - New write operations from authenticated screens must align with the app's offline queue pattern.
 - Support idempotent creation via an optional client-supplied identifier on create DTOs where the pattern already exists, so retried or offline-synced requests don't create duplicate records.
+- Validate ownership before returning an existing record for a duplicate identifier.
 - Server and client duplicate-detection logic must agree.
 
 ## Client-server alignment
 
 - When a contract changes, update both the affected UI code and server code in the same change — never let them drift.
 - Communicate meaningful error messages to the client without leaking sensitive information.
-
-## Common mistakes to avoid
-
-- Payload shapes that don't match between client and server.
-- Creating duplicate mutation effects during retry or offline sync.
-- Overloading a single endpoint with unrelated behavior.

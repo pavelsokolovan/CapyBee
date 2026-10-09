@@ -1,158 +1,35 @@
-# CapyBee Skill Size Budget Pattern
+# CapyBee Guidance Size Budget
 
-## Rationale
+## Loading Model
+- The [root guidance](copilot-instructions.md) supplies universal constraints and selective routing.
+- [Scoped instructions](instructions/) attach through `applyTo` file patterns or are discovered through task-specific `description` metadata. Keep patterns relevant, not repo-wide by default.
+- Skills expose `name` and `description` for discovery. A relevant skill's body is loaded on demand, followed by only the references needed for the task.
+- `applyTo` belongs to instruction files, not skill frontmatter. Skills are selected by task relevance or explicit invocation.
+- References use context when opened; moving text into references helps only if agents open them selectively.
 
-Skills are loaded into context for every coding request. Larger skills = more tokens used, higher cost. This pattern balances comprehensiveness with efficiency by capping main skill files and moving detailed content to references.
+## Ownership And Size
+- Root: aim for about 20 lines. Retain safety, privacy, auth, tone, offline-first, concise responses, and routing; move stack maps and procedures elsewhere.
+- Scoped instructions: one detailed owner per concern. Keep standards and obligations here; link commands to the build guide and procedures to the relevant skill.
+- `SKILL.md`: scope, ordered procedure, essential completion checks, verification routing, and explicit reference links. Prefer a short workflow; review bodies above 100 lines and keep them below 250 unless necessary.
+- `references/`: substantial examples and troubleshooting only. Reuse existing files and actual code patterns; do not copy every reference into the main skill.
+- A brief safety reminder at a critical boundary is useful; repeated policy sections and command lists are not.
 
-## Budget Guidelines
-
-### Main Skill File (`SKILL.md`)
-
-| Section | Lines | Purpose |
-|---------|-------|---------|
-| Frontmatter + Description | 3-4 | YAML header (name, description, triggers) |
-| "When to Use" section | 15-20 | 3-5 brief bullet points (not essays) |
-| Key Principles/Checklist | 20-30 | Core rules, quick reference (bullets, not prose) |
-| Main Workflow | 60-100 | 5-8 steps, each 2-4 lines + 1-2 code examples |
-| Running/Verification | 20-30 | Commands, test procedures |
-| Common Patterns | 15-25 | Quick mistakes + fixes (bullets) |
-| **Total** | **150–200 lines** | Never exceed 250 |
-
-### Reference Files (Separate Directory)
-
-- **Location:** `skill-name/references/`
-- **Scope:** Detailed docs, long code examples, troubleshooting, data tables
-- **No penalty for length:** 300-500 lines per reference file is acceptable
-- **Naming:** `topic-name.md` (e.g., `schema-conventions.md`, `mockito-patterns.md`)
-
-### Scoped `applyTo` Patterns
-
-- **Required:** All skills must have tight `applyTo` patterns in YAML frontmatter
-- **Example:** `applyTo: app/server/**/*.java` (not `**/*`)
-- **Benefit:** Prevents skill from being loaded for unrelated requests (e.g., UI skill won't load when editing Java files)
-
----
-
-## Applied Pattern Results
-
-### Before Optimization
-
-| Skill | Main | References | Total |
-|-------|------|------------|-------|
-| flyway-migration | 500+ | 600+ | 1100+ |
-| new-crud-feature | 600+ | 350+ | 950+ |
-| service-unit-test-scaffold | 700+ | 1350+ | 2050+ |
-| **Total** | **1800+** | **2300+** | **4100+** |
-
-**Problem:** 4100+ lines loaded for every migration/feature/test request = significant token overhead + context bloat.
-
-### After Optimization
-
-| Skill | Main | References | Total | Reduction |
-|-------|------|------------|-------|-----------|
-| flyway-migration | **79** | 600+ | 679+ | **38% smaller** |
-| new-crud-feature | **89** | 350+ | 439+ | **54% smaller** |
-| service-unit-test-scaffold | **188** | 1350+ | 1538+ | **25% smaller** |
-| **Total** | **356** | **2300+** | **2656** | **35% smaller** |
-
-**Benefit:** Main skills now fit on 1-2 screens, references loaded only when needed.
-
----
-
-## Key Optimizations Applied
-
-### 1. Frontmatter
-- Kept trigger phrases intact (essential for skill invocation)
-- Condensed description to 1-2 sentences
-
-### 2. "When to Use" Section
-- Reduced from 5-8 lines of prose to 3-4 bullet points
-- Removed examples/context (moved to references)
-
-### 3. Workflow Steps
-- Condensed step explanations: 1-2 lines instead of paragraphs
-- Kept **one** quick code example per step
-- Moved detailed patterns to references (`entity-template.md`, `mockito-patterns.md`)
-
-### 4. Checklists
-- Kept essential pass/fail items
-- Removed explanatory text
-
-### 5. Examples & Troubleshooting
-- Moved verbose examples to `references/` directory
-- Kept only "common mistakes" + quick fixes in main skill
-
-### 6. References
-- Split by topic (e.g., `schema-conventions.md`, `data-types.md`, `mockito-patterns.md`)
-- Moved there: full code templates, detailed troubleshooting, data tables, migration examples
-- Users access references via skill footer: "See `references/` for..."
-
----
-
-## Metrics & Impact
-
-### Token Efficiency
-- **Before:** ~4100 tokens per main skill load
-- **After:** ~356 tokens per main skill load (on-demand references load separately)
-- **Savings:** ~89% reduction in context bloat for base skill load
-
-### User Experience
-- **Before:** Long, overwhelming skill files (hard to scan)
-- **After:** 1-2 screen skills (fast to read), detailed references available for deep dives
-
-### Maintenance
-- **Before:** Large monolithic files (hard to update)
-- **After:** Modular references (easier to update specific topics)
-
----
-
-## Best Practices for New Skills
-
-When adding skills to CapyBee, follow this pattern:
-
-1. **Frontmatter:** Name + 1-2 sentence description + trigger phrases
-2. **"When to Use":** 3-5 bullets (not prose)
-3. **Core Workflow:** 5-8 steps, each 2-4 lines + 1 quick code example
-4. **Checklists:** Pass/fail items only
-5. **References:** Detailed docs, long examples, troubleshooting in separate files
-6. **Total Main File:** Target 150–200 lines (max 250)
-
----
-
-## Trigger Phrases & Scoping
-
-Each skill includes YAML frontmatter with:
-- `applyTo` pattern (scopes when skill is loaded)
-- Trigger phrases in description (tells Copilot when to use it)
-
-**Example:**
+## Skill Metadata Example
 ```yaml
 ---
 name: new-crud-feature
-description: End-to-end scaffold for new domain feature... Triggers on "add new feature", "scaffold new domain entity", "create new feature", "implement new domain".
-applyTo: app/server/**/*.java,app/server/**/*.md
+description: "Use when adding a new child-owned CRUD feature or scaffolding a domain entity in CapyBee."
 ---
 ```
 
-This ensures skills are only loaded when relevant, reducing unnecessary context overhead.
+The folder name must match `name`. Describe specific tasks; avoid triggers so broad that unrelated work loads the workflow.
 
----
+## Validation
+1. Measure line and character counts before and after edits; these are size proxies, not token counts or billing estimates.
+2. Validate YAML frontmatter and resolve relative links. Link references directly using `./references/<existing-file>.md` rather than a vague directory listing.
+3. Check `applyTo` against representative UI, CSS, Java, SQL, CI, and script paths. Keep the product overview task-discoverable rather than attaching it to every source file.
+4. In fresh VS Code chats, inspect customization/context diagnostics for actual instruction and skill loading on routine UI, service-test, migration, and product tasks. Links and descriptions guide discovery, not a guarantee of invocation.
+5. Confirm universal safeguards, scoped test obligations, and the [build gates](instructions/build-workflow.instructions.md) remain intact.
 
-## Files Affected
-
-- ✅ [`flyway-migration/SKILL.md`] — 79 lines (was 500+)
-- ✅ [`new-crud-feature/SKILL.md`] — 89 lines (was 600+)
-- ✅ [`service-unit-test-scaffold/SKILL.md`] — 188 lines (was 700+)
-- ✓ Reference files remain in `references/` subdirectories (no changes needed)
-
----
-
-## Future Maintenance
-
-As new skills are added to CapyBee:
-1. Measure the main file size
-2. If >200 lines, move sections to `references/`
-3. Keep trigger phrases in main skill header
-4. Update `references/` index if adding new reference files
-5. Test that trigger phrases invoke the skill correctly
+Do not publish cost-saving percentages without measured token usage. Recheck sizes and routing when guidance changes instead of retaining stale before/after tables.
 

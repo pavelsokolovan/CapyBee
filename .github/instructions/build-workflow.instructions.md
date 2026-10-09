@@ -1,62 +1,30 @@
 ---
-applyTo: "app/**/*,Dockerfile,fly.toml"
+description: "Use when building, testing, syncing static assets, running local servers, changing CI workflows, or configuring deployment. Owns verification commands and gates."
+applyTo: "app/**/*,Dockerfile,fly.toml,scripts/dev-workflow.ps1,.vscode/tasks.json,.github/workflows/**/*.yml,.github/workflows/**/*.yaml"
 ---
 
-# Build, deployment, and development workflow
+# Build And Verification
 
-Reference for local development setup, CI/CD, and containerization.
+Owns development commands and final application gates. Reuse the [workflow script](../../scripts/dev-workflow.ps1) and [VS Code tasks](../../.vscode/tasks.json), rather than inventing build/copy sequences.
 
-## Local development workflow
+## UI Build And Static Sync
+- After UI changes, run `./scripts/dev-workflow.ps1 -Action sync` from the repo root, or the `Workflow: Sync UI + Static` task. Both build the UI and copy `dist/` into **both** `app/server/src/main/resources/static` and `app/server/target/classes/static`.
+- `-SkipBuild` copies an existing build only; use it only when `dist/` is already current.
+- The running Maven dev server reads `target/classes/static`; packaging uses `src/main/resources/static`. Verify the integrated Spring Boot-served UI after sync to catch stale bundles.
 
-### UI build → Spring Boot static resources
+## Local Servers
+- `Dev: Start All` starts Spring Boot (8080) and Vite in parallel. Individually: `mvn spring-boot:run` in `app/server`, `npm run dev` in `app/ui`.
+- `./scripts/dev-workflow.ps1 -Action all` builds, copies, and starts managed servers; add `-ForceRestart` only when a restart is needed. The `Workflow: Build + Copy + Start All` task includes that flag.
+- Stop managed servers with `./scripts/dev-workflow.ps1 -Action stop` or `Workflow: Stop All`.
+- In PowerShell, use `npm.cmd` if the `npm.ps1` execution policy blocks npm commands.
 
-When you modify `app/ui/src/`:
+## Required Gates
+- During iteration, run focused checks for the changed behavior first.
+- Backend changes: `mvn verify` in `app/server` (JUnit + JaCoCo minimum 70% line coverage on `com.capybee.server.service.*`). Add tests, never lower the gate.
+- Frontend changes: `npm test` (or `npm run test:coverage`) in `app/ui`, then the build-and-sync workflow above.
+- Before shipping application changes, start the integrated app and manually verify affected user flows, not just Vite.
+- Guidance-only edits: validate frontmatter, links, routing, and preserved rules; application builds, static sync, and test suites are not required.
 
-1. Run `npm run build` in `app/ui` to generate `dist/`
-2. Copy `dist/*` into **both**:
-   - `app/server/src/main/resources/static` (for next build)
-   - `app/server/target/classes/static` (for current dev server)
-
-**Why both?** The running dev server reads from `target/classes/static`; a stale copy is a common source of "missing feature" bugs.
-
-**Automation:** Use VS Code tasks:
-- `Workflow: Sync UI + Static` — just copy (for quick iteration)
-- `Workflow: Build + Copy + Start All` — full build, copy, and restart all servers
-
-Or run `scripts/dev-workflow.ps1 -Action sync` / `-Action all -ForceRestart` directly.
-
-### Running local servers
-
-- **`Dev: Start All`** task: starts Spring Boot (8080) and Vite dev server in parallel.
-- Or run individually:
-  - Backend: `mvn spring-boot:run` in `app/server/`
-  - Frontend: `npm run dev` in `app/ui/`
-
-## Containerization and deployment
-
-### Build process
-
-- Root `Dockerfile` orchestrates the build:
-  1. Builds UI (`npm run build` → `dist/`)
-  2. Copies `dist/` into `app/server/src/main/resources/static/`
-  3. Builds Spring Boot JAR with embedded static resources
-  4. Final image runs the single JAR
-
-### Fly.io deployment
-
-- `fly.toml` defines app configuration.
-- Environment: `SPRING_PROFILES_ACTIVE=fly`
-- Database: private Postgres network (managed by Fly.io).
-- **Never hardcode fly-specific config outside `application-fly.yml`.**
-
-## Verification before shipping
-
-- **Backend:** Run `mvn verify` in `app/server/` (JUnit 5 + JaCoCo 70% gate on `service.*`).
-- **Frontend:** Run `npm test` (or `npm run test:coverage`) in `app/ui/` (Vitest).
-- **Integration:** Run the full `Dev: Start All` locally and manually test key user flows before pushing.
-
-## Common gotchas
-
-- Stale UI static files causing "feature not showing" bugs — always re-copy after build.
-- Missing JaCoCo tests preventing backend verification — add tests, don't lower the threshold.
-- Fly.io config changes checked into version control instead of `application-fly.yml` — use profiles.
+## Deployment
+- The [Dockerfile](../../Dockerfile) builds UI assets, embeds them in the Spring Boot JAR, then runs one container. [fly.toml](../../fly.toml) selects the `fly` Spring profile.
+- Keep Fly-specific Spring settings in `application-fly.yml`; supply credentials through environment/secrets, never hardcode them.
