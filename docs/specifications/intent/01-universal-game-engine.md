@@ -95,8 +95,11 @@ is one pack plus the web host. A console is another host.
   fallback so a failure never becomes an error screen.
 - **Safety hooks live in the engine:** free text is an explicit per-pack
   opt-in, and no player content is written to logs.
-- **Single Maven module for now.** The package boundary is enforced by tests;
-  extract a module when a second game actually consumes the engine.
+- **Separate SDK module (2026-10-09 decision).** `engine/` is independently
+  buildable and testable without the app, with its own dependencies and
+  coverage gate. A root Maven aggregator builds both Java modules. Source
+  boundary tests also enforce universality within the SDK. The console host
+  will drive its in-process API before any web integration.
 
 ### First game (CapyBee)
 

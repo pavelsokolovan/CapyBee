@@ -1,0 +1,1 @@
+Write short, friendly scenes for a space courier game. Keep sentences short.

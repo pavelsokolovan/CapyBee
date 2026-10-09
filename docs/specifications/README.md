@@ -31,9 +31,23 @@ For anything substantial (new screen, new feature, data model change), write a s
 - `17-pwa-navigation-hang-fix-instruction.md` - PWA navigation hang fix
 - `18-missions-categories-and-expansion-instruction.md` - mission categories and catalog expansion
 - `19-missions-accordion-list-instruction.md` - missions accordion list UI
+- `20-pollen-match-minigame-instruction.md` - Pollen Match mini-game
+- `21-hive-builder-tap-minigame-instruction.md` - Hive Builder Tap mini-game
+- [22-engine-core-and-pack-format-instruction.md](22-engine-core-and-pack-format-instruction.md) - standalone engine SDK, pack format, loader, and boundary tests
 
 All of the above are implemented; see [../../.github/copilot-instructions.md](../../.github/copilot-instructions.md) for current coding conventions.
+Spec 22 lives in the independent `engine/` Maven module. Console-first runtime
+and host integration follow in the series below.
 
 ## Planned Documents
 
+- 23 - Engine API and minimal authored console loop
+- 24 - Rules, state, places, and snapshots
+- 25 - Templates, kinds, and generation stages
+- 26 - Input and safety policy
+- 27 - Generation pipeline and reference adapters
+- 28 - Console host, scripted playthroughs, and golden transcripts
+- 29 - Web host integration
+- 30 - Client rendering and asset catalog
+- 31 - Polish game pack, Play tab entry, and rewards
 - deployment checklist

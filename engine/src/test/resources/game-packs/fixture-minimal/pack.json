@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture-minimal",
+  "version": "1.0.0",
+  "name": "Minimal fixture",
+  "locales": ["pl"],
+  "defaultLocale": "pl",
+  "features": [],
+  "startInputs": [{"id": "direction", "kind": "ENUM", "required": true, "labelKey": "input.direction", "values": ["left", "right"]}],
+  "contentPolicy": {"freeTextAllowed": false},
+  "files": ["strings/pl.json"]
+}

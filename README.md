@@ -8,6 +8,7 @@ visualized on a growing honeycomb progress map.
 
 ## Repository Layout
 
+- `engine` - standalone, universal Java game-engine SDK; no Spring or app dependency
 - `app/server` - Spring Boot backend, security, persistence, and API endpoints
 - `app/ui` - React frontend, landing page, and app shell
 - `docs` - concept notes and implementation specifications
@@ -43,6 +44,17 @@ visualized on a growing honeycomb progress map.
 ## Local Development
 
 The project is scaffolded as a mono-repo, so the backend and frontend can be developed independently and deployed together.
+
+### Standalone engine
+
+Run `mvn -f engine/pom.xml clean verify` from the repo root to build and test
+the SDK without PostgreSQL, Spring, OAuth, or the UI. Open `engine/` alone in
+an IDE for independent development. See [engine/README.md](engine/README.md)
+for the pack API and console-first roadmap.
+
+The root Maven POM aggregates `engine` and `app/server`: `mvn verify` verifies
+both. Existing backend-only builds and Docker deployment remain unchanged;
+the app does not consume the SDK until the web-host integration spec.
 
 ### Suggested workflow
 

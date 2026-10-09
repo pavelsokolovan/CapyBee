@@ -22,9 +22,26 @@ This spec fixes:
    bounded, and cheap.
 5. The **Game Pack** format, plus its loader and validator.
 
-Code delivered: pure-Java `com.capybee.engine.pack` with tests, and a
-boundary test that guards universality. No database, HTTP endpoint, LLM call,
-UI, or Spring wiring. The running app does not change.
+Code delivered: standalone `engine/` Maven SDK (`com.capybee:game-engine`),
+pure-Java `com.capybee.engine.pack` with tests, and a boundary test that guards
+universality. No database, HTTP endpoint, LLM call, UI, or Spring wiring. The
+running app does not change.
+
+### Implementation decisions (2026-10-09)
+
+Pavlo requested a separate SDK module so engine development and testing need
+none of the app. This overrides the draft's single-module choice: `engine/`
+has its own POM with no Spring parent; a root aggregator lists `engine` and
+`app/server`. The backend does not depend on the SDK until spec 29. Existing
+Docker and backend dev commands therefore stay unchanged. CI verifies the
+SDK in a separate job with no application services.
+
+The working namespace `com.capybee.engine` is retained, but all implementation
+and tests live outside `app/`. Console-first delivery, explicit features,
+one free-text input, JSON/Markdown packs, and one pack with multiple locales
+remain as specified. No neutral public product name is invented. The SDK
+declares Jackson 3 and JUnit explicitly because it cannot inherit them from
+the application. No dependency is added to the backend.
 
 ### Series map
 
@@ -97,7 +114,8 @@ host (29) comes only once the loop is proven headless.
 - Host-level safety, privacy, and tone rules in `copilot-instructions.md`
   apply to CapyBee's host and pack. The engine supplies the hooks: free text
   is an explicit pack opt-in and player content never goes to logs.
-- No schema change, endpoint, UI, or new Maven dependency in this spec.
+- No schema change, endpoint, UI, or new backend dependency in this spec.
+  The independent SDK declares Jackson 3 and test-scoped JUnit itself.
 
 ## 1. Architecture
 
@@ -151,21 +169,25 @@ Rules, enforced by `EngineBoundaryTest` (§8.1):
 7. Dependencies point host → engine only. The engine reaches a host only
    through returned values (`View`, events) and ports.
 
-### 1.3 Why a package and not a Maven module
+### 1.3 Independent SDK module
 
-A separate module would enforce the boundary at compile time, but the build is
-single-module end to end: the Dockerfile copies only `app/server/pom.xml` and
-`app/server/src`, CI runs `mvn -B verify` in `app/server`, and the dev script
-points at `app/server`. A split needs a parent POM plus changes to all three.
-This spec takes the cheaper route: one module, a strict package boundary, and
-a test that fails the build when the boundary is crossed.
+`engine/` is a standalone Maven module producing a plain JAR. It has no Spring
+parent or application dependency. `mvn -f engine/pom.xml clean verify` builds
+and tests it with only a JDK and Maven. It can also be opened as a separate
+IDE project. The root POM aggregates the SDK and backend without becoming
+their shared parent; `mvn verify` at the repo root verifies both.
 
-The console host (`cli`) lives in the same module. How it is launched (IDE run
-configuration, fat JAR, or a Maven profile) is decided in spec 28.
+Compile-time isolation prevents an SDK dependency on the host, and the source
+boundary test also protects purity and universality inside the SDK. Its own
+JaCoCo gate covers every engine package; the backend service gate is untouched.
 
-Upgrade path: when a second game actually consumes the engine, move
-`com.capybee.engine` into its own module. The boundary test guarantees that
-move is mechanical.
+The console host (`cli`) will live in the SDK module and use the same API as
+the eventual web host. Spec 23 adds the minimal authored loop; spec 28 decides
+the full console launch and commands. No runnable console is delivered in 22.
+
+Backend builds, Docker packaging, and dev scripts still point at `app/server`
+because the app does not consume the SDK yet. Spec 29 will add the host-to-SDK
+dependency and reactor-aware deployment/dev builds when actually needed.
 
 ### 1.4 Ports (reserved names)
 
@@ -338,7 +360,7 @@ Locations:
 
 - Host packs: `app/server/src/main/resources/game-packs/<pack-id>/`
   (classpath `game-packs/<pack-id>/`).
-- Test fixtures: `app/server/src/test/resources/game-packs/<fixture-id>/`.
+- Test fixtures: `engine/src/test/resources/game-packs/<fixture-id>/`.
 
 **Files index.** `pack.json` lists every other file in `files`. The loader
 reads only listed files and never lists directories, because classpath
@@ -675,16 +697,18 @@ Jackson notes for the implementer:
 - Do not import `com.fasterxml.jackson.databind.*` — that is the Jackson 2
   line. Several tree-API method names changed in Jackson 3, so check them
   against the Jackson 3 migration notes instead of copying Jackson 2 habits.
-- No new Maven dependency is needed. Confirm with
-  `mvn dependency:tree | grep jackson`.
+- The standalone module declares `tools.jackson.core:jackson-databind`.
+  Confirm with `mvn -f engine/pom.xml dependency:tree`; the tree must contain
+  Jackson 3 and no Spring, JPA, or application dependency. Jackson annotations
+  retain the `com.fasterxml.jackson.annotation` namespace as noted above.
 
 ## 8. Quality gates
 
 ### 8.1 `EngineBoundaryTest`
 
 JUnit 5, no Spring context. Reads every `.java` file under
-`src/main/java/com/capybee/engine` (surefire's working directory is the module
-directory `app/server`). Each file's zone is its first folder under the engine
+`src/main/java/com/capybee/engine` (surefire's working directory is the SDK
+directory `engine`). Each file's zone is its first folder under the engine
 root (`pack`, `adapter`, `cli`, …); a `json` folder anywhere in the path marks
 a JSON zone. A violation fails the test with the offending file and line.
 
@@ -713,8 +737,8 @@ the build, not a review.
 
 ### 8.2 JaCoCo gate
 
-Add a second `<rule>` to the existing `check` execution in
-`app/server/pom.xml`. Do not touch the existing service rule.
+Configure the SDK's own `check` execution in `engine/pom.xml`. Do not touch
+the existing service rule in `app/server/pom.xml`. The SDK gate uses:
 
 ```xml
 <rule>
@@ -738,11 +762,14 @@ Create `.github/instructions/engine.instructions.md`:
 
 ```markdown
 ---
-applyTo: "app/server/src/main/java/com/capybee/engine/**,app/server/src/test/java/com/capybee/engine/**,app/server/src/main/resources/game-packs/**"
+description: "Use when implementing the standalone game engine SDK, pack validation, engine tests, or game pack content."
+applyTo: "engine/**/*.java,engine/pom.xml,engine/src/**/resources/game-packs/**,app/server/src/main/resources/game-packs/**"
 ---
 
 # Engine standards
 
+- Standalone SDK in `engine/`: no Spring parent or app dependency. Verify it
+  with `mvn -f engine/pom.xml verify`; root Maven aggregates Java modules.
 - The engine is universal and headless. Pure Java only: no Spring, JPA,
   Hibernate, and nothing from `com.capybee.server`. Jackson 3 only in `json`
   folders and under `adapter`. `EngineBoundaryTest` enforces this.
@@ -762,7 +789,7 @@ applyTo: "app/server/src/main/java/com/capybee/engine/**,app/server/src/test/jav
 - Host-specific code (CapyBee) lives under `com.capybee.server` and follows
   the normal layering (web → service → repository → domain).
 - Engine tests mirror the package structure under
-  `app/server/src/test/java/com/capybee/engine/`. JaCoCo gate: 70% on
+  `engine/src/test/java/com/capybee/engine/`. JaCoCo gate: 70% on
   `com.capybee.engine.*`.
 - Changing a pack: bump `version` and keep the `files` index in sync
   (`PackIndexLintTest`).
@@ -772,7 +799,7 @@ applyTo: "app/server/src/main/java/com/capybee/engine/**,app/server/src/test/jav
 
 Engine tests are plain JUnit 5 with no collaborators to mock, so the Mockito
 service-test pattern does not apply here. Tests mirror the package structure
-under `app/server/src/test/java/com/capybee/engine/`.
+under `engine/src/test/java/com/capybee/engine/`.
 
 - **`PackIdTest`, `PackVersionTest`, `LocaleTagTest`** — valid and invalid
   formats, length limits, `tryParse` edge cases (`1.2`, `01.2.3`, `1.2.3-rc1`).
@@ -820,10 +847,12 @@ under `app/server/src/test/java/com/capybee/engine/`.
    tool, and a future extraction), and should its root package leave the
    CapyBee namespace now or at extraction time? Renaming later is an IDE
    refactor plus the pack folder name.
-2. **Package vs module (§1.3).** This spec takes one module plus a boundary
-   test. Say so if you would rather pay the multi-module cost now.
-3. **Console-first order.** The series now builds the console host (28) and
-   proves a generated run there before the web host (29). Confirm.
+2. **Package vs module (§1.3), resolved.** The engine is a standalone SDK in
+  `engine/`, with its own POM, dependencies, tests, and coverage gate. The
+  root POM aggregates it and the backend; neither inherits from the root.
+3. **Console-first order, resolved.** The minimal authored console loop is
+  spec 23; the full console host is spec 28. Generated runs are proven there
+  before web integration (29). No console runtime is part of spec 22.
 4. **`features` in the manifest** (`GENERATION`, `PLACES`, `ASSETS`) instead of
    guessing capabilities from the files present. Explicit declaration lets
    validators and hosts fail early. Confirm.
@@ -838,27 +867,42 @@ under `app/server/src/test/java/com/capybee/engine/`.
 
 ## 11. Rollout checklist
 
-- [ ] Answer §10 (names, package-vs-module, and console-first order first).
-- [ ] If the first draft was copied into the repo, delete
+- [x] Record the standalone-module and console-first decisions. Retain the
+  specified working namespace and format defaults; neutral naming and
+  first-game locale confirmation remain future product questions (§10).
+- [x] Confirm the superseded first-draft files are absent:
   `22-adventure-engine-core-and-pack-format-instruction.md` and
   `intent/01-ai-adventure-game-engine.md`; they are superseded by this spec
   and `intent/01-universal-game-engine.md`.
-- [ ] Add package `com.capybee.engine` with a `package-info.java` stating the
+- [x] Add package `com.capybee.engine` with a `package-info.java` stating the
   boundary rules from §1.2 in words (no forbidden literal strings).
-- [ ] Implement the model and plumbing types in `com.capybee.engine.pack` (§7).
-- [ ] Implement `PackLoader` and parsers in `com.capybee.engine.pack.json` on
-  Jackson 3; confirm with `mvn dependency:tree | grep jackson`.
-- [ ] Add fixtures `fixture-minimal`, `fixture-text-dungeon`, and
-  `fixture-space-courier` under `app/server/src/test/resources/game-packs/`.
-- [ ] Add all tests from §9.
-- [ ] Add the JaCoCo rule for `com.capybee.engine.*` (§8.2); run `mvn verify`.
-- [ ] Add `.github/instructions/engine.instructions.md` (§8.3).
-- [ ] Update `docs/specifications/README.md`: add the missing specs 20 and 21,
+- [x] Implement the model and plumbing types in `com.capybee.engine.pack` (§7).
+- [x] Implement `PackLoader` and parsers in `com.capybee.engine.pack.json` on
+  Jackson 3; confirm with `mvn -f engine/pom.xml dependency:tree`.
+- [x] Add fixtures `fixture-minimal`, `fixture-text-dungeon`, and
+  `fixture-space-courier` under `engine/src/test/resources/game-packs/`.
+- [x] Add all tests from §9, including aggregation of manifest-field defects
+  with independent file, policy, and reference defects.
+- [x] Add the SDK JaCoCo rule for `com.capybee.engine.*` (§8.2); run
+  `mvn -f engine/pom.xml clean verify`.
+- [x] Add the root Maven aggregator and an independent SDK CI job requiring
+  no application services; leave the backend dependency and deployment unchanged.
+- [x] Add `.github/instructions/engine.instructions.md` (§8.3).
+- [x] Update `docs/specifications/README.md`: add the missing specs 20 and 21,
   add 22, and list specs 23–31 under "Planned Documents".
-- [ ] Update the `docs/specifications/intent/README.md` index with the row
+- [x] Update the `docs/specifications/intent/README.md` index with the row
   `01-universal-game-engine.md | → spec 22 (series 22–31) | 22`.
-- [ ] Confirm nothing user-facing changed: no endpoint, migration, Maven
-  dependency, or UI edit in the diff (`git diff --stat`).
+- [x] Confirm nothing user-facing changed: no endpoint, migration, backend
+  Maven dependency, or UI edit. SDK dependencies are declared only in `engine/pom.xml`.
+
+Verification (2026-10-09): the clean standalone build reports 157 tests,
+zero failures or errors, and all coverage checks met. One symlink-escape test
+is skipped on the local Windows account because symlink creation is unavailable;
+the test runs where the filesystem/account supports it. Jackson databind/core
+are 3.1.2; no Spring, persistence, or application dependency is in the SDK tree.
+Root `mvn verify` also verifies the SDK, but the backend context-load test fails
+locally because PostgreSQL at `localhost:5432` is unavailable. Its other 74
+tests pass. Full reactor verification still requires the backend environment.
 
 ## Notes
 
