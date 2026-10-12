@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "scenes": [
+    {
+      "id": "start",
+      "start": true,
+      "blocks": [
+        { "kind": "NARRATION", "text": "Stoisz na brzegu cichego jeziora. Na wodzie kołysze się mała łódka." }
+      ],
+      "options": [
+        { "id": "boat", "label": "Wsiadam do łódki", "next": "boat" },
+        { "id": "walk", "label": "Idę wzdłuż brzegu", "next": "shore" }
+      ]
+    },
+    {
+      "id": "boat",
+      "blocks": [
+        { "kind": "NARRATION", "text": "Łódka płynie powoli. Po chwili widzisz na środku jeziora małą wyspę." },
+        { "kind": "SPEECH", "speaker": "Żaba", "text": "Cześć! Pomożesz mi znaleźć latarnię?" }
+      ],
+      "next": "island"
+    },
+    {
+      "id": "shore",
+      "blocks": [
+        { "kind": "NARRATION", "text": "Na brzegu leży gładki, ciepły kamień. Siadasz na nim i patrzysz na wodę." }
+      ],
+      "options": [
+        { "id": "back", "label": "Wracam do łódki", "next": "boat" },
+        { "id": "stay", "label": "Zostaję jeszcze chwilę", "next": "calm-end" }
+      ]
+    },
+    {
+      "id": "island",
+      "blocks": [
+        { "kind": "NARRATION", "text": "Razem z Żabą znajdujecie starą latarnię. Zapala się, gdy tylko jej dotykasz." }
+      ],
+      "end": true
+    },
+    {
+      "id": "calm-end",
+      "blocks": [
+        { "kind": "NARRATION", "text": "Robi się cicho i spokojnie. To wystarczy na dziś." }
+      ],
+      "end": true
+    }
+  ]
+}

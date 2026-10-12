@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture-minimal",
+  "version": "1.0.0",
+  "name": "Fixture — Minimal",
+  "locales": ["pl"],
+  "defaultLocale": "pl",
+  "features": [],
+  "startInputs": [
+    { "id": "tone", "kind": "ENUM", "required": false, "labelKey": "input.tone", "values": ["calm", "silly"] }
+  ],
+  "contentPolicy": { "freeTextAllowed": false },
+  "files": ["strings/pl.json", "scenes/pl/story.json"]
+}
