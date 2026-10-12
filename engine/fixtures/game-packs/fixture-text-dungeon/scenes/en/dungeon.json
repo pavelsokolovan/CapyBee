@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "scenes": [
+    {
+      "id": "cell",
+      "start": true,
+      "blocks": [
+        { "kind": "NARRATION", "text": "You wake in a cold stone cell. The door hangs open." }
+      ],
+      "options": [
+        { "id": "corridor", "label": "Step into the corridor", "next": "corridor" },
+        { "id": "listen", "label": "Stay and listen", "next": "listen" }
+      ]
+    },
+    {
+      "id": "listen",
+      "blocks": [
+        { "kind": "NARRATION", "text": "Water drips somewhere far away. Nothing else moves." }
+      ],
+      "next": "cell"
+    },
+    {
+      "id": "corridor",
+      "blocks": [
+        { "kind": "NARRATION", "text": "A long corridor. A faint draught comes from the left, and a stair rises on the right." }
+      ],
+      "options": [
+        { "id": "left", "label": "Go left", "next": "armory" },
+        { "id": "right", "label": "Go right", "next": "stairs" },
+        { "id": "back", "label": "Go back to the cell", "next": "cell" }
+      ]
+    },
+    {
+      "id": "armory",
+      "blocks": [
+        { "kind": "NARRATION", "text": "Racks of rusty tools line the walls. A small iron key lies beneath a bench." }
+      ],
+      "onEnter": [
+        { "type": "FLAG_SET", "flag": "has-key", "value": true },
+        { "type": "SET_ADD", "set": "inventory", "value": "key" }
+      ],
+      "options": [
+        { "id": "back", "label": "Return to the corridor", "next": "corridor" }
+      ]
+    },
+    {
+      "id": "stairs",
+      "blocks": [
+        { "kind": "NARRATION", "text": "Worn steps lead up toward a square of daylight." }
+      ],
+      "onEnter": [
+        { "type": "COUNTER_ADD", "counter": "health", "delta": -2 }
+      ],
+      "options": [
+        {
+          "id": "climb",
+          "label": "Climb the stairs",
+          "next": "exit",
+          "requires": { "type": "SET_CONTAINS", "set": "inventory", "value": "key" },
+          "unmetHint": "hint.need-key"
+        },
+        { "id": "back", "label": "Return to the corridor", "next": "corridor" }
+      ]
+    },
+    {
+      "id": "exit",
+      "blocks": [
+        { "kind": "NARRATION", "text": "Daylight. You made it out." }
+      ],
+      "end": true,
+      "outcome": "escaped"
+    }
+  ]
+}

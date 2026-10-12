@@ -10,6 +10,8 @@ import com.capybee.engine.pack.Pack;
 import com.capybee.engine.pack.PackFeature;
 import com.capybee.engine.pack.PackValidationContext;
 import com.capybee.engine.pack.SectionValidator;
+import com.capybee.engine.rules.Effect;
+import com.capybee.engine.rules.json.RulesParser;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -25,7 +27,8 @@ import java.util.Set;
 public final class SceneSectionValidator implements SectionValidator {
     @Override
     public void validate(Pack pack, PackValidationContext context) {
-        Map<LocaleTag, SceneSet> sceneSets = SceneSets.load(pack);
+        Map<LocaleTag, SceneSet> sceneSets = SceneSets.load(pack, context);
+        boolean hasEndRun = hasEndRun(sceneSets, RulesParser.parse(pack));
         for (LocaleTag locale : pack.manifest().locales()) {
             SceneSet set = sceneSets.get(locale);
             if (set == null) {
@@ -71,7 +74,7 @@ public final class SceneSectionValidator implements SectionValidator {
                     }
                 }
             }
-            checkReachability(set, locale, context);
+            checkReachability(set, locale, context, hasEndRun);
         }
         validateLocaleParity(pack, context);
     }
@@ -120,10 +123,16 @@ public final class SceneSectionValidator implements SectionValidator {
         if (scene.next() != null && !scene.next().isBlank() && scene.options() != null && !scene.options().isEmpty()) {
             context.error("SCENE_FIELD_INVALID", "pack.json", "/scenes/" + scene.id(), "Scene cannot have both options and next");
         }
+        if (!scene.branches().isEmpty() && (scene.next() == null || scene.next().isBlank() || scene.end()
+                || scene.options() != null && !scene.options().isEmpty())) {
+            context.error("SCENE_FIELD_INVALID", "pack.json", "/scenes/" + scene.id(), "Branches are only allowed on linear scenes");
+        }
         if (scene.end()) {
             if (scene.options() != null && !scene.options().isEmpty()) {
                 context.error("SCENE_FIELD_INVALID", "pack.json", "/scenes/" + scene.id(), "End scene cannot have options");
             }
+        } else if (scene.outcome() != null) {
+            context.error("SCENE_FIELD_INVALID", "pack.json", "/scenes/" + scene.id() + "/outcome", "Outcome is only allowed on end scenes");
         }
         if (scene.next() != null && !scene.next().isBlank()) {
             if (scene.next().equals(scene.id())) {
@@ -132,7 +141,7 @@ public final class SceneSectionValidator implements SectionValidator {
         }
     }
 
-    private void checkReachability(SceneSet set, LocaleTag locale, PackValidationContext context) {
+    private void checkReachability(SceneSet set, LocaleTag locale, PackValidationContext context, boolean hasEndRun) {
         Map<String, Scene> scenes = set.scenes();
         if (set.startId() == null || !scenes.containsKey(set.startId())) {
             return;
@@ -149,17 +158,16 @@ public final class SceneSectionValidator implements SectionValidator {
                 for (var option : scene.options()) {
                     if (option.next() != null && scenes.containsKey(option.next())) {
                         queue.add(option.next());
-                    } else {
-                        context.error("PACK_DANGLING_REF", "pack.json", "/scenes", "Dangling scene ref: " + option.next());
                     }
                 }
             }
             if (scene.next() != null && !scene.next().isBlank()) {
                 if (scenes.containsKey(scene.next())) {
                     queue.add(scene.next());
-                } else {
-                    context.error("PACK_DANGLING_REF", "pack.json", "/scenes", "Dangling scene ref: " + scene.next());
                 }
+            }
+            for (var branch : scene.branches()) {
+                if (scenes.containsKey(branch.next())) queue.add(branch.next());
             }
         }
         for (String sceneId : scenes.keySet()) {
@@ -176,7 +184,9 @@ public final class SceneSectionValidator implements SectionValidator {
             }
         }
         if (withEnd.isEmpty()) {
-            context.error("SCENE_NO_END", "pack.json", "/scenes", "No end scene is reachable from start in locale " + locale.value());
+            if (!hasEndRun) {
+                context.error("SCENE_NO_END", "pack.json", "/scenes", "No end scene or END_RUN effect is available in locale " + locale.value());
+            }
             return;
         }
         for (String sceneId : visited) {
@@ -186,6 +196,17 @@ public final class SceneSectionValidator implements SectionValidator {
             }
             context.warn("SCENE_NO_PATH_TO_END", "pack.json", "/scenes", "Scene has no path to an end scene: " + sceneId);
         }
+    }
+
+    private boolean hasEndRun(Map<LocaleTag, SceneSet> sceneSets, com.capybee.engine.rules.Rules rules) {
+        if (rules.objectives().stream().anyMatch(objective -> containsEndRun(objective.onComplete()))) return true;
+        return sceneSets.values().stream().flatMap(set -> set.scenes().values().stream())
+                .anyMatch(scene -> containsEndRun(scene.onEnter())
+                        || scene.options().stream().anyMatch(option -> containsEndRun(option.effects())));
+    }
+
+    private boolean containsEndRun(List<Effect> effects) {
+        return effects.stream().anyMatch(Effect.EndRun.class::isInstance);
     }
 
     private boolean reachesEnd(Map<String, Scene> scenes, String current, Set<String> seen, Set<String> endIds) {
@@ -200,6 +221,9 @@ public final class SceneSectionValidator implements SectionValidator {
                     return true;
                 }
             }
+        }
+        for (var branch : scene.branches()) {
+            if (reachesEnd(scenes, branch.next(), new HashSet<>(seen), endIds)) return true;
         }
         if (scene.next() != null && !scene.next().isBlank()) {
             if (reachesEnd(scenes, scene.next(), new HashSet<>(seen), endIds)) {

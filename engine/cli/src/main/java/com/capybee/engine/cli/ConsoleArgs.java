@@ -52,7 +52,11 @@ public final class ConsoleArgs {
                 }
                 case "--seed" -> {
                     if (index + 1 >= args.length) return new ParseResult(null, "Missing value for --seed.");
-                    seed = Long.parseLong(args[++index]);
+                    try {
+                        seed = Long.parseLong(args[++index]);
+                    } catch (NumberFormatException exception) {
+                        return new ParseResult(null, "Seed must be a signed 64-bit integer.");
+                    }
                 }
                 case "--script" -> {
                     if (index + 1 >= args.length) return new ParseResult(null, "Missing value for --script.");

@@ -9,16 +9,19 @@ final class ViewBuilder {
     private ViewBuilder() {}
 
     static View build(Scene scene, boolean ended, EndReason endReason) {
+        List<Option> options = scene == null || scene.options() == null ? List.of()
+                : scene.options().stream().map(ViewBuilder::toOption).toList();
+        return build(scene, ended, endReason, options, List.of(), List.of(), null);
+    }
+
+    static View build(Scene scene, boolean ended, EndReason endReason, List<Option> options,
+                      List<StatusItem> status, List<ObjectiveItem> objectives, String outcome) {
         if (scene == null) {
             return new View(List.of(), List.of(), new InputSpec(InputMode.NONE, 0), List.of(), true, endReason);
         }
 
-        List<Option> options = List.of();
         InputMode mode = InputMode.NONE;
-        if (!ended && scene.options() != null && !scene.options().isEmpty()) {
-            options = scene.options().stream()
-                    .map(ViewBuilder::toOption)
-                    .toList();
+        if (!ended && !options.isEmpty()) {
             mode = InputMode.CHOICE;
         }
 
@@ -26,8 +29,8 @@ final class ViewBuilder {
             return new View(List.of(), List.of(), new InputSpec(InputMode.NONE, 0), List.of(), true, endReason);
         }
 
-        return new View(List.copyOf(scene.blocks()), options,
-                new InputSpec(mode, 0), List.of(), ended, endReason);
+        return new View(List.copyOf(scene.blocks()), ended ? List.of() : options,
+            new InputSpec(mode, 0), status, ended, endReason, objectives, outcome);
     }
 
     private static Option toOption(SceneOption option) {

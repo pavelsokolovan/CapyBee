@@ -6,6 +6,8 @@ import com.capybee.engine.content.SceneSet;
 import com.capybee.engine.content.json.SceneSets;
 import com.capybee.engine.pack.*;
 import com.capybee.engine.port.IdSource;
+import com.capybee.engine.rules.*;
+import com.capybee.engine.rules.json.RulesParser;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -57,10 +59,11 @@ final class DefaultEngine implements Engine {
         Instant now = clock.instant();
         List<String> visited = new ArrayList<>();
         visited.add(startScene.id());
+        Rules rules = RulesParser.parse(pack);
         RunImpl run = new RunImpl(runId, pack, locale, seed, normalizedInputs, now, now, 0L,
-                startScene.id(), visited, startScene.end(), startScene.end() ? EndReason.COMPLETED : null,
-                sceneSet, clock);
-        return new StartResult(run, issues);
+            startScene.id(), visited, false, null, sceneSet, clock, rules, null);
+        issues.addAll(run.startupIssues());
+        return new StartResult(run, issues, run.startupEvents());
     }
 
     @Override
@@ -70,17 +73,27 @@ final class DefaultEngine implements Engine {
             issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_INVALID", "Snapshot is missing"));
             return new ResumeResult(null, issues);
         }
-
+        if (snapshot.snapshotVersion() != 1 || snapshot.pack() == null || snapshot.pack().id() == null
+            || snapshot.pack().version() == null || snapshot.state() == null || snapshot.runId() == null
+            || snapshot.runId().isBlank() || snapshot.createdAt() == null || snapshot.updatedAt() == null
+            || snapshot.step() < 0) {
+            issues.add(new Issue(Issue.Severity.ERROR, snapshot.snapshotVersion() == 1 ? "SNAPSHOT_INVALID" : "SNAPSHOT_VERSION_UNSUPPORTED",
+                    "Snapshot version, pack, or state is invalid"));
+            return new ResumeResult(null, issues);
+        }
         Pack pack = packs.find(snapshot.pack().id()).orElse(null);
         if (pack == null) {
-            issues.add(new Issue(Issue.Severity.ERROR, "PACK_NOT_FOUND", "Pack not found: " + snapshot.pack().id()));
+            issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_PACK_MISMATCH", "Snapshot pack is not loaded"));
             return new ResumeResult(null, issues);
         }
-        if (!pack.manifest().version().equals(snapshot.pack().version())) {
+        PackVersion loadedVersion = pack.manifest().version();
+        PackVersion savedVersion = snapshot.pack().version();
+        if (loadedVersion.major() != savedVersion.major()) {
             issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_PACK_MISMATCH",
-                    "Snapshot pack version does not match loaded pack version"));
+                    "Snapshot pack major version does not match loaded pack"));
             return new ResumeResult(null, issues);
         }
+        boolean migrating = !loadedVersion.equals(savedVersion);
 
         LocaleTag locale = snapshot.locale();
         if (locale == null) {
@@ -104,21 +117,132 @@ final class DefaultEngine implements Engine {
                     "Snapshot state references unknown scene: " + currentSceneId));
             return new ResumeResult(null, issues);
         }
-        for (String visitedId : snapshot.state().visited()) {
-            if (!sceneSet.scenes().containsKey(visitedId)) {
-                issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_INVALID",
-                        "Snapshot visited list references unknown scene: " + visitedId));
-            }
-        }
+        Rules rules = RulesParser.parse(pack);
+        RunState restoredState = migrateState(snapshot.state(), rules, sceneSet, migrating, issues);
         if (issues.stream().anyMatch(issue -> issue.severity() == Issue.Severity.ERROR)) {
             return new ResumeResult(null, issues);
         }
 
         RunImpl run = new RunImpl(snapshot.runId(), pack, locale, snapshot.seed(), snapshot.startInputs(),
                 snapshot.createdAt(), snapshot.updatedAt(), snapshot.step(), currentSceneId,
-                new ArrayList<>(snapshot.state().visited()), snapshot.state().ended(), snapshot.state().endReason(),
-                sceneSet, clock);
+                new ArrayList<>(restoredState.visited()), restoredState.ended(), restoredState.endReason(),
+                sceneSet, clock, rules, restoredState);
         return new ResumeResult(run, issues);
+    }
+
+    private RunState migrateState(RunState saved, Rules rules, SceneSet scenes, boolean migrating, List<Issue> issues) {
+        boolean pruned = false;
+        boolean clamped = false;
+        if (saved.ended() == (saved.endReason() == null)) {
+            issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_INVALID", "Snapshot ended state and end reason are inconsistent"));
+        }
+        Map<String, CounterDef> counterDefs = new LinkedHashMap<>();
+        Map<String, Integer> counters = new LinkedHashMap<>();
+        rules.counters().forEach(def -> {
+            counterDefs.put(def.id(), def);
+            counters.put(def.id(), def.initial());
+        });
+        for (var entry : saved.counters().entrySet()) {
+            CounterDef def = counterDefs.get(entry.getKey());
+            if (def == null) {
+                if (migrating) pruned = true;
+                else issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_INVALID", "Unknown snapshot counter: " + entry.getKey()));
+                continue;
+            }
+            int value = entry.getValue();
+            if (value < def.min() || value > def.max()) {
+                if (migrating) {
+                    value = Math.max(def.min(), Math.min(def.max(), value));
+                    clamped = true;
+                } else {
+                    issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_INVALID", "Snapshot counter is outside bounds: " + entry.getKey()));
+                    continue;
+                }
+            }
+            counters.put(entry.getKey(), value);
+        }
+
+        Map<String, Boolean> flags = new LinkedHashMap<>();
+        Set<String> flagIds = new HashSet<>();
+        rules.flags().forEach(def -> {
+            flagIds.add(def.id());
+            flags.put(def.id(), def.initial());
+        });
+        for (var entry : saved.flags().entrySet()) {
+            if (!flagIds.contains(entry.getKey())) {
+                if (migrating) pruned = true;
+                else issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_INVALID", "Unknown snapshot flag: " + entry.getKey()));
+            } else flags.put(entry.getKey(), entry.getValue());
+        }
+
+        Map<String, SetDef> setDefs = new LinkedHashMap<>();
+        Map<String, List<String>> sets = new LinkedHashMap<>();
+        rules.sets().forEach(def -> {
+            setDefs.put(def.id(), def);
+            sets.put(def.id(), def.initial().stream().sorted().toList());
+        });
+        for (var entry : saved.sets().entrySet()) {
+            SetDef def = setDefs.get(entry.getKey());
+            if (def == null) {
+                if (migrating) pruned = true;
+                else issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_INVALID", "Unknown snapshot set: " + entry.getKey()));
+                continue;
+            }
+            Set<String> seen = new HashSet<>();
+            List<String> members = new ArrayList<>();
+            for (String member : entry.getValue()) {
+                if (!seen.add(member)) {
+                    if (migrating) pruned = true;
+                    else issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_INVALID", "Duplicate snapshot set member: " + entry.getKey()));
+                } else if (!def.values().contains(member)) {
+                    if (migrating) pruned = true;
+                    else issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_INVALID", "Unknown snapshot set member: " + entry.getKey()));
+                } else members.add(member);
+            }
+            sets.put(entry.getKey(), members.stream().sorted().toList());
+        }
+
+        Map<String, ObjectiveState> objectives = new LinkedHashMap<>();
+        Set<String> objectiveIds = new HashSet<>();
+        rules.objectives().forEach(def -> {
+            objectiveIds.add(def.id());
+            objectives.put(def.id(), ObjectiveState.ACTIVE);
+        });
+        for (var entry : saved.objectives().entrySet()) {
+            if (!objectiveIds.contains(entry.getKey())) {
+                if (migrating) pruned = true;
+                else issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_INVALID", "Unknown snapshot objective: " + entry.getKey()));
+            } else objectives.put(entry.getKey(), entry.getValue());
+        }
+
+        Set<String> outcomeIds = new HashSet<>();
+        rules.outcomes().forEach(def -> outcomeIds.add(def.id()));
+        String outcome = saved.outcome();
+        if (outcome != null && !outcomeIds.contains(outcome)) {
+            if (migrating) {
+                outcome = null;
+                pruned = true;
+            } else issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_INVALID", "Snapshot outcome is not declared"));
+        }
+
+        List<String> visited = new ArrayList<>();
+        Set<String> seenScenes = new HashSet<>();
+        for (String visitedId : saved.visited()) {
+            if (!seenScenes.add(visitedId)) {
+                if (migrating) pruned = true;
+                else issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_INVALID", "Snapshot visited list contains duplicates"));
+            } else if (!scenes.scenes().containsKey(visitedId)) {
+                if (migrating) pruned = true;
+                else issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_INVALID", "Snapshot visited list references unknown scene: " + visitedId));
+            } else visited.add(visitedId);
+        }
+        if (!seenScenes.contains(saved.sceneId())) {
+            if (migrating) visited.add(saved.sceneId());
+            else issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_INVALID", "Current scene is missing from visited list"));
+        }
+        if (pruned) issues.add(new Issue(Issue.Severity.WARNING, "SNAPSHOT_STATE_PRUNED", "Obsolete snapshot state was removed"));
+        if (clamped) issues.add(new Issue(Issue.Severity.WARNING, "SNAPSHOT_STATE_CLAMPED", "Snapshot counters were clamped to current bounds"));
+        return new RunState(saved.sceneId(), visited, saved.ended(), saved.endReason(), counters, flags, sets, objectives, outcome);
     }
 
     private List<Issue> validateStartRequest(RunRequest request) {

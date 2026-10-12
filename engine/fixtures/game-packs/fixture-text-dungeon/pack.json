@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture-text-dungeon",
+  "version": "1.1.0",
+  "name": "Fixture — Text Dungeon",
+  "locales": ["en"],
+  "defaultLocale": "en",
+  "features": ["PLACES"],
+  "startInputs": [],
+  "events": [
+    {
+      "id": "run.completed",
+      "payload": [
+        { "name": "outcome", "type": "STRING" },
+        { "name": "health", "type": "INT" }
+      ]
+    }
+  ],
+  "contentPolicy": { "freeTextAllowed": false },
+  "files": ["strings/en.json", "scenes/en/dungeon.json", "rules.json"]
+}

@@ -1,0 +1,17 @@
+{
+  "snapshotVersion": 1,
+  "runId": "manual-run",
+  "pack": { "id": "fixture-minimal", "version": "1.0.0" },
+  "locale": "pl",
+  "seed": 99,
+  "startInputs": {},
+  "createdAt": "2026-10-12T10:00:00Z",
+  "updatedAt": "2026-10-12T10:00:00Z",
+  "step": 0,
+  "state": {
+    "sceneId": "start",
+    "visited": ["start"],
+    "ended": false,
+    "endReason": null
+  }
+}

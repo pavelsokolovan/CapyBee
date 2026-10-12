@@ -21,6 +21,8 @@ import com.capybee.engine.pack.PackRegistry;
 import com.capybee.engine.port.IdSource;
 
 import java.io.InputStream;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -68,7 +70,13 @@ public final class ConsoleApp {
         Path packDir = options.packDir().toAbsolutePath().normalize();
         String packName = packDir.getFileName() == null ? "" : packDir.getFileName().toString();
         PackId packId = new PackId(packName);
-        LoadResult load = new PackLoader(Engine.sectionValidators()).tryLoad(packId, new DirectoryPackSource(packDir));
+        LoadResult load;
+        try {
+            load = new PackLoader(Engine.sectionValidators()).tryLoad(packId, new DirectoryPackSource(packDir));
+        } catch (RuntimeException exception) {
+            err.println("PACK_SOURCE_INVALID: " + exception.getMessage());
+            return 1;
+        }
         if (!load.ok()) {
             for (var issue : load.issues()) {
                 err.println("ERROR|WARNING " + issue.code() + " " + issue.message());
@@ -117,7 +125,18 @@ public final class ConsoleApp {
             run = startResult.run();
         }
 
-        out.println("Running " + packId + " in locale " + run.snapshot().locale());
+        boolean scripted = options.script() != null;
+        BufferedReader reader;
+        try {
+            reader = scripted
+                    ? Files.newBufferedReader(options.script(), StandardCharsets.UTF_8)
+                    : new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+        } catch (Exception exception) {
+            err.println("SCRIPT_INVALID: " + exception.getMessage());
+            return 2;
+        }
+
+        out.println("Running " + packId.value() + " in locale " + run.snapshot().locale().value());
         View view = run.view();
         out.println(ConsoleRenderer.render(view));
 
@@ -125,14 +144,17 @@ public final class ConsoleApp {
             return 0;
         }
 
+        inputLoop:
         while (true) {
-            out.print("> ");
-            String line = readLine();
+            if (!scripted) out.print("> ");
+            String line = readLine(reader);
             if (line == null) {
+                if (scripted) return 0;
                 out.println();
                 out.println(ConsoleChrome.EOF);
                 return 0;
             }
+            if (scripted) out.println("> " + line);
             String trimmed = line.trim();
             if (trimmed.equalsIgnoreCase("q") || trimmed.equalsIgnoreCase("quit")) {
                 StepResult stepResult = run.apply(new Command.Abandon());
@@ -145,6 +167,7 @@ public final class ConsoleApp {
                 StepResult stepResult = run.apply(new Command.Advance());
                 if (stepResult.accepted()) {
                     out.println(ConsoleRenderer.render(stepResult.view()));
+                        view = run.view();
                 } else {
                     out.println(stepResult.issues().getFirst().message());
                 }
@@ -171,7 +194,7 @@ public final class ConsoleApp {
                             return 0;
                         }
                         view = run.view();
-                        continue;
+                        continue inputLoop;
                     }
                 } catch (NumberFormatException ignored) {
                     // fall through to default handling
@@ -198,20 +221,15 @@ public final class ConsoleApp {
         }
     }
 
-    private String readLine() {
+    private String readLine(BufferedReader reader) {
         try {
-            byte[] bytes = new byte[4096];
-            int read = in.read(bytes);
-            if (read < 0) {
-                return null;
-            }
-            return new String(bytes, 0, read, StandardCharsets.UTF_8).replace("\r", "").replace("\n", "");
+            return reader.readLine();
         } catch (Exception exception) {
             return null;
         }
     }
 
     private String consoleUsage() {
-        return "Usage: java -jar engine-cli.jar --pack-dir <dir> [--locale <tag>] [--input <key=value>]...";
+        return "Usage: java -jar engine-cli.jar --pack-dir <dir> [--locale <tag>] [--input <key=value>]... [--script <file>]";
     }
 }

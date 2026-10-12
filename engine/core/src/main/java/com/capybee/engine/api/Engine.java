@@ -3,6 +3,8 @@ package com.capybee.engine.api;
 import com.capybee.engine.content.json.SceneSectionValidator;
 import com.capybee.engine.pack.PackRegistry;
 import com.capybee.engine.pack.SectionValidator;
+import com.capybee.engine.rules.json.RulesSectionValidator;
+import com.capybee.engine.rules.json.RuleReferenceValidator;
 
 import java.util.List;
 
@@ -12,7 +14,7 @@ public interface Engine {
     }
 
     static List<SectionValidator> sectionValidators() {
-        return List.of(new SceneSectionValidator());
+        return List.of(new SceneSectionValidator(), new RulesSectionValidator(), new RuleReferenceValidator());
     }
 
     StartResult start(RunRequest request);
