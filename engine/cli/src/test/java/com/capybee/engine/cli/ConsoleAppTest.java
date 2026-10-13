@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ConsoleAppTest {
     private static final String MINIMAL_PACK = Path.of("..", "fixtures", "game-packs", "fixture-minimal").toString();
     private static final String DUNGEON_PACK = Path.of("..", "fixtures", "game-packs", "fixture-text-dungeon").toString();
+    private static final String TEXT_INPUT_PACK = Path.of("..", "fixtures", "game-packs", "fixture-text-input").toString();
 
     @Test
     void helpAndMissingPackDirectoryReturnUsageErrors() {
@@ -46,6 +47,15 @@ class ConsoleAppTest {
 
         assertThat(result.exitCode).isZero();
         assertThat(result.output).contains("Place: Cell", "Place: Corridor", "[abandoned]");
+    }
+
+    @Test
+    void textSubmissionFailsClosedWithoutEchoAndAuthoredChoiceStillWorks() {
+        var result = run(new String[]{"--pack-dir", TEXT_INPUT_PACK}, "private-marker@example.com\n1\nq\n");
+
+        assertThat(result.exitCode).isZero();
+        assertThat(result.output).contains("Text safety checks are unavailable", "You can add a thought here.", "[abandoned]");
+        assertThat(result.output).doesNotContain("private-marker@example.com");
     }
 
     @Test

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "scenes": [
+    {
+      "id": "start",
+      "start": true,
+      "blocks": [{ "kind": "NARRATION", "text": "Choose or say what you would like to do." }],
+      "options": [{ "id": "continue", "label": "Continue", "next": "text-scene" }],
+      "input": { "mode": "CHOICE_OR_TEXT" }
+    },
+    {
+      "id": "text-scene",
+      "blocks": [{ "kind": "NARRATION", "text": "You can add a thought here." }],
+      "next": "end",
+      "input": { "mode": "TEXT", "maxChars": 120 }
+    },
+    {
+      "id": "end",
+      "blocks": [{ "kind": "NARRATION", "text": "The story is complete." }],
+      "end": true
+    }
+  ]
+}

@@ -3,6 +3,7 @@ package com.capybee.engine.content.json;
 import com.capybee.engine.content.Block;
 import com.capybee.engine.content.BlockKind;
 import com.capybee.engine.content.Scene;
+import com.capybee.engine.content.SceneInputMode;
 import com.capybee.engine.content.SceneOption;
 import com.capybee.engine.content.SceneSet;
 import com.capybee.engine.pack.LocaleTag;
@@ -54,7 +55,7 @@ public final class SceneSectionValidator implements SectionValidator {
                 context.error("SCENE_START_MULTIPLE", "pack.json", "/scenes", "Multiple start scenes in locale " + locale.value());
             }
             for (Scene scene : scenes.values()) {
-                validateScene(scene, locale, context);
+                validateScene(scene, locale, context, pack);
             }
             if (!sceneIds.isEmpty()) {
                 Set<String> optionIds = new LinkedHashSet<>();
@@ -79,7 +80,36 @@ public final class SceneSectionValidator implements SectionValidator {
         validateLocaleParity(pack, context);
     }
 
-    private void validateScene(Scene scene, LocaleTag locale, PackValidationContext context) {
+    private void validateScene(Scene scene, LocaleTag locale, PackValidationContext context, Pack pack) {
+        if (scene.inputMode() != null) {
+            boolean hasOptions = !scene.options().isEmpty();
+            boolean valid = switch (scene.inputMode()) {
+                case NONE -> !hasOptions;
+                case CHOICE -> hasOptions;
+                case TEXT -> !hasOptions;
+                case CHOICE_OR_TEXT -> hasOptions;
+            };
+            if (!valid) {
+                context.error("INPUT_MODE_INVALID", "pack.json", "/scenes/" + scene.id() + "/input/mode",
+                        "Input mode is incompatible with scene options");
+            }
+            if ((scene.inputMode() == SceneInputMode.TEXT || scene.inputMode() == SceneInputMode.CHOICE_OR_TEXT)
+                    && (scene.maxChars() < 1 || scene.maxChars() > 500)) {
+                context.error("INPUT_LIMIT_INVALID", "pack.json", "/scenes/" + scene.id() + "/input/maxChars",
+                        "Text input limit must be between 1 and 500");
+            }
+            if ((scene.inputMode() == SceneInputMode.TEXT || scene.inputMode() == SceneInputMode.CHOICE_OR_TEXT)
+                    && scene.options().size() > 32) {
+                context.error("INPUT_MODE_INVALID", "pack.json", "/scenes/" + scene.id() + "/options",
+                        "Text-enabled scenes may not have more than 32 options");
+            }
+            if ((scene.inputMode() == SceneInputMode.TEXT || scene.inputMode() == SceneInputMode.CHOICE_OR_TEXT)
+                    && (pack.manifest().contentPolicy() == null
+                    || !pack.manifest().contentPolicy().freeTextAllowed())) {
+                context.error("FREE_TEXT_DISABLED", "pack.json", "/scenes/" + scene.id() + "/input",
+                        "Free text is disabled by pack policy");
+            }
+        }
         int wayCount = 0;
         if (scene.options() != null && !scene.options().isEmpty()) wayCount++;
         if (scene.next() != null && !scene.next().isBlank()) wayCount++;

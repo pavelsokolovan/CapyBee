@@ -223,13 +223,32 @@ public final class ConsoleApp {
                             return 0;
                         }
                         view = run.view();
-                        continue;
+                        continue inputLoop;
                     }
                 }
-                out.println("! Type a number from 1 to " + view.options().size() + " (q to quit).") ;
+                StepResult textResult = run.apply(new Command.SubmitText(line));
+                if (textResult.accepted()) {
+                    out.println(ConsoleRenderer.render(textResult.view()));
+                } else {
+                    out.println(textResult.issues().getFirst().message());
+                }
+                if (run.view().ended()) return 0;
+                view = run.view();
                 continue;
             }
-            out.println("! Press Enter to continue (q to quit).") ;
+            if (view.input().mode() == com.capybee.engine.api.InputMode.TEXT
+                    || view.input().mode() == com.capybee.engine.api.InputMode.CHOICE_OR_TEXT) {
+                StepResult textResult = run.apply(new Command.SubmitText(line));
+                if (textResult.accepted()) {
+                    out.println(ConsoleRenderer.render(textResult.view()));
+                } else {
+                    out.println(textResult.issues().getFirst().message());
+                }
+                if (run.view().ended()) return 0;
+                view = run.view();
+                continue;
+            }
+            out.println("! Press Enter to continue (q to quit).");
         }
     }
 

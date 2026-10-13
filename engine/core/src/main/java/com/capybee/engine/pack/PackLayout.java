@@ -8,7 +8,7 @@ public final class PackLayout {
     public static final Set<Integer> SUPPORTED_SCHEMA_VERSIONS = Set.of(1);
     public static final int MAX_FILE_BYTES = 256 * 1024;
     public static final int MAX_PACK_BYTES = 2 * 1024 * 1024;
-    public static final int MAX_FREE_TEXT_CHARS = 300;
+    public static final int MAX_FREE_TEXT_CHARS = 500;
     public static final int MAX_FREE_TEXT_INPUTS = 1;
 
     private PackLayout() {}

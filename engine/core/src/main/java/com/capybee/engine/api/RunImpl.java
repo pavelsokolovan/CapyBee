@@ -4,10 +4,23 @@ import com.capybee.engine.content.Scene;
 import com.capybee.engine.content.SceneBranch;
 import com.capybee.engine.content.SceneOption;
 import com.capybee.engine.content.SceneSet;
+import com.capybee.engine.content.Block;
+import com.capybee.engine.content.BlockKind;
+import com.capybee.engine.input.InputContext;
+import com.capybee.engine.input.InputPolicy;
+import com.capybee.engine.input.InputResolution;
+import com.capybee.engine.input.InputSafetyAction;
+import com.capybee.engine.input.InputSafetyDecision;
+import com.capybee.engine.input.PiiScrubber;
+import com.capybee.engine.input.ProcessedInput;
 import com.capybee.engine.pack.EventDef;
 import com.capybee.engine.pack.LocaleTag;
 import com.capybee.engine.pack.Pack;
 import com.capybee.engine.pack.PackFeature;
+import com.capybee.engine.pack.ContentPolicy;
+import com.capybee.engine.pack.StartInputDef;
+import com.capybee.engine.port.InputGuard;
+import com.capybee.engine.port.InputInterpreter;
 import com.capybee.engine.rules.Condition;
 import com.capybee.engine.rules.CounterDef;
 import com.capybee.engine.rules.Effect;
@@ -28,6 +41,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 final class RunImpl implements Run {
     private final String id;
@@ -41,6 +55,9 @@ final class RunImpl implements Run {
     private final SceneSet sceneSet;
     private final Rules rules;
     private final PlaceMap placeMap;
+    private final InputGuard inputGuard;
+    private final InputInterpreter inputInterpreter;
+    private final PiiScrubber piiScrubber;
     private final Map<String, String> strings;
     private final Map<String, CounterDef> counterDefs = new LinkedHashMap<>();
     private final Map<String, FlagDef> flagDefs = new LinkedHashMap<>();
@@ -75,13 +92,15 @@ final class RunImpl implements Run {
             RunState savedState) {
         this(id, pack, locale, seed, startInputs, createdAt, updatedAt, step, sceneId, visited,
             ended, endReason, sceneSet, clock, rules, savedState,
-            pack.manifest().features().contains(PackFeature.PLACES) ? PlacesParser.parse(pack) : null);
+            pack.manifest().features().contains(PackFeature.PLACES) ? PlacesParser.parse(pack) : null,
+            null, null, new PiiScrubber());
         }
 
         RunImpl(String id, Pack pack, LocaleTag locale, long seed, Map<String, String> startInputs,
             Instant createdAt, Instant updatedAt, long step, String sceneId, List<String> visited,
             boolean ended, EndReason endReason, SceneSet sceneSet, Clock clock, Rules rules,
-            RunState savedState, PlaceMap placeMap) {
+            RunState savedState, PlaceMap placeMap, InputGuard inputGuard,
+            InputInterpreter inputInterpreter, PiiScrubber piiScrubber) {
         this.id = id;
         this.pack = pack;
         this.locale = locale;
@@ -98,6 +117,9 @@ final class RunImpl implements Run {
         this.clock = clock;
         this.rules = rules;
         this.placeMap = placeMap;
+        this.inputGuard = inputGuard;
+        this.inputInterpreter = inputInterpreter;
+        this.piiScrubber = piiScrubber;
         this.strings = RuleStrings.load(pack, locale);
         rules.counters().forEach(def -> counterDefs.put(def.id(), def));
         rules.flags().forEach(def -> flagDefs.put(def.id(), def));
@@ -150,19 +172,9 @@ final class RunImpl implements Run {
         if (command instanceof Command.Move move) return move(move.placeId());
         Scene current = sceneSet.scenes().get(sceneId);
         if (current == null) return reject("COMMAND_NOT_ALLOWED", "The current scene is missing");
-        if (command instanceof Command.SubmitText) return reject("INPUT_NOT_EXPECTED", "Text input is not expected in this scene");
+        if (command instanceof Command.SubmitText submitText) return submitText(current, submitText.text());
         if (command instanceof Command.Choose choose) {
-            if (current.options().isEmpty()) return reject("COMMAND_NOT_ALLOWED", "Choice commands are not allowed in the current scene");
-            SceneOption option = current.options().stream().filter(item -> item.id().equals(choose.optionId())).findFirst().orElse(null);
-            if (option == null) return reject("OPTION_UNKNOWN", "Unknown option id: " + choose.optionId());
-            if (!isEnabled(option)) return reject("OPTION_DISABLED", "Option is unavailable: " + option.id());
-            step++;
-            List<Event> events = new ArrayList<>();
-            List<Issue> issues = new ArrayList<>();
-            applyEffects(option.effects(), events);
-            enterTarget(option.next(), events, issues);
-            updatedAt = clock.instant();
-            return new StepResult(true, view(), events, issues);
+            return choose(current, choose.optionId());
         }
         if (command instanceof Command.Advance) {
             if (!current.options().isEmpty()) return reject("COMMAND_NOT_ALLOWED", "Advance is not allowed in a choice scene");
@@ -189,7 +201,7 @@ final class RunImpl implements Run {
         Map<String, List<String>> savedSets = new LinkedHashMap<>();
         sets.forEach((setId, members) -> savedSets.put(setId, members.stream().sorted().toList()));
         return new RunSnapshot(1, id, new PackRef(pack.manifest().id(), pack.manifest().version()),
-                locale, seed, startInputs, createdAt, updatedAt, step,
+                locale, seed, persistentStartInputs(), createdAt, updatedAt, step,
                 new RunState(sceneId, List.copyOf(visited), ended, endReason,
                     counters, flags, savedSets, objectives, outcome, currentPlaceId, visitedPlaces));
     }
@@ -304,6 +316,164 @@ final class RunImpl implements Run {
 
     private boolean isEnabled(SceneOption option) {
         return option.requires() == null || evaluate(option.requires());
+    }
+
+    private StepResult choose(Scene current, String optionId) {
+        if (current.options().isEmpty()) return reject("COMMAND_NOT_ALLOWED", "Choice commands are not allowed in the current scene");
+        SceneOption option = current.options().stream().filter(item -> item.id().equals(optionId)).findFirst().orElse(null);
+        if (option == null) return reject("OPTION_UNKNOWN", "Unknown option id");
+        if (!isEnabled(option)) return reject("OPTION_DISABLED", "Option is unavailable");
+        step++;
+        List<Event> events = new ArrayList<>();
+        List<Issue> issues = new ArrayList<>();
+        applyEffects(option.effects(), events);
+        enterTarget(option.next(), events, issues);
+        updatedAt = clock.instant();
+        return new StepResult(true, view(), events, issues);
+    }
+
+    private StepResult submitText(Scene current, String rawText) {
+        InputMode mode = view().input().mode();
+        if (mode != InputMode.TEXT && mode != InputMode.CHOICE_OR_TEXT) {
+            return reject("INPUT_NOT_EXPECTED", "Text input is not expected in this scene");
+        }
+        ContentPolicy contentPolicy = pack.manifest().contentPolicy();
+        if (contentPolicy == null || !contentPolicy.freeTextAllowed()) {
+            return reject("FREE_TEXT_DISABLED", "Free-text input is disabled by pack policy");
+        }
+        if (inputGuard == null) return reject("INPUT_GUARD_UNAVAILABLE", "Text safety checks are unavailable");
+        if (inputInterpreter == null) return reject("INPUT_INTERPRETER_UNAVAILABLE", "Text interpretation is unavailable");
+
+        ProcessedInput processed;
+        try {
+            String normalized = piiScrubber.normalize(rawText);
+            int inputLimit = Math.min(current.maxChars(), PiiScrubber.MAX_INPUT_CODE_POINTS);
+            if (normalized.codePointCount(0, normalized.length()) > inputLimit) {
+                return reject("INPUT_TOO_LONG", "Text input exceeds the allowed length");
+            }
+            processed = piiScrubber.process(normalized);
+        } catch (PiiScrubber.InputTextException exception) {
+            return reject(exception.code(), "Text input is invalid or too long");
+        } catch (RuntimeException exception) {
+            return reject("INPUT_INVALID_CHARACTERS", "Text input is invalid");
+        }
+
+        InputPolicy policy = inputPolicy(contentPolicy, current.maxChars());
+        InputSafetyDecision inputDecision = inspect(processed, policy);
+        if (inputDecision == null || inputDecision.action() == null || inputDecision.action() == InputSafetyAction.UNAVAILABLE) {
+            return reject("INPUT_GUARD_UNAVAILABLE", "Text safety checks are unavailable");
+        }
+        if (inputDecision.action() == InputSafetyAction.BLOCK) return reject("INPUT_BLOCKED", "Text input was not accepted");
+        if (inputDecision.action() == InputSafetyAction.NEEDS_CLARIFICATION) {
+            return reject("INPUT_NEEDS_CLARIFICATION", "Text input needs clarification");
+        }
+
+        InputContext context = inputContext(current, mode);
+        InputResolution resolution;
+        try {
+            resolution = inputInterpreter.interpret(processed.input(), context);
+        } catch (RuntimeException exception) {
+            return reject("INPUT_INTERPRETER_UNAVAILABLE", "Text interpretation is unavailable");
+        }
+        if (resolution instanceof InputResolution.SelectOption selected) {
+            boolean enabledAndVisible = context.options().stream()
+                    .anyMatch(option -> option.enabled() && option.id().equals(selected.optionId()));
+            if (!enabledAndVisible) return reject("INPUT_RESOLUTION_INVALID", "Text resolution was invalid");
+            StepResult result = choose(current, selected.optionId());
+            return processed.changed() ? addRedactedWarning(result) : result;
+        }
+        if (resolution instanceof InputResolution.ShortReply reply) {
+            StepResult result = shortReply(reply.text(), policy);
+            return processed.changed() ? addRedactedWarning(result) : result;
+        }
+        if (resolution instanceof InputResolution.NoMatch) {
+            return rejectWarning("INPUT_NO_MATCH", "Choose an available option or try different words", processed.changed());
+        }
+        if (resolution instanceof InputResolution.Blocked) {
+            return rejectWarning("INPUT_BLOCKED", "Text input was not accepted", processed.changed());
+        }
+        return reject("INPUT_RESOLUTION_INVALID", "Text resolution was invalid");
+    }
+
+    private InputSafetyDecision inspect(ProcessedInput input, InputPolicy policy) {
+        try {
+            return inputGuard.inspect(input.input(), policy);
+        } catch (RuntimeException exception) {
+            return new InputSafetyDecision(InputSafetyAction.UNAVAILABLE, null, "SERVICE_ERROR");
+        }
+    }
+
+    private StepResult shortReply(String rawReply, InputPolicy policy) {
+        if (rawReply == null || rawReply.isBlank() || lineCount(rawReply) > policy.maxReplyLines()) {
+            return reject("INPUT_OUTPUT_UNSAFE", "A safe reply could not be prepared");
+        }
+        ProcessedInput processedReply;
+        try {
+            processedReply = piiScrubber.process(rawReply);
+        } catch (RuntimeException exception) {
+            return reject("INPUT_OUTPUT_UNSAFE", "A safe reply could not be prepared");
+        }
+        String safeReply = processedReply.input().text();
+        if (safeReply.codePointCount(0, safeReply.length()) > policy.maxReplyCodePoints()) {
+            return reject("INPUT_OUTPUT_UNSAFE", "A safe reply could not be prepared");
+        }
+        InputSafetyDecision outputDecision = inspect(processedReply, policy);
+        if (outputDecision == null || outputDecision.action() != InputSafetyAction.ALLOW
+                && outputDecision.action() != InputSafetyAction.ALLOW_REDACTED) {
+            return reject("INPUT_OUTPUT_UNSAFE", "A safe reply could not be prepared");
+        }
+        View current = view();
+        List<Block> blocks = new ArrayList<>(current.blocks());
+        blocks.add(new Block(BlockKind.NARRATION, null, safeReply, List.of()));
+        View replyView = new View(blocks, current.options(), current.input(), current.status(), current.ended(),
+                current.endReason(), current.objectives(), current.outcome(), current.places());
+        List<Issue> issues = processedReply.changed()
+                ? List.of(new Issue(Issue.Severity.WARNING, "INPUT_REDACTED", "Personal details were removed from the reply"))
+                : List.of();
+        return new StepResult(true, replyView, List.of(), issues);
+    }
+
+    private int lineCount(String text) {
+        return text.split("\\R", -1).length;
+    }
+
+    private InputContext inputContext(Scene current, InputMode mode) {
+        View currentView = view();
+        List<InputContext.InputOption> options = currentView.options().stream()
+                .map(option -> new InputContext.InputOption(option.id(), option.label(), option.enabled())).toList();
+        ContentPolicy contentPolicy = pack.manifest().contentPolicy();
+        String audience = contentPolicy.audience() == null ? null
+                : contentPolicy.audience().minAge() + "-" + contentPolicy.audience().maxAge();
+        return new InputContext(locale.value(), mode, current.maxChars(), options, audience,
+                Set.copyOf(contentPolicy.forbiddenTags()), "1");
+    }
+
+    private InputPolicy inputPolicy(ContentPolicy contentPolicy, int maxChars) {
+        String audience = contentPolicy.audience() == null ? null
+                : contentPolicy.audience().minAge() + "-" + contentPolicy.audience().maxAge();
+        return new InputPolicy(contentPolicy.freeTextAllowed(), Math.min(maxChars, PiiScrubber.MAX_INPUT_CODE_POINTS),
+                280, 3, audience, Set.copyOf(contentPolicy.forbiddenTags()), "1");
+    }
+
+    private Map<String, String> persistentStartInputs() {
+        Map<String, String> persistent = new LinkedHashMap<>(startInputs);
+        for (StartInputDef input : pack.manifest().startInputs()) {
+            if (input instanceof StartInputDef.FreeTextInput) persistent.remove(input.id());
+        }
+        return persistent;
+    }
+
+    private StepResult addRedactedWarning(StepResult result) {
+        List<Issue> issues = new ArrayList<>(result.issues());
+        issues.add(new Issue(Issue.Severity.WARNING, "INPUT_REDACTED", "Personal details were removed from the input"));
+        return new StepResult(result.accepted(), result.view(), result.events(), issues);
+    }
+
+    private StepResult rejectWarning(String code, String message, boolean redacted) {
+        List<Issue> issues = new ArrayList<>();
+        issues.add(new Issue(Issue.Severity.WARNING, code, message));
+        if (redacted) issues.add(new Issue(Issue.Severity.WARNING, "INPUT_REDACTED", "Personal details were removed from the input"));
+        return new StepResult(false, view(), List.of(), issues);
     }
 
     private View buildView(Scene scene) {

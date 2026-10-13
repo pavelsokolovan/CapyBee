@@ -143,7 +143,7 @@ public final class PackLoader {
             }
             if (input instanceof StartInputDef.FreeTextInput) {
                 freeTextCount++;
-                if (manifest.contentPolicy() != null && !manifest.contentPolicy().freeTextAllowed()) {
+                if (manifest.contentPolicy() == null || !manifest.contentPolicy().freeTextAllowed()) {
                     context.error("PACK_FREE_TEXT_NOT_ALLOWED", "pack.json", pointer, "Free text is not allowed by policy");
                 }
             }

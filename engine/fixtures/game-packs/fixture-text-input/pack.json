@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture-text-input",
+  "version": "1.0.0",
+  "name": "Fixture Text Input",
+  "locales": ["en"],
+  "defaultLocale": "en",
+  "features": [],
+  "startInputs": [
+    { "id": "note", "kind": "FREE_TEXT", "required": false, "labelKey": "input.note", "maxChars": 500 }
+  ],
+  "contentPolicy": { "freeTextAllowed": true, "forbiddenTags": ["personal-data"] },
+  "files": ["strings/en.json", "scenes/en/story.json"]
+}

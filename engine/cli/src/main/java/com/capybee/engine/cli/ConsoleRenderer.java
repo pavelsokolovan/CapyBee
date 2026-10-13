@@ -103,6 +103,12 @@ public final class ConsoleRenderer {
 			builder.append("  ").append(ConsoleChrome.ENTER);
 		}
 
+		if ((view.input().mode() == InputMode.TEXT || view.input().mode() == InputMode.CHOICE_OR_TEXT)
+				&& !view.ended()) {
+			if (builder.length() > 0) builder.append(System.lineSeparator());
+			builder.append("  Text input: up to ").append(view.input().maxChars()).append(" characters.");
+		}
+
 		if (view.ended()) {
 			if (builder.length() > 0) {
 				builder.append(System.lineSeparator());

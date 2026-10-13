@@ -6,6 +6,8 @@ import com.capybee.engine.content.Scene;
 import com.capybee.engine.content.SceneBranch;
 import com.capybee.engine.content.SceneOption;
 import com.capybee.engine.content.SceneSet;
+import com.capybee.engine.content.SceneInputMode;
+import com.capybee.engine.input.PiiScrubber;
 import com.capybee.engine.pack.LocaleTag;
 import com.capybee.engine.pack.Pack;
 import com.capybee.engine.pack.PackValidationContext;
@@ -65,7 +67,7 @@ public final class SceneSets {
                     continue;
                 }
                 warnUnknown(node, context, file, scenePointer,
-                        "id", "start", "blocks", "options", "next", "end", "onEnter", "branches", "outcome");
+                    "id", "start", "blocks", "options", "next", "end", "onEnter", "branches", "outcome", "input");
                 String id = text(node, "id");
                 if (id == null || !validId(id)) {
                     if (context != null) context.error("SCENE_FIELD_INVALID", file, scenePointer + "/id", "Invalid scene id");
@@ -177,7 +179,46 @@ public final class SceneSets {
                 if (outcome != null && context != null) {
                     context.references().reference("outcome", outcome, file, scenePointer + "/outcome");
                 }
-                scenes.put(id, new Scene(id, isStart, blocks, options, next, end, onEnter, branches, outcome));
+                SceneInputMode inputMode = null;
+                int maxChars = 0;
+                JsonNode inputNode = node.get("input");
+                if (inputNode != null) {
+                    if (!inputNode.isObject()) {
+                        if (context != null) context.error("INPUT_MODE_INVALID", file, scenePointer + "/input", "Expected input object");
+                    } else {
+                        warnUnknown(inputNode, context, file, scenePointer + "/input", "mode", "maxChars");
+                        String modeText = text(inputNode, "mode");
+                        try {
+                            inputMode = modeText == null ? null : SceneInputMode.valueOf(modeText);
+                        } catch (IllegalArgumentException exception) {
+                            if (context != null) context.error("INPUT_MODE_INVALID", file,
+                                    scenePointer + "/input/mode", "Unknown input mode");
+                        }
+                        if (inputMode == null && modeText == null && context != null) {
+                            context.error("INPUT_MODE_INVALID", file, scenePointer + "/input/mode", "Input mode is required");
+                        }
+                        boolean hasMaxChars = inputNode.has("maxChars");
+                        if (hasMaxChars) {
+                            JsonNode maxNode = inputNode.get("maxChars");
+                            if (!maxNode.isIntegralNumber() || !maxNode.canConvertToInt()) {
+                                if (context != null) context.error("INPUT_LIMIT_INVALID", file,
+                                        scenePointer + "/input/maxChars", "Expected an integer input limit");
+                            } else maxChars = maxNode.intValue();
+                        }
+                        if (inputMode == SceneInputMode.TEXT || inputMode == SceneInputMode.CHOICE_OR_TEXT) {
+                            if (!hasMaxChars) maxChars = PiiScrubber.DEFAULT_INPUT_CODE_POINTS;
+                            if (maxChars < 1 || maxChars > PiiScrubber.MAX_INPUT_CODE_POINTS) {
+                                if (context != null) context.error("INPUT_LIMIT_INVALID", file,
+                                        scenePointer + "/input/maxChars", "Text input limit must be between 1 and 500");
+                            }
+                        } else if (hasMaxChars && context != null) {
+                            context.error("INPUT_LIMIT_INVALID", file, scenePointer + "/input/maxChars",
+                                    "Non-text input modes must not set a positive limit");
+                        }
+                    }
+                }
+                scenes.put(id, new Scene(id, isStart, blocks, options, next, end, onEnter, branches, outcome,
+                        inputMode, maxChars));
             }
             sets.put(locale, new SceneSet(locale, scenes, startId));
         }

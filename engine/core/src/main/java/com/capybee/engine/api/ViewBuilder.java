@@ -26,10 +26,8 @@ final class ViewBuilder {
                     endReason, List.of(), null, places);
         }
 
-        InputMode mode = InputMode.NONE;
-        if (!ended && !options.isEmpty()) {
-            mode = InputMode.CHOICE;
-        }
+        InputMode mode = ended ? InputMode.NONE : scene.inputMode() != null ? InputMode.valueOf(scene.inputMode().name())
+            : !options.isEmpty() ? InputMode.CHOICE : InputMode.NONE;
 
         if (ended && endReason == EndReason.ABANDONED) {
             return new View(List.of(), List.of(), new InputSpec(InputMode.NONE, 0), List.of(), true,
@@ -37,7 +35,7 @@ final class ViewBuilder {
         }
 
         return new View(List.copyOf(scene.blocks()), ended ? List.of() : options,
-            new InputSpec(mode, 0), status, ended, endReason, objectives, outcome, places);
+            new InputSpec(mode, ended ? 0 : scene.maxChars()), status, ended, endReason, objectives, outcome, places);
     }
 
     private static Option toOption(SceneOption option) {

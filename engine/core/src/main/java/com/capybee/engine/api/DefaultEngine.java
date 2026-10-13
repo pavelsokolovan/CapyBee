@@ -6,6 +6,14 @@ import com.capybee.engine.content.SceneSet;
 import com.capybee.engine.content.json.SceneSets;
 import com.capybee.engine.pack.*;
 import com.capybee.engine.port.IdSource;
+import com.capybee.engine.port.InputGuard;
+import com.capybee.engine.port.InputInterpreter;
+import com.capybee.engine.input.InputPolicy;
+import com.capybee.engine.input.InputSafetyAction;
+import com.capybee.engine.input.InputSafetyDecision;
+import com.capybee.engine.input.PiiScrubber;
+import com.capybee.engine.input.ProcessedInput;
+import com.capybee.engine.pack.StartInputDef;
 import com.capybee.engine.rules.*;
 import com.capybee.engine.rules.json.RulesParser;
 import com.capybee.engine.places.PlaceMap;
@@ -27,13 +35,19 @@ final class DefaultEngine implements Engine {
     private final Clock clock;
     private final RandomGenerator random;
     private final IdSource ids;
+    private final InputGuard inputGuard;
+    private final InputInterpreter inputInterpreter;
+    private final PiiScrubber piiScrubber = new PiiScrubber();
     private final Map<PackId, PlaceMap> placeMaps = new ConcurrentHashMap<>();
 
-    DefaultEngine(PackRegistry packs, Clock clock, RandomGenerator random, IdSource ids) {
+    DefaultEngine(PackRegistry packs, Clock clock, RandomGenerator random, IdSource ids,
+                  InputGuard inputGuard, InputInterpreter inputInterpreter) {
         this.packs = packs;
         this.clock = clock;
         this.random = random;
         this.ids = ids;
+        this.inputGuard = inputGuard;
+        this.inputInterpreter = inputInterpreter;
     }
 
     @Override
@@ -57,7 +71,7 @@ final class DefaultEngine implements Engine {
                     "The pack has no start scene for locale " + locale.value())));
         }
 
-        Map<String, String> normalizedInputs = normalizeInputs(request.startInputs(), pack);
+        Map<String, String> normalizedInputs = persistentInputs(normalizeInputs(request.startInputs(), pack), pack);
         long seed = request.seed() != null ? request.seed() : random.nextLong();
         String runId = ids.nextId();
         Instant now = clock.instant();
@@ -66,7 +80,8 @@ final class DefaultEngine implements Engine {
         Rules rules = RulesParser.parse(pack);
         PlaceMap placeMap = placeMap(pack);
         RunImpl run = new RunImpl(runId, pack, locale, seed, normalizedInputs, now, now, 0L,
-            startScene.id(), visited, false, null, sceneSet, clock, rules, null, placeMap);
+            startScene.id(), visited, false, null, sceneSet, clock, rules, null, placeMap,
+                inputGuard, inputInterpreter, piiScrubber);
         issues.addAll(run.startupIssues());
         return new StartResult(run, issues, run.startupEvents());
     }
@@ -129,10 +144,10 @@ final class DefaultEngine implements Engine {
             return new ResumeResult(null, issues);
         }
 
-        RunImpl run = new RunImpl(snapshot.runId(), pack, locale, snapshot.seed(), snapshot.startInputs(),
+        RunImpl run = new RunImpl(snapshot.runId(), pack, locale, snapshot.seed(), persistentInputs(snapshot.startInputs(), pack),
                 snapshot.createdAt(), snapshot.updatedAt(), snapshot.step(), currentSceneId,
-                new ArrayList<>(restoredState.visited()), restoredState.ended(), restoredState.endReason(),
-                sceneSet, clock, rules, restoredState, placeMap);
+            new ArrayList<>(restoredState.visited()), restoredState.ended(), restoredState.endReason(),
+            sceneSet, clock, rules, restoredState, placeMap, inputGuard, inputInterpreter, piiScrubber);
         return new ResumeResult(run, issues);
     }
 
@@ -359,9 +374,46 @@ final class DefaultEngine implements Engine {
                 }
                 continue;
             }
-            if (!inputValueValid(input, value)) {
+            if (input instanceof StartInputDef.FreeTextInput) {
+                try {
+                    String normalizedText = piiScrubber.normalize(value);
+                    int maxChars = Math.min(freeTextLimit(input), PiiScrubber.MAX_INPUT_CODE_POINTS);
+                    if (normalizedText.codePointCount(0, normalizedText.length()) > maxChars) {
+                        issues.add(new Issue(Issue.Severity.ERROR, "INPUT_TOO_LONG", "Text input exceeds the allowed length"));
+                        continue;
+                    }
+                } catch (PiiScrubber.InputTextException exception) {
+                    issues.add(new Issue(Issue.Severity.ERROR, exception.code(), "Text input is invalid"));
+                    continue;
+                }
+            } else if (!inputValueValid(input, value)) {
                 issues.add(new Issue(Issue.Severity.ERROR, "START_INPUT_INVALID",
                         "Start input value is invalid for " + input.id()));
+                continue;
+            }
+            if (input instanceof StartInputDef.FreeTextInput) {
+                if (pack.manifest().contentPolicy() == null || !pack.manifest().contentPolicy().freeTextAllowed()) {
+                    issues.add(new Issue(Issue.Severity.ERROR, "FREE_TEXT_DISABLED", "Free-text input is disabled by pack policy"));
+                    continue;
+                }
+                if (inputGuard == null) {
+                    issues.add(new Issue(Issue.Severity.ERROR, "INPUT_GUARD_UNAVAILABLE", "Text safety checks are unavailable"));
+                    continue;
+                }
+                try {
+                    ProcessedInput processed = piiScrubber.process(value);
+                    InputSafetyDecision decision = inputGuard.inspect(processed.input(), policy(pack,
+                            Math.min(freeTextLimit(input), PiiScrubber.MAX_INPUT_CODE_POINTS)));
+                    if (decision == null || decision.action() == null || decision.action() == InputSafetyAction.UNAVAILABLE) {
+                        issues.add(new Issue(Issue.Severity.ERROR, "INPUT_GUARD_UNAVAILABLE", "Text safety checks are unavailable"));
+                    } else if (decision.action() == InputSafetyAction.BLOCK) {
+                        issues.add(new Issue(Issue.Severity.ERROR, "INPUT_BLOCKED", "Text input was not accepted"));
+                    } else if (decision.action() == InputSafetyAction.NEEDS_CLARIFICATION) {
+                        issues.add(new Issue(Issue.Severity.ERROR, "INPUT_NEEDS_CLARIFICATION", "Text input needs clarification"));
+                    }
+                } catch (RuntimeException exception) {
+                    issues.add(new Issue(Issue.Severity.ERROR, "INPUT_GUARD_UNAVAILABLE", "Text safety checks are unavailable"));
+                }
             }
         }
 
@@ -409,9 +461,30 @@ final class DefaultEngine implements Engine {
             }
             return true;
         }
-        if (input instanceof StartInputDef.FreeTextInput freeTextInput) {
-            return value.length() <= freeTextInput.maxChars();
-        }
+        if (input instanceof StartInputDef.FreeTextInput) return true;
         return false;
+    }
+
+    private int freeTextLimit(StartInputDef input) {
+        return input instanceof StartInputDef.FreeTextInput freeText ? freeText.maxChars() : PiiScrubber.DEFAULT_INPUT_CODE_POINTS;
+    }
+
+    private InputPolicy policy(Pack pack, int maxChars) {
+        ContentPolicy contentPolicy = pack.manifest().contentPolicy();
+        String audience = contentPolicy == null || contentPolicy.audience() == null ? null
+                : contentPolicy.audience().minAge() + "-" + contentPolicy.audience().maxAge();
+        Set<String> tags = contentPolicy == null ? Set.of() : Set.copyOf(contentPolicy.forbiddenTags());
+        return new InputPolicy(contentPolicy != null && contentPolicy.freeTextAllowed(), maxChars, 280, 3,
+                audience, tags, "1");
+    }
+
+    private Map<String, String> persistentInputs(Map<String, String> inputs, Pack pack) {
+        Set<String> freeTextIds = new HashSet<>();
+        for (StartInputDef input : pack.manifest().startInputs()) {
+            if (input instanceof StartInputDef.FreeTextInput) freeTextIds.add(input.id());
+        }
+        Map<String, String> persistent = new LinkedHashMap<>(inputs);
+        freeTextIds.forEach(persistent::remove);
+        return persistent;
     }
 }
