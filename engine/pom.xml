@@ -12,6 +12,7 @@
 
   <modules>
     <module>core</module>
+    <module>adapter-anthropic</module>
     <module>cli</module>
   </modules>
 

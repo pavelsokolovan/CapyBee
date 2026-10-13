@@ -21,6 +21,28 @@ Reports are in `target/surefire-reports/` and `target/site/jacoco/` inside
 this module. Every engine package must reach 70% line coverage. Tests need
 only the JDK and Maven; after dependencies are cached, `mvn -o verify` works.
 
+The provider-neutral `TextGenerator` port and `StructuredInputInterpreter`
+live in `engine-core`. The optional `engine-adapter-anthropic` module is built
+only when selected; it is not a dependency of core or the CLI. Verify it with:
+
+```sh
+mvn -f engine/pom.xml -pl adapter-anthropic -am verify
+```
+
+Live adapter configuration requires `GENERATION_MODEL_ID` and
+`ANTHROPIC_API_KEY`. The model ID has no implicit default; use an explicitly
+pinned model value. API credentials are never read from packs or logged. The
+adapter tests use a local stub server and need no key or external network.
+
+The current checkout has no `engine/template` package, scenario/archetype
+catalog, or generation-specific fixture/fallback contract. Consequently this
+change adds the structured provider boundary and the spec 25 input-resolution
+bridge, but not theme/scenario/cast/scene orchestration, repair/fallback,
+artifact storage, or run/player cost quotas. Do not wire a live generator into
+play until those contracts and the mandatory budget ledger are implemented;
+that work must reuse the template contract when it is introduced, not create a
+parallel format here.
+
 The root POM is an aggregator, not a shared parent. `mvn verify` at the
 repository root verifies both the engine and backend; backend tests still
 need their existing environment. Backend-only builds and Docker deployment
