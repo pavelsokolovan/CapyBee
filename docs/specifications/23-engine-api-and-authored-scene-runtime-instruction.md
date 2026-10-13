@@ -233,7 +233,7 @@ exists.
 |---|---|
 | `packId` is in the registry | `PACK_NOT_FOUND` |
 | `locale` (default: pack `defaultLocale`) is one of the pack's locales | `LOCALE_UNSUPPORTED` |
-| The pack's features are supported by this engine version. Supported now: `PLACES`, `ASSETS` (no runtime semantics yet). `GENERATION` is **not** supported until spec 27. | `FEATURE_NOT_AVAILABLE` |
+| The pack's features are supported by this engine version. `PLACES` has runtime semantics in spec 24.1; `ASSETS` remains metadata-only. `GENERATION` is **not** supported until spec 27. | `FEATURE_NOT_AVAILABLE` |
 | Every start input id is declared by the pack | `START_INPUT_UNKNOWN` |
 | Every `required` start input is present and non-blank | `START_INPUT_MISSING` |
 | Values fit their kind (below) | `START_INPUT_INVALID` |
@@ -702,8 +702,8 @@ them and updates their manifests. Locations: `engine/fixtures/game-packs/<id>/`.
 
 `strings/en.json`: `{}`.
 
-`scenes/en/dungeon.json` (rooms are authored scenes for now; spec 24 adds a
-`places.json` to this fixture):
+`scenes/en/dungeon.json` (rooms are authored scenes for now; spec 24.1 adds
+`places.json` and map movement to this fixture):
 
 ```json
 {
@@ -1055,9 +1055,9 @@ Standalone, headless game engine (SDK) and console host. See
 
 - This spec adds no rules, state, or events. Scene navigation is the whole
   state machine; spec 24 adds counters, flags, sets, effects, conditions,
-  objectives, the optional place graph, and starts raising events.
-- Spec 24 (Rules and state) is next. It extends the scene schema (effects and
-  conditions on options), the snapshot `state`, and adds `places.json` to
-  `fixture-text-dungeon`.
+  objectives, and starts raising events. Spec 24.1 adds the optional place graph.
+- Spec 24 (Rules and state) extends the scene schema (effects and conditions
+  on options) and snapshot `state`. Spec 24.1 adds `places.json`, `Command.Move`,
+  `View.places`, and place snapshot fields to `fixture-text-dungeon`.
 - If anything here conflicts with the repo at implementation time, the repo
   wins; flag the difference in the PR instead of silently following either.

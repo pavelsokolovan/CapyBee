@@ -27,6 +27,11 @@ class ConsoleGoldenTest {
         assertScriptMatches("dungeon-locked-exit.txt", "dungeon-locked-exit.txt");
     }
 
+    @Test
+    void mapMovementScriptMatchesGoldenTranscript() throws Exception {
+        assertScriptMatches("dungeon-map-move.txt", "dungeon-map-move.txt");
+    }
+
     private void assertScriptMatches(String scriptName, String goldenName) throws Exception {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         PrintStream output = new PrintStream(bytes, true, StandardCharsets.UTF_8);

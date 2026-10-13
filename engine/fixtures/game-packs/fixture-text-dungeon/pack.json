@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "fixture-text-dungeon",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "name": "Fixture — Text Dungeon",
   "locales": ["en"],
   "defaultLocale": "en",
@@ -17,5 +17,5 @@
     }
   ],
   "contentPolicy": { "freeTextAllowed": false },
-  "files": ["strings/en.json", "scenes/en/dungeon.json", "rules.json"]
+  "files": ["strings/en.json", "scenes/en/dungeon.json", "rules.json", "places.json"]
 }

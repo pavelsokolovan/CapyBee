@@ -8,7 +8,7 @@
         { "kind": "NARRATION", "text": "You wake in a cold stone cell. The door hangs open." }
       ],
       "options": [
-        { "id": "corridor", "label": "Step into the corridor", "next": "corridor" },
+        { "id": "corridor", "label": "Step into the corridor", "next": "corridor", "effects": [{ "type": "GO_TO", "place": "corridor" }] },
         { "id": "listen", "label": "Stay and listen", "next": "listen" }
       ]
     },
@@ -25,9 +25,9 @@
         { "kind": "NARRATION", "text": "A long corridor. A faint draught comes from the left, and a stair rises on the right." }
       ],
       "options": [
-        { "id": "left", "label": "Go left", "next": "armory" },
-        { "id": "right", "label": "Go right", "next": "stairs" },
-        { "id": "back", "label": "Go back to the cell", "next": "cell" }
+        { "id": "left", "label": "Go left", "next": "armory", "effects": [{ "type": "GO_TO", "place": "armory" }] },
+        { "id": "right", "label": "Go right", "next": "stairs", "effects": [{ "type": "GO_TO", "place": "stairs" }] },
+        { "id": "back", "label": "Go back to the cell", "next": "cell", "effects": [{ "type": "GO_TO", "place": "cell" }] }
       ]
     },
     {
@@ -40,7 +40,7 @@
         { "type": "SET_ADD", "set": "inventory", "value": "key" }
       ],
       "options": [
-        { "id": "back", "label": "Return to the corridor", "next": "corridor" }
+        { "id": "back", "label": "Return to the corridor", "next": "corridor", "effects": [{ "type": "GO_TO", "place": "corridor" }] }
       ]
     },
     {
@@ -56,10 +56,11 @@
           "id": "climb",
           "label": "Climb the stairs",
           "next": "exit",
+          "effects": [{ "type": "GO_TO", "place": "exit" }],
           "requires": { "type": "SET_CONTAINS", "set": "inventory", "value": "key" },
           "unmetHint": "hint.need-key"
         },
-        { "id": "back", "label": "Return to the corridor", "next": "corridor" }
+        { "id": "back", "label": "Return to the corridor", "next": "corridor", "effects": [{ "type": "GO_TO", "place": "corridor" }] }
       ]
     },
     {

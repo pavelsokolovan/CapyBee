@@ -95,6 +95,9 @@ public final class PackLoader {
                 readable.add(path);
             }
         }
+        if (!manifest.features().contains(PackFeature.PLACES) && indexed.contains("places.json")) {
+            context.error("PLACES_FEATURE_REQUIRED", "places.json", "", "places.json requires the PLACES feature");
+        }
         for (String required : PackLayout.requiredFiles(manifest.locales(), manifest.features())) {
             if (!indexed.contains(required)) {
                 context.error("PACK_REQUIRED_FILE_MISSING", required, "", "Required file is not indexed");

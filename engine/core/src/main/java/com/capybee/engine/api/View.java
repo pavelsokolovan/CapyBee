@@ -5,7 +5,8 @@ import com.capybee.engine.content.Block;
 import java.util.List;
 
 public record View(List<Block> blocks, List<Option> options, InputSpec input, List<StatusItem> status,
-                   boolean ended, EndReason endReason, List<ObjectiveItem> objectives, String outcome) {
+                   boolean ended, EndReason endReason, List<ObjectiveItem> objectives, String outcome,
+                   PlacesView places) {
     public View {
         blocks = blocks == null ? List.of() : List.copyOf(blocks);
         options = options == null ? List.of() : List.copyOf(options);
@@ -15,6 +16,11 @@ public record View(List<Block> blocks, List<Option> options, InputSpec input, Li
 
     public View(List<Block> blocks, List<Option> options, InputSpec input, List<StatusItem> status,
                 boolean ended, EndReason endReason) {
-        this(blocks, options, input, status, ended, endReason, List.of(), null);
+        this(blocks, options, input, status, ended, endReason, List.of(), null, null);
+    }
+
+    public View(List<Block> blocks, List<Option> options, InputSpec input, List<StatusItem> status,
+                boolean ended, EndReason endReason, List<ObjectiveItem> objectives, String outcome) {
+        this(blocks, options, input, status, ended, endReason, objectives, outcome, null);
     }
 }

@@ -3,6 +3,9 @@ You wake in a cold stone cell. The door hangs open.
 
 [Health 10 / 10]
 Objectives: Escape (active)
+Place: Cell
+Moves:
+  move corridor — Corridor
   1) Step into the corridor
   2) Stay and listen
 > 1
@@ -10,6 +13,11 @@ A long corridor. A faint draught comes from the left, and a stair rises on the r
 
 [Health 10 / 10]
 Objectives: Escape (active)
+Place: Corridor
+Moves:
+  move cell — Cell
+  move armory — Armory
+  move stairs — Stairs
   1) Go left
   2) Go right
   3) Go back to the cell
@@ -18,5 +26,9 @@ Worn steps lead up toward a square of daylight.
 
 [Health 8 / 10]
 Objectives: Escape (active)
+Place: Stairs
+Moves:
+  move corridor — Corridor
+  move exit — Exit
   1) Climb the stairs (unavailable) — You need the key.
   2) Return to the corridor

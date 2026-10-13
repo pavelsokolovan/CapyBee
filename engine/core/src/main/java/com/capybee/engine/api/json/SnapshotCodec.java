@@ -67,6 +67,11 @@ public final class SnapshotCodec {
         snapshot.state().objectives().forEach((id, value) -> objectivesNode.put(id, value.name()));
         stateNode.set("objectives", objectivesNode);
         if (snapshot.state().outcome() != null) stateNode.put("outcome", snapshot.state().outcome());
+        if (snapshot.state().currentPlaceId() == null) stateNode.putNull("currentPlaceId");
+        else stateNode.put("currentPlaceId", snapshot.state().currentPlaceId());
+        ArrayNode visitedPlacesNode = MAPPER.createArrayNode();
+        for (String placeId : snapshot.state().visitedPlaces()) visitedPlacesNode.add(placeId);
+        stateNode.set("visitedPlaces", visitedPlacesNode);
         root.set("state", stateNode);
         return root.toString();
     }
@@ -189,10 +194,28 @@ public final class SnapshotCodec {
             if (stateNode.has("outcome") && outcome == null && !stateNode.get("outcome").isNull()) {
                 issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_INVALID", "Snapshot outcome is malformed"));
             }
+            String currentPlaceId = null;
+            if (stateNode.has("currentPlaceId") && !stateNode.get("currentPlaceId").isNull()) {
+                currentPlaceId = text(stateNode.get("currentPlaceId"));
+                if (currentPlaceId == null) invalid(issues, "/state/currentPlaceId");
+            }
+            List<String> visitedPlaces = new ArrayList<>();
+            JsonNode visitedPlacesNode = stateNode.get("visitedPlaces");
+            if (visitedPlacesNode != null) {
+                if (!visitedPlacesNode.isArray()) invalid(issues, "/state/visitedPlaces");
+                else {
+                    for (int index = 0; index < visitedPlacesNode.size(); index++) {
+                        JsonNode item = visitedPlacesNode.get(index);
+                        if (!item.isString()) invalid(issues, "/state/visitedPlaces/" + index);
+                        else visitedPlaces.add(item.asString());
+                    }
+                }
+            }
             if (issues.stream().anyMatch(issue -> issue.severity() == Issue.Severity.ERROR)) {
                 return new SnapshotParse(null, issues);
             }
-            RunState state = new RunState(sceneId, visited, ended, endReason, counters, flags, sets, objectives, outcome);
+            RunState state = new RunState(sceneId, visited, ended, endReason, counters, flags, sets, objectives,
+                    outcome, currentPlaceId, visitedPlaces);
             RunSnapshot snapshot = new RunSnapshot(version, runId, new PackRef(packId, packVersion), locale, seed, inputs, createdAt, updatedAt, step, state);
             return new SnapshotParse(snapshot, issues);
         } catch (Exception exception) {

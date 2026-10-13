@@ -42,6 +42,8 @@ class RulesParserTest {
                 "{\"type\":\"SET_CONTAINS\",\"set\":\"inventory\",\"value\":\"key\"}",
                 "{\"type\":\"SET_SIZE_AT_LEAST\",\"set\":\"inventory\",\"size\":1}",
                 "{\"type\":\"VISITED_SCENE\",\"scene\":\"exit\"}",
+                "{\"type\":\"AT_PLACE\",\"place\":\"cell\"}",
+                "{\"type\":\"VISITED_PLACE\",\"place\":\"armory\"}",
                 "{\"type\":\"STEP_AT_LEAST\",\"step\":3}",
                 "{\"type\":\"ALL\",\"conditions\":[{\"type\":\"FLAG_IS\",\"flag\":\"has-key\",\"value\":true}]}",
                 "{\"type\":\"ANY\",\"conditions\":[{\"type\":\"STEP_AT_LEAST\",\"step\":1}]}",
@@ -93,12 +95,14 @@ class RulesParserTest {
                 + "{\"type\":\"SET_REMOVE\",\"set\":\"inventory\",\"value\":\"key\"},"
                 + "{\"type\":\"EMIT_EVENT\",\"event\":\"run.completed\",\"payload\":{\"outcome\":\"escaped\",\"health\":{\"counter\":\"health\"}}},"
                 + "{\"type\":\"END_RUN\"},"
-                + "{\"type\":\"END_RUN\",\"outcome\":\"escaped\"}]";
+                + "{\"type\":\"END_RUN\",\"outcome\":\"escaped\"},"
+                + "{\"type\":\"GO_TO\",\"place\":\"stairs\"}]";
         PackValidationContext context = new PackValidationContext();
         List<Effect> effects = RulesParser.parseEffects(MAPPER.readTree(json), pack, context, "test.json", "/effects", false);
 
-        assertThat(effects).hasSize(8);
+        assertThat(effects).hasSize(9);
         assertThat(effects.get(5)).isInstanceOf(Effect.EmitEvent.class);
+        assertThat(effects.get(8)).isEqualTo(new Effect.GoTo("stairs"));
         Effect.EmitEvent event = (Effect.EmitEvent) effects.get(5);
         assertThat(event.payload().get("health")).isEqualTo(new Effect.PayloadValue.CounterRef("health"));
         assertThat(context.issues()).isEmpty();

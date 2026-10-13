@@ -4,6 +4,7 @@ import com.capybee.engine.api.EndReason;
 import com.capybee.engine.api.InputMode;
 import com.capybee.engine.api.ObjectiveItem;
 import com.capybee.engine.api.Option;
+import com.capybee.engine.api.PlaceView;
 import com.capybee.engine.api.StatusItem;
 import com.capybee.engine.api.View;
 import com.capybee.engine.content.Block;
@@ -55,6 +56,27 @@ public final class ConsoleRenderer {
 		if (view.outcome() != null) {
 			appendLine(builder);
 			builder.append("Outcome: ").append(view.outcome());
+		}
+
+		if (view.places() != null) {
+			PlaceView current = view.places().places().stream()
+					.filter(place -> place.id().equals(view.places().currentPlaceId())).findFirst().orElse(null);
+			appendLine(builder);
+			builder.append("Place: ").append(current == null ? view.places().currentPlaceId() : current.label());
+			if (!view.ended()) {
+				appendLine(builder);
+				builder.append("Moves:");
+				if (view.places().availableMoves().isEmpty()) {
+					builder.append(" none");
+				} else {
+					for (String placeId : view.places().availableMoves()) {
+						PlaceView destination = view.places().places().stream()
+								.filter(place -> place.id().equals(placeId)).findFirst().orElse(null);
+						builder.append(System.lineSeparator()).append("  move ").append(placeId)
+								.append(" — ").append(destination == null ? placeId : destination.label());
+					}
+				}
+			}
 		}
 
 		if (!view.options().isEmpty()) {

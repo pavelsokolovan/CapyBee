@@ -3,6 +3,7 @@ package com.capybee.engine.rules.json;
 import com.capybee.engine.pack.EventDef;
 import com.capybee.engine.pack.LocaleTag;
 import com.capybee.engine.pack.Pack;
+import com.capybee.engine.pack.PackFeature;
 import com.capybee.engine.pack.PackValidationContext;
 import com.capybee.engine.rules.Condition;
 import com.capybee.engine.rules.CounterDef;
@@ -254,6 +255,15 @@ public final class RulesParser {
                     result = new Condition.VisitedScene(scene);
                 }
             }
+            case "AT_PLACE", "VISITED_PLACE" -> {
+                exact(node, file, pointer, "CONDITION_INVALID", "type", "place");
+                String place = id(node.get("place"), file, pointer + "/place", "CONDITION_INVALID");
+                if (place != null) {
+                    reference("place", place, file, pointer + "/place");
+                    if (!placesEnabled()) error("CONDITION_INVALID", file, pointer, "Place conditions require PLACES");
+                    else result = type.equals("AT_PLACE") ? new Condition.AtPlace(place) : new Condition.VisitedPlace(place);
+                }
+            }
             case "STEP_AT_LEAST" -> {
                 exact(node, file, pointer, "CONDITION_INVALID", "type", "step");
                 Long step = longInteger(node.get("step"), file, pointer + "/step", "CONDITION_INVALID");
@@ -316,6 +326,7 @@ public final class RulesParser {
             case "SET_ADD", "SET_REMOVE" -> new String[]{"type", "set", "value"};
             case "EMIT_EVENT" -> new String[]{"type", "event", "payload"};
             case "END_RUN" -> node.has("outcome") ? new String[]{"type", "outcome"} : new String[]{"type"};
+            case "GO_TO" -> new String[]{"type", "place"};
             default -> {
                 error("EFFECT_INVALID", file, pointer + "/type", "Unsupported effect type");
                 yield null;
@@ -356,6 +367,14 @@ public final class RulesParser {
                 String outcome = node.has("outcome") ? id(node.get("outcome"), file, pointer + "/outcome", "EFFECT_INVALID") : null;
                 if (outcome != null) reference("outcome", outcome, file, pointer + "/outcome");
                 yield node.has("outcome") && outcome == null ? null : new Effect.EndRun(outcome);
+            }
+            case "GO_TO" -> {
+                String place = id(node.get("place"), file, pointer + "/place", "EFFECT_INVALID");
+                if (place != null) {
+                    reference("place", place, file, pointer + "/place");
+                    if (!placesEnabled()) error("EFFECT_INVALID", file, pointer, "GO_TO requires PLACES");
+                }
+                yield place == null || !placesEnabled() ? null : new Effect.GoTo(place);
             }
             default -> null;
         };
@@ -557,6 +576,10 @@ public final class RulesParser {
 
     private void warn(String code, String file, String pointer, String message) {
         if (context != null) context.warn(code, file, pointer, message);
+    }
+
+    private boolean placesEnabled() {
+        return pack.manifest().features().contains(PackFeature.PLACES);
     }
 
     private boolean hasParseIssueAt(String file, String pointer) {

@@ -1,0 +1,22 @@
+Running fixture-text-dungeon in locale en
+You wake in a cold stone cell. The door hangs open.
+
+[Health 10 / 10]
+Objectives: Escape (active)
+Place: Cell
+Moves:
+  move corridor — Corridor
+  1) Step into the corridor
+  2) Stay and listen
+> move corridor
+You wake in a cold stone cell. The door hangs open.
+
+[Health 10 / 10]
+Objectives: Escape (active)
+Place: Corridor
+Moves:
+  move cell — Cell
+  move armory — Armory
+  move stairs — Stairs
+  1) Step into the corridor
+  2) Stay and listen

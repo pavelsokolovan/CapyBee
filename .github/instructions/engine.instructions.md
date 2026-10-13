@@ -22,6 +22,10 @@ applyTo: "engine/**/*.java,engine/pom.xml,engine/src/**/resources/game-packs/**,
   safety, vocabulary, or locale assumptions in the SDK.
 - Domain types are immutable records with defensive collection copies.
   Validators collect issues and use `ReferenceIndex` for cross-file links.
+- `PLACES` is optional: `places.json` is required only for that feature;
+  links govern direct `Move`, while `GO_TO` relocates without changing scenes.
+  Keep place history ordered in run snapshots and expose resolved map data only
+  through `View.places` (spec 24.1).
 - Host-specific code stays in `app/server` with its existing layering.
   Do not wire the SDK into Spring before the web-host spec.
 - Plain JUnit tests mirror engine packages under `engine/src/test/java`.

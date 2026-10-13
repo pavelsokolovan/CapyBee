@@ -7,6 +7,7 @@ import com.capybee.engine.content.SceneSet;
 import com.capybee.engine.pack.EventDef;
 import com.capybee.engine.pack.LocaleTag;
 import com.capybee.engine.pack.Pack;
+import com.capybee.engine.pack.PackFeature;
 import com.capybee.engine.rules.Condition;
 import com.capybee.engine.rules.CounterDef;
 import com.capybee.engine.rules.Effect;
@@ -15,6 +16,10 @@ import com.capybee.engine.rules.ObjectiveDef;
 import com.capybee.engine.rules.Rules;
 import com.capybee.engine.rules.SetDef;
 import com.capybee.engine.rules.json.RuleStrings;
+import com.capybee.engine.places.PlaceDef;
+import com.capybee.engine.places.PlaceLinkDef;
+import com.capybee.engine.places.PlaceMap;
+import com.capybee.engine.places.json.PlacesParser;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -35,6 +40,7 @@ final class RunImpl implements Run {
     private final Clock clock;
     private final SceneSet sceneSet;
     private final Rules rules;
+    private final PlaceMap placeMap;
     private final Map<String, String> strings;
     private final Map<String, CounterDef> counterDefs = new LinkedHashMap<>();
     private final Map<String, FlagDef> flagDefs = new LinkedHashMap<>();
@@ -44,9 +50,11 @@ final class RunImpl implements Run {
     private final Map<String, LinkedHashSet<String>> sets = new LinkedHashMap<>();
     private final Map<String, ObjectiveState> objectives = new LinkedHashMap<>();
     private final List<String> visited;
+    private final List<String> visitedPlaces = new ArrayList<>();
     private final List<Event> startupEvents = new ArrayList<>();
     private final List<Issue> startupIssues = new ArrayList<>();
     private String sceneId;
+    private String currentPlaceId;
     private boolean ended;
     private EndReason endReason;
     private String outcome;
@@ -65,6 +73,15 @@ final class RunImpl implements Run {
             Instant createdAt, Instant updatedAt, long step, String sceneId, List<String> visited,
             boolean ended, EndReason endReason, SceneSet sceneSet, Clock clock, Rules rules,
             RunState savedState) {
+        this(id, pack, locale, seed, startInputs, createdAt, updatedAt, step, sceneId, visited,
+            ended, endReason, sceneSet, clock, rules, savedState,
+            pack.manifest().features().contains(PackFeature.PLACES) ? PlacesParser.parse(pack) : null);
+        }
+
+        RunImpl(String id, Pack pack, LocaleTag locale, long seed, Map<String, String> startInputs,
+            Instant createdAt, Instant updatedAt, long step, String sceneId, List<String> visited,
+            boolean ended, EndReason endReason, SceneSet sceneSet, Clock clock, Rules rules,
+            RunState savedState, PlaceMap placeMap) {
         this.id = id;
         this.pack = pack;
         this.locale = locale;
@@ -80,6 +97,7 @@ final class RunImpl implements Run {
         this.sceneSet = sceneSet;
         this.clock = clock;
         this.rules = rules;
+        this.placeMap = placeMap;
         this.strings = RuleStrings.load(pack, locale);
         rules.counters().forEach(def -> counterDefs.put(def.id(), def));
         rules.flags().forEach(def -> flagDefs.put(def.id(), def));
@@ -89,6 +107,10 @@ final class RunImpl implements Run {
             rules.flags().forEach(def -> flags.put(def.id(), def.initial()));
             rules.sets().forEach(def -> sets.put(def.id(), new LinkedHashSet<>(def.initial())));
             rules.objectives().forEach(def -> objectives.put(def.id(), ObjectiveState.ACTIVE));
+            if (placeMap != null) {
+                currentPlaceId = placeMap.startPlace();
+                visitedPlaces.add(currentPlaceId);
+            }
             initializeAtStart();
         } else {
             counters.putAll(savedState.counters());
@@ -96,6 +118,8 @@ final class RunImpl implements Run {
             savedState.sets().forEach((setId, members) -> sets.put(setId, new LinkedHashSet<>(members)));
             objectives.putAll(savedState.objectives());
             outcome = savedState.outcome();
+            currentPlaceId = savedState.currentPlaceId();
+            visitedPlaces.addAll(savedState.visitedPlaces());
         }
     }
 
@@ -107,22 +131,25 @@ final class RunImpl implements Run {
 
     @Override
     public View view() {
-        if (ended && endReason == EndReason.ABANDONED) return ViewBuilder.build(null, true, endReason);
+        if (ended && endReason == EndReason.ABANDONED) {
+            return ViewBuilder.build(null, true, endReason, List.of(), List.of(), List.of(), null, buildPlacesView(true));
+        }
         return buildView(sceneSet.scenes().get(sceneId));
     }
 
     @Override
     public StepResult apply(Command command) {
         if (ended) return reject("RUN_ENDED", "The run has already ended");
-        Scene current = sceneSet.scenes().get(sceneId);
-        if (current == null) return reject("COMMAND_NOT_ALLOWED", "The current scene is missing");
         if (command instanceof Command.Abandon) {
             ended = true;
             endReason = EndReason.ABANDONED;
             step++;
             updatedAt = clock.instant();
-            return new StepResult(true, ViewBuilder.build(null, true, endReason), List.of(), List.of());
+            return new StepResult(true, view(), List.of(), List.of());
         }
+        if (command instanceof Command.Move move) return move(move.placeId());
+        Scene current = sceneSet.scenes().get(sceneId);
+        if (current == null) return reject("COMMAND_NOT_ALLOWED", "The current scene is missing");
         if (command instanceof Command.SubmitText) return reject("INPUT_NOT_EXPECTED", "Text input is not expected in this scene");
         if (command instanceof Command.Choose choose) {
             if (current.options().isEmpty()) return reject("COMMAND_NOT_ALLOWED", "Choice commands are not allowed in the current scene");
@@ -164,7 +191,7 @@ final class RunImpl implements Run {
         return new RunSnapshot(1, id, new PackRef(pack.manifest().id(), pack.manifest().version()),
                 locale, seed, startInputs, createdAt, updatedAt, step,
                 new RunState(sceneId, List.copyOf(visited), ended, endReason,
-                        counters, flags, savedSets, objectives, outcome));
+                    counters, flags, savedSets, objectives, outcome, currentPlaceId, visitedPlaces));
     }
 
     private void initializeAtStart() {
@@ -221,6 +248,8 @@ final class RunImpl implements Run {
         if (condition instanceof Condition.SetContains item) return sets.getOrDefault(item.set(), new LinkedHashSet<>()).contains(item.value());
         if (condition instanceof Condition.SetSizeAtLeast item) return sets.getOrDefault(item.set(), new LinkedHashSet<>()).size() >= item.size();
         if (condition instanceof Condition.VisitedScene item) return visited.contains(item.scene());
+        if (condition instanceof Condition.AtPlace item) return item.place().equals(currentPlaceId);
+        if (condition instanceof Condition.VisitedPlace item) return visitedPlaces.contains(item.place());
         if (condition instanceof Condition.StepAtLeast item) return step >= item.step();
         if (condition instanceof Condition.All item) return item.conditions().stream().allMatch(this::evaluate);
         if (condition instanceof Condition.Any item) return item.conditions().stream().anyMatch(this::evaluate);
@@ -248,6 +277,9 @@ final class RunImpl implements Run {
             } else if (effect instanceof Effect.EndRun item) {
                 endRequested = true;
                 if (item.outcome() != null) requestedOutcome = item.outcome();
+            } else if (effect instanceof Effect.GoTo item) {
+                currentPlaceId = item.place();
+                if (!visitedPlaces.contains(item.place())) visitedPlaces.add(item.place());
             }
         }
     }
@@ -295,7 +327,58 @@ final class RunImpl implements Run {
                 options.add(new Option(option.id(), option.label(), enabled, hint));
             }
         }
-        return ViewBuilder.build(scene, ended, endReason, options, status, objectiveItems, outcome);
+        return ViewBuilder.build(scene, ended, endReason, options, status, objectiveItems, outcome,
+                buildPlacesView(ended));
+    }
+
+    private StepResult move(String placeId) {
+        if (placeMap == null) return reject("PLACES_NOT_ENABLED", "Places are not enabled for this run");
+        if (placeMap.places().stream().noneMatch(place -> place.id().equals(placeId))) {
+            return reject("PLACE_UNKNOWN", "Unknown place id: " + placeId);
+        }
+        if (!isConnected(currentPlaceId, placeId)) {
+            return reject("PLACE_NOT_CONNECTED", "Place is not directly connected: " + placeId);
+        }
+        step++;
+        currentPlaceId = placeId;
+        if (!visitedPlaces.contains(placeId)) visitedPlaces.add(placeId);
+        List<Event> events = new ArrayList<>();
+        List<Issue> issues = new ArrayList<>();
+        evaluateObjectives(events, issues);
+        if (endRequested) finish(EndReason.COMPLETED, sceneSet.scenes().get(sceneId));
+        updatedAt = clock.instant();
+        return new StepResult(true, view(), events, issues);
+    }
+
+    private boolean isConnected(String from, String to) {
+        for (PlaceLinkDef link : placeMap.links()) {
+            if (link.from().equals(from) && link.to().equals(to)) return true;
+            if (link.bidirectional() && link.from().equals(to) && link.to().equals(from)) return true;
+        }
+        return false;
+    }
+
+    private PlacesView buildPlacesView(boolean runEnded) {
+        if (placeMap == null) return null;
+        List<PlaceView> placeViews = new ArrayList<>();
+        for (PlaceDef place : placeMap.places()) {
+            String description = place.descriptionKey() == null ? null : resolve(place.descriptionKey());
+            Integer x = place.position() == null ? null : place.position().x();
+            Integer y = place.position() == null ? null : place.position().y();
+            placeViews.add(new PlaceView(place.id(), resolve(place.labelKey()), description, x, y));
+        }
+        List<PlaceLinkView> links = placeMap.links().stream()
+                .map(link -> new PlaceLinkView(link.from(), link.to(), link.bidirectional())).toList();
+        List<String> availableMoves = new ArrayList<>();
+        if (!runEnded) {
+            for (PlaceDef place : placeMap.places()) {
+                if (!place.id().equals(currentPlaceId) && isConnected(currentPlaceId, place.id())) {
+                    availableMoves.add(place.id());
+                }
+            }
+        }
+        return new PlacesView(currentPlaceId, placeViews, links, availableMoves, visitedPlaces,
+                placeMap.layoutKind().name());
     }
 
     private String resolve(String key) { return strings.getOrDefault(key, key); }

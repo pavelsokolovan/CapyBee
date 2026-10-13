@@ -75,6 +75,18 @@ class EngineRuntimeTest {
     }
 
     @Test
+    void placeMoveIsRejectedWhenFeatureIsNotEnabled() {
+        var engine = minimalEngine();
+        var started = engine.start(new RunRequest(new PackId("fixture-minimal"), null, Map.of(), 99L));
+
+        var move = started.run().apply(new Command.Move("somewhere"));
+
+        assertThat(started.run().view().places()).isNull();
+        assertThat(move.accepted()).isFalse();
+        assertThat(move.issues()).extracting(Issue::code).containsExactly("PLACES_NOT_ENABLED");
+    }
+
+    @Test
     void snapshotCanBeResumed() {
         var engine = minimalEngine();
 

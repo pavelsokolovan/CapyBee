@@ -180,6 +180,18 @@ public final class ConsoleApp {
                 out.println(ConsoleChrome.HELP);
                 continue;
             }
+            String moveTarget = moveTarget(trimmed);
+            if (moveTarget != null) {
+                StepResult stepResult = run.apply(new Command.Move(moveTarget));
+                if (stepResult.accepted()) {
+                    out.println(ConsoleRenderer.render(stepResult.view()));
+                } else {
+                    out.println(stepResult.issues().getFirst().message());
+                }
+                if (run.view().ended()) return 0;
+                view = run.view();
+                continue;
+            }
             if (view.options() != null && !view.options().isEmpty()) {
                 try {
                     int index = Integer.parseInt(trimmed) - 1;
@@ -227,6 +239,13 @@ public final class ConsoleApp {
         } catch (Exception exception) {
             return null;
         }
+    }
+
+    private String moveTarget(String input) {
+        int separator = input.indexOf(' ');
+        String command = separator < 0 ? input : input.substring(0, separator);
+        if (!command.equalsIgnoreCase("move") && !command.equalsIgnoreCase("m")) return null;
+        return separator < 0 ? "" : input.substring(separator + 1).trim();
     }
 
     private String consoleUsage() {

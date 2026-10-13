@@ -1,5 +1,10 @@
 {
   "status.health": "Health",
   "objective.escape": "Escape",
-  "hint.need-key": "You need the key."
+  "hint.need-key": "You need the key.",
+  "place.cell": "Cell",
+  "place.corridor": "Corridor",
+  "place.armory": "Armory",
+  "place.stairs": "Stairs",
+  "place.exit": "Exit"
 }

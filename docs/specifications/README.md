@@ -34,6 +34,7 @@ For anything substantial (new screen, new feature, data model change), write a s
 - `20-pollen-match-minigame-instruction.md` - Pollen Match mini-game
 - `21-hive-builder-tap-minigame-instruction.md` - Hive Builder Tap mini-game
 - [22-engine-core-and-pack-format-instruction.md](22-engine-core-and-pack-format-instruction.md) - standalone engine SDK, pack format, loader, and boundary tests
+- [24.1-engine-places-and-map-instruction.md](24.1-engine-places-and-map-instruction.md) - optional place graph, movement, and map runtime
 
 All of the above are implemented; see [../../.github/copilot-instructions.md](../../.github/copilot-instructions.md) for current coding conventions.
 Spec 22 lives in the independent `engine/` Maven module. Console-first runtime
@@ -42,7 +43,8 @@ and host integration follow in the series below.
 ## Planned Documents
 
 - 23 - Engine API and minimal authored console loop
-- 24 - Rules, state, places, and snapshots
+- 24 - Rules, state, and snapshots
+- 24.1 - Places and map runtime
 - 25 - Templates, kinds, and generation stages
 - 26 - Input and safety policy
 - 27 - Generation pipeline and reference adapters

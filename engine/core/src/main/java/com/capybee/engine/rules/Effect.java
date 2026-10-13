@@ -3,7 +3,7 @@ package com.capybee.engine.rules;
 import java.util.Map;
 
 public sealed interface Effect permits Effect.CounterAdd, Effect.CounterSet, Effect.FlagSet,
-        Effect.SetAdd, Effect.SetRemove, Effect.EmitEvent, Effect.EndRun {
+        Effect.SetAdd, Effect.SetRemove, Effect.EmitEvent, Effect.EndRun, Effect.GoTo {
     record CounterAdd(String counter, int delta) implements Effect {}
     record CounterSet(String counter, int value) implements Effect {}
     record FlagSet(String flag, boolean value) implements Effect {}
@@ -13,6 +13,7 @@ public sealed interface Effect permits Effect.CounterAdd, Effect.CounterSet, Eff
         public EmitEvent { payload = Map.copyOf(payload); }
     }
     record EndRun(String outcome) implements Effect {}
+    record GoTo(String place) implements Effect {}
 
     sealed interface PayloadValue permits PayloadValue.StringLiteral, PayloadValue.IntegerLiteral,
             PayloadValue.BooleanLiteral, PayloadValue.CounterRef {

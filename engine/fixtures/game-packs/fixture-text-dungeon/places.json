@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "startPlace": "cell",
+  "layout": { "kind": "GRAPH" },
+  "places": [
+    { "id": "cell", "labelKey": "place.cell", "position": { "x": 0, "y": 0 } },
+    { "id": "corridor", "labelKey": "place.corridor", "position": { "x": 1, "y": 0 } },
+    { "id": "armory", "labelKey": "place.armory", "position": { "x": 2, "y": -1 } },
+    { "id": "stairs", "labelKey": "place.stairs", "position": { "x": 2, "y": 1 } },
+    { "id": "exit", "labelKey": "place.exit", "position": { "x": 3, "y": 1 } }
+  ],
+  "links": [
+    { "from": "cell", "to": "corridor", "bidirectional": true },
+    { "from": "corridor", "to": "armory", "bidirectional": true },
+    { "from": "corridor", "to": "stairs", "bidirectional": true },
+    { "from": "stairs", "to": "exit", "bidirectional": true }
+  ]
+}

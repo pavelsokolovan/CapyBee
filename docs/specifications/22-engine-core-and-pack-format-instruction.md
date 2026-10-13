@@ -49,7 +49,8 @@ the application. No dependency is added to the backend.
 |---|---|
 | 22 | This spec: architecture, API principles, vocabulary, generation contract, Pack format + loader |
 | 23 | Engine API: `Engine`, `Run`, `Command`, `View`, `Event`, ports, reference adapters, authored-scene runtime, a minimal console loop |
-| 24 | Rules and state: counters, flags, sets, effects, conditions, objectives, optional place graph, snapshots |
+| 24 | Rules and state: counters, flags, sets, effects, conditions, objectives, snapshots |
+| 24.1 | Optional place graph, movement commands, place-aware rules, and map view |
 | 25 | Templates and stages: scene kinds, entity kinds and presets, stage graph, slot schemas |
 | 26 | Input and safety policy: free text, scrubbing, moderation, distress path |
 | 27 | Generation pipeline: `TextGenerator` port, provider adapter, prompts, validate/repair/fallback, caching, budgets, record/replay |
@@ -294,10 +295,11 @@ type; spec 22 fixes name and meaning.
 | Stage | Pack-declared generation step with input/output schema and prompt; stages form a pack-declared graph | 25, 27 |
 | Entity, Entity kind | A thing in the world (a character, a room, an item) and its pack-defined type with typed attributes; presets are named attribute bundles | 25 |
 | State | Counters (bounded numbers), flags (booleans), sets (named collections of entities) | 24 |
-| Effect | Typed state change from a closed set: `COUNTER_ADD`, `COUNTER_SET`, `FLAG_SET`, `SET_ADD`, `SET_REMOVE`, `GO_TO`, `EMIT_EVENT`, `END_RUN` | 24 |
+| Effect | Typed state change from a closed set: `COUNTER_ADD`, `COUNTER_SET`, `FLAG_SET`, `SET_ADD`, `SET_REMOVE`, `EMIT_EVENT`, `END_RUN` | 24 |
+| `GO_TO` | Authored place relocation effect | 24.1 |
 | Condition | Typed predicate over state, from a closed set | 24 |
 | Objective | Condition-based goal that becomes completed; the engine's neutral word for quest, mission, or task | 24 |
-| Places (feature) | Optional graph of nodes and links, with layout metadata for renderers | 24 |
+| Places (feature) | Optional graph of nodes and links, with layout metadata for renderers | 24.1 |
 | Asset ref | `catalog:id` hint attached to blocks, places, or entities; engine passes it through, text hosts ignore it | 30 |
 | Authored content | Scenes written by hand; also serves as fallback when generation is off, fails, or is invalid | 23 |
 
@@ -351,7 +353,7 @@ game-packs/<pack-id>/
 ├── prompts/<locale>/*.md          stage prompt fragments — spec 27
 ├── scenes/<locale>/*.json         authored scenes, including fallback — spec 23
 ├── rules.json                     counters, flags, sets, limits, display rules — spec 24
-├── places.json                    place graph; feature PLACES — spec 24
+├── places.json                    place graph; feature PLACES — spec 24.1
 ├── templates/*.json               scene kinds, entity kinds, stage graph — spec 25
 └── assets/catalog.json            asset ids and tags; feature ASSETS — spec 30
 ```
@@ -464,7 +466,7 @@ to an ending in the console.
 | Fixture | Locale | Features | Start inputs | Events | Shape |
 |---|---|---|---|---|---|
 | `fixture-minimal` | `pl` | none | one `ENUM` | none | Fully authored, text only |
-| `fixture-text-dungeon` | `en` | `PLACES` | none (`strings/en.json` is `{}`) | none | Console-style game: rooms and items, no AI, no assets |
+| `fixture-text-dungeon` | `en` | `PLACES` | none | `run.completed` | Authored text scenes plus the optional place graph (24.1) |
 | `fixture-space-courier` | `en` | `GENERATION`, `ASSETS` | `ENUM`, `ENUM_SET`, `FREE_TEXT` | `run.completed` | Generated, with assets and free text |
 
 ### 5.4 Ids, versions, locales
@@ -494,8 +496,8 @@ Unused-key warnings are out of scope until all reference sources exist.
 For every declared locale, `strings/<locale>.json` must be in `files`. If the
 pack declares feature `GENERATION`, `prompts/<locale>/system.md` must also be
 in `files` for every locale. Later specs extend `PackLayout.requiredFiles`
-(spec 23 authored scenes, spec 24 rules and places, spec 25 templates, and so
-on). A pack without `GENERATION` needs no prompts.
+(spec 23 authored scenes, spec 24 rules, spec 24.1 places, spec 25 templates,
+and so on). A pack without `GENERATION` needs no prompts.
 
 ## 6. Loading and validation
 
@@ -558,8 +560,8 @@ continuing is meaningless (steps 1–3).
 
 ### 6.3 Extension point
 
-Later specs add `SectionValidator`s (rules and places in 24, templates in 25,
-assets in 30). A validator receives the loaded `Pack` (raw file text) and a
+Later specs add `SectionValidator`s (rules in 24, places in 24.1, templates in
+25, assets in 30). A validator receives the loaded `Pack` (raw file text) and a
 `PackValidationContext`. It must be pure (no I/O), report problems through the
 context, and register ids through the `ReferenceIndex` instead of checking
 cross-file links itself. It parses its own JSON inside its feature's `json`

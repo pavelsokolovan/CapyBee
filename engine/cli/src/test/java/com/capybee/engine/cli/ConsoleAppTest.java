@@ -41,6 +41,14 @@ class ConsoleAppTest {
     }
 
     @Test
+    void shortMoveAliasIsCaseInsensitiveAndMovesBeforeSceneChoiceHandling() {
+        var result = run(new String[]{"--pack-dir", DUNGEON_PACK}, "M corridor\nq\n");
+
+        assertThat(result.exitCode).isZero();
+        assertThat(result.output).contains("Place: Cell", "Place: Corridor", "[abandoned]");
+    }
+
+    @Test
     void reportsInvalidLocaleAndMissingScript() {
         assertThat(run(new String[]{"--pack-dir", DUNGEON_PACK, "--locale", "fr"}, "").exitCode).isEqualTo(3);
         var script = run(new String[]{"--pack-dir", DUNGEON_PACK, "--script", "missing-script.txt"}, "");

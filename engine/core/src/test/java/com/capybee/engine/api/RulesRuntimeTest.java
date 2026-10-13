@@ -54,6 +54,92 @@ class RulesRuntimeTest {
         return result.run();
     }
 
+        @Test
+        void mapMovesAreDirectOrderedIndependentAndRejectedMovesAreAtomic() {
+                Run run = start(engine());
+                assertThat(run.view().places().currentPlaceId()).isEqualTo("cell");
+                assertThat(run.view().places().availableMoves()).containsExactly("corridor");
+                assertThat(run.view().places().places()).extracting(PlaceView::label)
+                                .containsExactly("Cell", "Corridor", "Armory", "Stairs", "Exit");
+
+                String before = SnapshotCodec.toJson(run.snapshot());
+                StepResult unknown = run.apply(new Command.Move("missing"));
+                assertThat(unknown.accepted()).isFalse();
+                assertThat(unknown.issues()).extracting(Issue::code).containsExactly("PLACE_UNKNOWN");
+                assertThat(SnapshotCodec.toJson(run.snapshot())).isEqualTo(before);
+
+                StepResult disconnected = run.apply(new Command.Move("exit"));
+                assertThat(disconnected.accepted()).isFalse();
+                assertThat(disconnected.issues()).extracting(Issue::code).containsExactly("PLACE_NOT_CONNECTED");
+                assertThat(SnapshotCodec.toJson(run.snapshot())).isEqualTo(before);
+
+                StepResult moved = run.apply(new Command.Move("corridor"));
+                assertThat(moved.accepted()).isTrue();
+                assertThat(run.snapshot().state().sceneId()).isEqualTo("cell");
+                assertThat(run.snapshot().step()).isEqualTo(1);
+                assertThat(moved.view().places().currentPlaceId()).isEqualTo("corridor");
+                assertThat(moved.view().places().visitedPlaceIds()).containsExactly("cell", "corridor");
+                assertThat(moved.view().places().availableMoves()).containsExactly("cell", "armory", "stairs");
+
+                run.apply(new Command.Move("cell"));
+                run.apply(new Command.Move("corridor"));
+                assertThat(run.snapshot().state().visitedPlaces()).containsExactly("cell", "corridor");
+        }
+
+        @Test
+        void oneWayLinksOnlyAllowMovementInTheirDeclaredDirection() throws Exception {
+                Pack base = pack();
+                Map<String, String> files = new LinkedHashMap<>(base.files());
+                ObjectNode places = (ObjectNode) MAPPER.readTree(files.get("places.json"));
+                ((ObjectNode) ((ArrayNode) places.get("links")).get(0)).put("bidirectional", false);
+                files.put("places.json", places.toString());
+                Run run = start(engine(new Pack(base.manifest(), files)));
+
+                assertThat(run.apply(new Command.Move("corridor")).accepted()).isTrue();
+                String beforeReturn = SnapshotCodec.toJson(run.snapshot());
+                StepResult reverse = run.apply(new Command.Move("cell"));
+
+                assertThat(reverse.accepted()).isFalse();
+                assertThat(reverse.issues()).extracting(Issue::code).containsExactly("PLACE_NOT_CONNECTED");
+                assertThat(SnapshotCodec.toJson(run.snapshot())).isEqualTo(beforeReturn);
+        }
+
+        @Test
+        void identicalRunsAndCommandsProduceIdenticalPlaceSnapshots() {
+                Run first = start(engine());
+                Run second = start(engine());
+
+                for (Run run : List.of(first, second)) {
+                        run.apply(new Command.Move("corridor"));
+                        run.apply(new Command.Choose("corridor"));
+                }
+
+                assertThat(SnapshotCodec.toJson(first.snapshot())).isEqualTo(SnapshotCodec.toJson(second.snapshot()));
+        }
+
+        @Test
+        void placeConditionCompletesObjectiveAndGoToRelocatesWithoutChangingScene() throws Exception {
+                Pack base = pack();
+                Map<String, String> files = new LinkedHashMap<>(base.files());
+                ObjectNode rules = (ObjectNode) MAPPER.readTree(files.get("rules.json"));
+                ObjectNode objective = (ObjectNode) ((ArrayNode) rules.get("objectives")).get(0);
+                objective.set("completeWhen", MAPPER.readTree("{\"type\":\"ALL\",\"conditions\":["
+                        + "{\"type\":\"AT_PLACE\",\"place\":\"corridor\"},"
+                        + "{\"type\":\"VISITED_PLACE\",\"place\":\"corridor\"}]}"));
+                objective.set("onComplete", MAPPER.createArrayNode().add(
+                                MAPPER.readTree("{\"type\":\"GO_TO\",\"place\":\"exit\"}")));
+                files.put("rules.json", rules.toString());
+
+                Run run = start(engine(new Pack(base.manifest(), files)));
+                StepResult moved = run.apply(new Command.Move("corridor"));
+
+                assertThat(moved.accepted()).isTrue();
+                assertThat(moved.view().objectives()).extracting(ObjectiveItem::state).containsExactly(ObjectiveState.DONE);
+                assertThat(moved.view().places().currentPlaceId()).isEqualTo("exit");
+                assertThat(moved.view().places().visitedPlaceIds()).containsExactly("cell", "corridor", "exit");
+                assertThat(run.snapshot().state().sceneId()).isEqualTo("cell");
+        }
+
     @Test
     void disabledChoiceDoesNotChangeSnapshot() {
         Run run = start(engine());
@@ -112,6 +198,8 @@ class RulesRuntimeTest {
         assertThat(legacyResume.run().snapshot().state().flags()).containsEntry("has-key", false);
         assertThat(legacyResume.run().snapshot().state().sets()).containsEntry("inventory", List.of());
         assertThat(legacyResume.run().snapshot().state().objectives()).containsEntry("escape", ObjectiveState.ACTIVE);
+        assertThat(legacyResume.run().snapshot().state().currentPlaceId()).isEqualTo("cell");
+        assertThat(legacyResume.run().snapshot().state().visitedPlaces()).containsExactly("cell");
 
         RunState oldVersionState = new RunState("stairs", List.of("cell", "removed-room", "stairs"), false, null,
                 Map.of("health", 15, "removed-counter", 2),
@@ -133,6 +221,56 @@ class RulesRuntimeTest {
         assertThat(migrated.run().snapshot().state().visited()).containsExactly("cell", "stairs");
         assertThat(migrated.run().snapshot().state().outcome()).isNull();
     }
+
+    @Test
+    void sameMajorPlaceMigrationPrunesRemovedPlacesAndExactVersionRejectsUnknownPlace() {
+        Engine engine = engine();
+        RunSnapshot current = start(engine).snapshot();
+        RunState removedPlaceState = new RunState("cell", List.of("cell"), false, null,
+                current.state().counters(), current.state().flags(), current.state().sets(),
+                current.state().objectives(), current.state().outcome(), "removed-place",
+                List.of("cell", "removed-place"));
+        RunSnapshot olderVersion = new RunSnapshot(1, current.runId(),
+                new PackRef(PACK_ID, new PackVersion(1, 1, 0)), current.locale(), current.seed(),
+                current.startInputs(), current.createdAt(), current.updatedAt(), current.step(), removedPlaceState);
+
+        var migrated = engine.resume(olderVersion);
+        assertThat(migrated.ok()).isTrue();
+        assertThat(migrated.issues()).extracting(Issue::code).contains("SNAPSHOT_STATE_PRUNED");
+        assertThat(migrated.run().snapshot().state().currentPlaceId()).isEqualTo("cell");
+        assertThat(migrated.run().snapshot().state().visitedPlaces()).containsExactly("cell");
+
+        RunState invalidState = new RunState("cell", List.of("cell"), false, null,
+                current.state().counters(), current.state().flags(), current.state().sets(),
+                current.state().objectives(), current.state().outcome(), "unknown-place", List.of("cell"));
+        RunSnapshot exactInvalid = new RunSnapshot(1, current.runId(), current.pack(), current.locale(),
+                current.seed(), current.startInputs(), current.createdAt(), current.updatedAt(), current.step(), invalidState);
+        var rejected = engine.resume(exactInvalid);
+        assertThat(rejected.ok()).isFalse();
+        assertThat(rejected.issues()).extracting(Issue::code).contains("SNAPSHOT_INVALID");
+    }
+
+        @Test
+        void snapshotCodecDefaultsMissingPlaceFieldsAndRejectsMalformedPlaceFields() throws Exception {
+                Engine engine = engine();
+                RunSnapshot current = start(engine).snapshot();
+                ObjectNode root = (ObjectNode) MAPPER.readTree(SnapshotCodec.toJson(current));
+                ObjectNode state = (ObjectNode) root.get("state");
+                state.remove("currentPlaceId");
+                state.remove("visitedPlaces");
+
+                var parsed = SnapshotCodec.fromJson(root.toString());
+                assertThat(parsed.issues()).isEmpty();
+                var resumed = engine.resume(parsed.snapshot());
+                assertThat(resumed.ok()).isTrue();
+                assertThat(resumed.run().snapshot().state().currentPlaceId()).isEqualTo("cell");
+                assertThat(resumed.run().snapshot().state().visitedPlaces()).containsExactly("cell");
+
+                state.put("currentPlaceId", 42);
+                var malformed = SnapshotCodec.fromJson(root.toString());
+                assertThat(malformed.snapshot()).isNull();
+                assertThat(malformed.issues()).extracting(Issue::code).contains("SNAPSHOT_INVALID");
+        }
 
     @Test
     void exactVersionRejectsInvalidCounterState() {

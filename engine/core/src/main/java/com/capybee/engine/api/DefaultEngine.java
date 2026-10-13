@@ -8,6 +8,8 @@ import com.capybee.engine.pack.*;
 import com.capybee.engine.port.IdSource;
 import com.capybee.engine.rules.*;
 import com.capybee.engine.rules.json.RulesParser;
+import com.capybee.engine.places.PlaceMap;
+import com.capybee.engine.places.json.PlacesParser;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -17,6 +19,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.random.RandomGenerator;
 
 final class DefaultEngine implements Engine {
@@ -24,6 +27,7 @@ final class DefaultEngine implements Engine {
     private final Clock clock;
     private final RandomGenerator random;
     private final IdSource ids;
+    private final Map<PackId, PlaceMap> placeMaps = new ConcurrentHashMap<>();
 
     DefaultEngine(PackRegistry packs, Clock clock, RandomGenerator random, IdSource ids) {
         this.packs = packs;
@@ -60,8 +64,9 @@ final class DefaultEngine implements Engine {
         List<String> visited = new ArrayList<>();
         visited.add(startScene.id());
         Rules rules = RulesParser.parse(pack);
+        PlaceMap placeMap = placeMap(pack);
         RunImpl run = new RunImpl(runId, pack, locale, seed, normalizedInputs, now, now, 0L,
-            startScene.id(), visited, false, null, sceneSet, clock, rules, null);
+            startScene.id(), visited, false, null, sceneSet, clock, rules, null, placeMap);
         issues.addAll(run.startupIssues());
         return new StartResult(run, issues, run.startupEvents());
     }
@@ -118,7 +123,8 @@ final class DefaultEngine implements Engine {
             return new ResumeResult(null, issues);
         }
         Rules rules = RulesParser.parse(pack);
-        RunState restoredState = migrateState(snapshot.state(), rules, sceneSet, migrating, issues);
+        PlaceMap placeMap = placeMap(pack);
+        RunState restoredState = migrateState(snapshot.state(), rules, sceneSet, placeMap, migrating, issues);
         if (issues.stream().anyMatch(issue -> issue.severity() == Issue.Severity.ERROR)) {
             return new ResumeResult(null, issues);
         }
@@ -126,11 +132,12 @@ final class DefaultEngine implements Engine {
         RunImpl run = new RunImpl(snapshot.runId(), pack, locale, snapshot.seed(), snapshot.startInputs(),
                 snapshot.createdAt(), snapshot.updatedAt(), snapshot.step(), currentSceneId,
                 new ArrayList<>(restoredState.visited()), restoredState.ended(), restoredState.endReason(),
-                sceneSet, clock, rules, restoredState);
+                sceneSet, clock, rules, restoredState, placeMap);
         return new ResumeResult(run, issues);
     }
 
-    private RunState migrateState(RunState saved, Rules rules, SceneSet scenes, boolean migrating, List<Issue> issues) {
+    private RunState migrateState(RunState saved, Rules rules, SceneSet scenes, PlaceMap placeMap,
+                                  boolean migrating, List<Issue> issues) {
         boolean pruned = false;
         boolean clamped = false;
         if (saved.ended() == (saved.endReason() == null)) {
@@ -240,9 +247,62 @@ final class DefaultEngine implements Engine {
             if (migrating) visited.add(saved.sceneId());
             else issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_INVALID", "Current scene is missing from visited list"));
         }
+        String currentPlaceId = saved.currentPlaceId();
+        List<String> visitedPlaceIds = new ArrayList<>();
+        if (placeMap == null) {
+            if (currentPlaceId != null || !saved.visitedPlaces().isEmpty()) {
+                if (migrating) pruned = true;
+                else issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_INVALID",
+                        "Snapshot contains place state for a pack without PLACES"));
+            }
+            currentPlaceId = null;
+        } else {
+            Set<String> placeIds = new HashSet<>();
+            placeMap.places().forEach(place -> placeIds.add(place.id()));
+            boolean missingCurrent = currentPlaceId == null;
+            boolean unknownCurrent = currentPlaceId != null && !placeIds.contains(currentPlaceId);
+            if (unknownCurrent) {
+                if (migrating) {
+                    currentPlaceId = placeMap.startPlace();
+                    pruned = true;
+                } else {
+                    issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_INVALID",
+                            "Snapshot references unknown current place: " + currentPlaceId));
+                }
+            } else if (missingCurrent || migrating && saved.visitedPlaces().isEmpty()) {
+                currentPlaceId = placeMap.startPlace();
+            }
+            Set<String> seenPlaces = new HashSet<>();
+            for (String visitedId : saved.visitedPlaces()) {
+                if (!seenPlaces.add(visitedId)) {
+                    if (migrating) pruned = true;
+                    else issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_INVALID", "Snapshot visited-place list contains duplicates"));
+                } else if (!placeIds.contains(visitedId)) {
+                    if (migrating) pruned = true;
+                    else issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_INVALID",
+                            "Snapshot visited-place list references unknown place: " + visitedId));
+                } else visitedPlaceIds.add(visitedId);
+            }
+            if (!visitedPlaceIds.contains(currentPlaceId)) {
+                if (migrating || missingCurrent) {
+                    visitedPlaceIds.add(currentPlaceId);
+                    if (migrating) pruned = true;
+                } else {
+                    issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_INVALID",
+                            "Current place is missing from visited-place list"));
+                }
+            }
+        }
         if (pruned) issues.add(new Issue(Issue.Severity.WARNING, "SNAPSHOT_STATE_PRUNED", "Obsolete snapshot state was removed"));
         if (clamped) issues.add(new Issue(Issue.Severity.WARNING, "SNAPSHOT_STATE_CLAMPED", "Snapshot counters were clamped to current bounds"));
-        return new RunState(saved.sceneId(), visited, saved.ended(), saved.endReason(), counters, flags, sets, objectives, outcome);
+        return new RunState(saved.sceneId(), visited, saved.ended(), saved.endReason(), counters, flags, sets,
+                objectives, outcome, currentPlaceId, visitedPlaceIds);
+    }
+
+    private PlaceMap placeMap(Pack pack) {
+        if (!pack.manifest().features().contains(PackFeature.PLACES)) return null;
+        PackId packId = pack.manifest().id();
+        return placeMaps.computeIfAbsent(packId, ignored -> PlacesParser.parse(pack));
     }
 
     private List<Issue> validateStartRequest(RunRequest request) {
