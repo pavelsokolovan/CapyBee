@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "scenes": [
+    {
+      "id": "opening",
+      "start": true,
+      "blocks": [{"kind":"NARRATION","text":"An old observatory stands above the valley."}],
+      "options": [
+        {"id":"explore","label":"Explore","next":"meeting"},
+        {"id":"rest","label":"Rest","next":"ending"}
+      ]
+    },
+    {
+      "id": "meeting",
+      "blocks": [{"kind":"NARRATION","text":"A lantern glows in the quiet room."}],
+      "options": [
+        {"id":"continue","label":"Continue","next":"ending"},
+        {"id":"finish","label":"Finish","next":"ending"}
+      ]
+    },
+    {
+      "id": "ending",
+      "blocks": [{"kind":"NARRATION","text":"The evening settles peacefully."}],
+      "end": true
+    }
+  ]
+}

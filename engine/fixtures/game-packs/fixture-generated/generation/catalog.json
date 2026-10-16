@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "supportedLocales": ["en"],
+  "defaultLocale": "en",
+  "stages": [
+    {"stage":"SCENARIO","templateId":"scenario-basic","dependencies":[],"fallbackResource":"generation/fallbacks/scenario.json"},
+    {"stage":"CAST","templateId":"cast-basic","dependencies":["SCENARIO"],"fallbackResource":"generation/fallbacks/cast.json"},
+    {"stage":"QUEST","templateId":"quest-basic","dependencies":["SCENARIO"],"fallbackResource":"generation/fallbacks/quest.json"},
+    {"stage":"SCENE","templateId":"scene-basic","dependencies":["SCENARIO","CAST","QUEST"],"fallbackResource":"generation/fallbacks/opening.json"}
+  ],
+  "sceneSlots": [
+    {"slotId":"opening-slot","sceneId":"opening","templateId":"scene-basic","fallbackResource":"generation/fallbacks/opening.json","choiceIds":["explore","rest"]},
+    {"slotId":"meeting-slot","sceneId":"meeting","templateId":"scene-basic","fallbackResource":"generation/fallbacks/meeting.json","choiceIds":["continue","finish"]}
+  ],
+  "limits": {"totalCallsPerRun":16,"callsPerStage":2,"maxOutputTokens":800,"maxInputCharacters":12000,"repairAttempts":1}
+}

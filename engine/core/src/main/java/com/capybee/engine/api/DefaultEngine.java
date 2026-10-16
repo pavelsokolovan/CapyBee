@@ -8,6 +8,8 @@ import com.capybee.engine.pack.*;
 import com.capybee.engine.port.IdSource;
 import com.capybee.engine.port.InputGuard;
 import com.capybee.engine.port.InputInterpreter;
+import com.capybee.engine.port.TextGenerator;
+import com.capybee.engine.generation.GenerationPipeline;
 import com.capybee.engine.input.InputPolicy;
 import com.capybee.engine.input.InputSafetyAction;
 import com.capybee.engine.input.InputSafetyDecision;
@@ -37,17 +39,19 @@ final class DefaultEngine implements Engine {
     private final IdSource ids;
     private final InputGuard inputGuard;
     private final InputInterpreter inputInterpreter;
+    private final TextGenerator textGenerator;
     private final PiiScrubber piiScrubber = new PiiScrubber();
     private final Map<PackId, PlaceMap> placeMaps = new ConcurrentHashMap<>();
 
     DefaultEngine(PackRegistry packs, Clock clock, RandomGenerator random, IdSource ids,
-                  InputGuard inputGuard, InputInterpreter inputInterpreter) {
+                  InputGuard inputGuard, InputInterpreter inputInterpreter, TextGenerator textGenerator) {
         this.packs = packs;
         this.clock = clock;
         this.random = random;
         this.ids = ids;
         this.inputGuard = inputGuard;
         this.inputInterpreter = inputInterpreter;
+        this.textGenerator = textGenerator;
     }
 
     @Override
@@ -71,6 +75,17 @@ final class DefaultEngine implements Engine {
                     "The pack has no start scene for locale " + locale.value())));
         }
 
+        GenerationPipeline generationPipeline = null;
+        if (request.generated()) {
+            try {
+                generationPipeline = new GenerationPipeline(pack, locale, textGenerator, ids, clock);
+                generationPipeline.initialize();
+            } catch (RuntimeException exception) {
+                return new StartResult(null, List.of(new Issue(Issue.Severity.ERROR,
+                        "GENERATION_START_FAILED", "Generated content could not be prepared")));
+            }
+        }
+
         Map<String, String> normalizedInputs = persistentInputs(normalizeInputs(request.startInputs(), pack), pack);
         long seed = request.seed() != null ? request.seed() : random.nextLong();
         String runId = ids.nextId();
@@ -81,7 +96,7 @@ final class DefaultEngine implements Engine {
         PlaceMap placeMap = placeMap(pack);
         RunImpl run = new RunImpl(runId, pack, locale, seed, normalizedInputs, now, now, 0L,
             startScene.id(), visited, false, null, sceneSet, clock, rules, null, placeMap,
-                inputGuard, inputInterpreter, piiScrubber);
+                inputGuard, inputInterpreter, piiScrubber, generationPipeline);
         issues.addAll(run.startupIssues());
         return new StartResult(run, issues, run.startupEvents());
     }
@@ -139,6 +154,28 @@ final class DefaultEngine implements Engine {
         }
         Rules rules = RulesParser.parse(pack);
         PlaceMap placeMap = placeMap(pack);
+        GenerationPipeline generationPipeline = null;
+        if (!snapshot.state().generationArtifacts().isEmpty()) {
+            if (!pack.manifest().features().contains(PackFeature.GENERATION)) {
+                issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_ARTIFACT_VERSION_MISMATCH",
+                        "Snapshot generated content is incompatible with the loaded pack"));
+                return new ResumeResult(null, issues);
+            }
+            try {
+                generationPipeline = GenerationPipeline.restore(pack, locale, textGenerator, ids, clock,
+                        snapshot.state().generationArtifacts());
+                for (String visitedScene : snapshot.state().visited()) {
+                    if (generationPipeline.hasSceneSlot(visitedScene)
+                            && !generationPipeline.hasCachedScene(visitedScene)) {
+                        throw new IllegalArgumentException("GENERATION_ARTIFACT_INCOMPLETE");
+                    }
+                }
+            } catch (RuntimeException exception) {
+                issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_ARTIFACT_VERSION_MISMATCH",
+                        "Snapshot generated content could not be restored safely"));
+                return new ResumeResult(null, issues);
+            }
+        }
         RunState restoredState = migrateState(snapshot.state(), rules, sceneSet, placeMap, migrating, issues);
         if (issues.stream().anyMatch(issue -> issue.severity() == Issue.Severity.ERROR)) {
             return new ResumeResult(null, issues);
@@ -147,7 +184,8 @@ final class DefaultEngine implements Engine {
         RunImpl run = new RunImpl(snapshot.runId(), pack, locale, snapshot.seed(), persistentInputs(snapshot.startInputs(), pack),
                 snapshot.createdAt(), snapshot.updatedAt(), snapshot.step(), currentSceneId,
             new ArrayList<>(restoredState.visited()), restoredState.ended(), restoredState.endReason(),
-            sceneSet, clock, rules, restoredState, placeMap, inputGuard, inputInterpreter, piiScrubber);
+            sceneSet, clock, rules, restoredState, placeMap, inputGuard, inputInterpreter, piiScrubber,
+            generationPipeline);
         return new ResumeResult(run, issues);
     }
 
@@ -311,7 +349,7 @@ final class DefaultEngine implements Engine {
         if (pruned) issues.add(new Issue(Issue.Severity.WARNING, "SNAPSHOT_STATE_PRUNED", "Obsolete snapshot state was removed"));
         if (clamped) issues.add(new Issue(Issue.Severity.WARNING, "SNAPSHOT_STATE_CLAMPED", "Snapshot counters were clamped to current bounds"));
         return new RunState(saved.sceneId(), visited, saved.ended(), saved.endReason(), counters, flags, sets,
-                objectives, outcome, currentPlaceId, visitedPlaceIds);
+            objectives, outcome, currentPlaceId, visitedPlaceIds, saved.generationArtifacts());
     }
 
     private PlaceMap placeMap(Pack pack) {
@@ -340,12 +378,15 @@ final class DefaultEngine implements Engine {
 
         Set<PackFeature> unsupported = new HashSet<>();
         for (PackFeature feature : pack.manifest().features()) {
-            if (feature == PackFeature.GENERATION) {
+            if (feature == PackFeature.GENERATION && !request.generated()) {
                 unsupported.add(feature);
             }
             if (feature != PackFeature.PLACES && feature != PackFeature.ASSETS && feature != PackFeature.GENERATION) {
                 unsupported.add(feature);
             }
+        }
+        if (request.generated() && !pack.manifest().features().contains(PackFeature.GENERATION)) {
+            issues.add(new Issue(Issue.Severity.ERROR, "GENERATION_NOT_ENABLED", "Pack does not enable generated play"));
         }
         if (!unsupported.isEmpty()) {
             issues.add(new Issue(Issue.Severity.ERROR, "FEATURE_NOT_AVAILABLE",

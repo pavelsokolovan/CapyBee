@@ -21,12 +21,14 @@ Reports are in `target/surefire-reports/` and `target/site/jacoco/` inside
 this module. Every engine package must reach 70% line coverage. Tests need
 only the JDK and Maven; after dependencies are cached, `mvn -o verify` works.
 
-The provider-neutral `TextGenerator` port and `StructuredInputInterpreter`
-live in `engine-core`. The optional `engine-adapter-anthropic` module is built
-only when selected; it is not a dependency of core or the CLI. Verify it with:
+The provider-neutral `TextGenerator` port, generation pipeline, and
+`StructuredInputInterpreter` live in `engine-core`. Core has no provider or
+network dependency. `engine-cli` includes the optional Anthropic adapter for
+explicit generated play; authored play never configures or invokes it. Verify
+the adapter and CLI through the reactor with:
 
 ```sh
-mvn -f engine/pom.xml -pl adapter-anthropic -am verify
+mvn -f engine/pom.xml -pl cli -am verify
 ```
 
 Live adapter configuration requires `GENERATION_MODEL_ID` and
@@ -34,14 +36,40 @@ Live adapter configuration requires `GENERATION_MODEL_ID` and
 pinned model value. API credentials are never read from packs or logged. The
 adapter tests use a local stub server and need no key or external network.
 
-The current checkout has no `engine/template` package, scenario/archetype
-catalog, or generation-specific fixture/fallback contract. Consequently this
-change adds the structured provider boundary and the spec 25 input-resolution
-bridge, but not theme/scenario/cast/scene orchestration, repair/fallback,
-artifact storage, or run/player cost quotas. Do not wire a live generator into
-play until those contracts and the mandatory budget ledger are implemented;
-that work must reuse the template contract when it is introduced, not create a
-parallel format here.
+## Generated Play
+
+Generation is opt-in. Authored packs and the default console path remain
+provider-free. A generation-enabled pack indexes `generation/catalog.json`,
+`generation/templates.json`, stage/slot fallback JSON, and the existing
+locale-specific prompt and scene files. The v1 template registry is the small
+versioned addition introduced by spec 26.1 because no Spec 24 template package
+or template-definition format existed in this checkout. Templates declare
+trusted actor slots, objective allow-lists, and tone vocabularies; the catalog
+declares stages, dependencies, budgets, scene slots, trusted choices, and
+validated fallbacks.
+
+Run generated play with `--generated`. `GENERATION_MODEL_ID` and
+`ANTHROPIC_API_KEY` are read from the environment only; if unavailable, the
+configured authored fallbacks are used and reported. `--live-smoke --script
+<file>` is a separate opt-in real-provider test and may incur provider cost.
+It exits non-zero unless the real adapter generates or repairs the required
+stages and at least one later scene without fallback. It is excluded from
+ordinary tests and builds.
+
+Live-provider failures are reported as fixed codes, never raw response bodies:
+`PROVIDER_BILLING_UNAVAILABLE` indicates insufficient API credits;
+`PROVIDER_STRUCTURED_OUTPUT_UNSUPPORTED` indicates the configured model rejects
+structured output; `PROVIDER_REQUEST_INVALID` indicates another HTTP 400
+request error. Check API billing in the provider console for the first case,
+and the provider's supported-model list for the second. A chat subscription
+does not itself establish available API credits. Never share an API key when
+reporting these diagnostics.
+
+Generated artifacts are typed, safety-checked, cached per run, and included in
+run snapshots. Resume validates the artifact envelope against the pack and
+does not regenerate content already shown. Provider summaries contain stage,
+status, call count, timing, usage, and stable error codes only; prompts,
+responses, player text, and credentials are not logged.
 
 The root POM is an aggregator, not a shared parent. `mvn verify` at the
 repository root verifies both the engine and backend; backend tests still
@@ -71,8 +99,9 @@ file. Sources never enumerate classpath directories and can read packs
 inside JARs. File reads are bounded; directory sources reject traversal
 and symlink escapes. JSON rejects duplicate keys and trailing documents.
 
-Three test packs exercise different locales, inputs and optional features:
-`fixture-minimal`, `fixture-text-dungeon`, and `fixture-space-courier`.
+Four test packs exercise different locales, inputs and optional features:
+`fixture-minimal`, `fixture-text-dungeon`, `fixture-space-courier`, and
+`fixture-generated`.
 The source boundary scanner has self-tests for every enforced rule.
 Section validators run in registration order and share a reference index
 for cross-file links.
@@ -80,9 +109,9 @@ for cross-file links.
 ## Console-First Roadmap
 
 [Spec 22](../docs/specifications/22-engine-core-and-pack-format-instruction.md)
-delivers the pack SDK, not a playable runtime. Spec 23 adds the common
-in-process `Engine`/`Run`/`Command`/`View` API and a minimal authored console
-loop. Spec 28 expands the console host with play, validate, and simulate
-commands. Neither needs Spring or the web app. Web integration follows in
-specs 29-31. No empty runtime ports or invented scene schemas are shipped
-ahead of those contracts.
+delivers the pack SDK. Specs 23-26.1 now provide the in-process runtime,
+rules/state, safety boundary, generation pipeline, generated-play CLI, and
+artifact continuity. Spec 27 retains ownership of the public session lifecycle
+and host-facing API contract; specs 28-31 cover the expanded console, web host,
+client rendering, and game pack. None of these engine modules needs Spring or
+the web application.

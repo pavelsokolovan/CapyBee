@@ -45,4 +45,18 @@ class ConsoleArgsTest {
         assertThat(ConsoleArgs.parse(new String[]{"--load", "save.json", "--input", "x=y"}).ok()).isFalse();
         assertThat(ConsoleArgs.parse(new String[]{"--load", "save.json", "--seed", "1"}).ok()).isFalse();
     }
+
+    @Test
+    void parsesGeneratedModeAndRequiresAScriptForLiveSmoke() {
+        var generated = ConsoleArgs.parse(new String[]{"--pack-dir", "packs/generated", "--generated"});
+        assertThat(generated.ok()).isTrue();
+        assertThat(generated.options().generated()).isTrue();
+        assertThat(generated.options().liveSmoke()).isFalse();
+
+        assertThat(ConsoleArgs.parse(new String[]{"--pack-dir", "packs/generated", "--live-smoke"}).ok()).isFalse();
+        var smoke = ConsoleArgs.parse(new String[]{"--pack-dir", "packs/generated", "--live-smoke", "--script", "play.txt"});
+        assertThat(smoke.ok()).isTrue();
+        assertThat(smoke.options().generated()).isTrue();
+        assertThat(smoke.options().liveSmoke()).isTrue();
+    }
 }

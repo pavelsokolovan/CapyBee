@@ -1,5 +1,6 @@
 package com.capybee.engine.cli;
 
+import com.capybee.engine.adapter.anthropic.AnthropicTextGenerator;
 import com.capybee.engine.adapter.Randoms;
 import com.capybee.engine.adapter.UuidIdSource;
 import com.capybee.engine.api.Command;
@@ -19,6 +20,10 @@ import com.capybee.engine.pack.PackId;
 import com.capybee.engine.pack.json.PackLoader;
 import com.capybee.engine.pack.PackRegistry;
 import com.capybee.engine.port.IdSource;
+import com.capybee.engine.port.TextGenerator;
+import com.capybee.engine.generation.GenerationArtifact;
+import com.capybee.engine.generation.GenerationCatalog;
+import com.capybee.engine.generation.GenerationExecutionSummary;
 
 import java.io.InputStream;
 import java.io.BufferedReader;
@@ -39,14 +44,22 @@ public final class ConsoleApp {
     private final Clock clock;
     private final IdSource ids;
     private final RandomGenerator random;
+    private final TextGenerator textGenerator;
+    private int printedGenerationStages;
 
     public ConsoleApp(InputStream in, PrintStream out, PrintStream err, Clock clock, IdSource ids, RandomGenerator random) {
+        this(in, out, err, clock, ids, random, null);
+    }
+
+    public ConsoleApp(InputStream in, PrintStream out, PrintStream err, Clock clock, IdSource ids,
+                      RandomGenerator random, TextGenerator textGenerator) {
         this.in = in;
         this.out = out;
         this.err = err;
         this.clock = clock;
         this.ids = ids;
         this.random = random;
+        this.textGenerator = textGenerator;
     }
 
     public int run(String[] args) {
@@ -57,6 +70,7 @@ public final class ConsoleApp {
         }
 
         ConsoleOptions options = parsed.options();
+        printedGenerationStages = 0;
         if (options.help()) {
             out.println(consoleUsage());
             return 0;
@@ -65,6 +79,10 @@ public final class ConsoleApp {
         if (options.packDir() == null) {
             err.println("A pack directory is required.");
             return 2;
+        }
+        if (options.liveSmoke() && !(textGenerator instanceof AnthropicTextGenerator)) {
+            err.println("LIVE_PROVIDER_NOT_CONFIGURED: --live-smoke requires the configured real provider.");
+            return 4;
         }
 
         Path packDir = options.packDir().toAbsolutePath().normalize();
@@ -85,11 +103,12 @@ public final class ConsoleApp {
         }
 
         var pack = load.pack().orElseThrow();
-        var engine = Engine.builder(new PackRegistry(List.of(pack)))
+        var engineBuilder = Engine.builder(new PackRegistry(List.of(pack)))
                 .clock(clock)
                 .random(random)
-                .ids(ids)
-                .build();
+            .ids(ids);
+        if (textGenerator != null) engineBuilder.textGenerator(textGenerator);
+        var engine = engineBuilder.build();
 
         Run run;
         if (options.load() != null) {
@@ -115,7 +134,8 @@ public final class ConsoleApp {
                 return 3;
             }
         } else {
-            StartResult startResult = engine.start(new RunRequest(packId, options.locale(), options.inputs(), options.seed()));
+                StartResult startResult = engine.start(new RunRequest(packId, options.locale(), options.inputs(),
+                    options.seed(), options.generated()));
             if (!startResult.ok()) {
                 for (var issue : startResult.issues()) {
                     err.println(issue.code() + ": " + issue.message());
@@ -139,9 +159,10 @@ public final class ConsoleApp {
         out.println("Running " + packId.value() + " in locale " + run.snapshot().locale().value());
         View view = run.view();
         out.println(ConsoleRenderer.render(view));
+        printGenerationSummary(run);
 
         if (view.ended()) {
-            return 0;
+            return smokeResult(options, run);
         }
 
         inputLoop:
@@ -149,7 +170,7 @@ public final class ConsoleApp {
             if (!scripted) out.print("> ");
             String line = readLine(reader);
             if (line == null) {
-                if (scripted) return 0;
+                if (scripted) return options.liveSmoke() ? smokeIncomplete() : 0;
                 out.println();
                 out.println(ConsoleChrome.EOF);
                 return 0;
@@ -160,19 +181,21 @@ public final class ConsoleApp {
                 StepResult stepResult = run.apply(new Command.Abandon());
                 if (stepResult.accepted()) {
                     out.println(ConsoleRenderer.render(stepResult.view()));
+                    printGenerationSummary(run);
                 }
-                return 0;
+                return options.liveSmoke() ? smokeIncomplete() : 0;
             }
             if (trimmed.isEmpty()) {
                 StepResult stepResult = run.apply(new Command.Advance());
                 if (stepResult.accepted()) {
                     out.println(ConsoleRenderer.render(stepResult.view()));
-                        view = run.view();
+                    printGenerationSummary(run);
+                    view = run.view();
                 } else {
                     out.println(stepResult.issues().getFirst().message());
                 }
                 if (run.view().ended()) {
-                    return 0;
+                    return smokeResult(options, run);
                 }
                 continue;
             }
@@ -185,10 +208,11 @@ public final class ConsoleApp {
                 StepResult stepResult = run.apply(new Command.Move(moveTarget));
                 if (stepResult.accepted()) {
                     out.println(ConsoleRenderer.render(stepResult.view()));
+                    printGenerationSummary(run);
                 } else {
                     out.println(stepResult.issues().getFirst().message());
                 }
-                if (run.view().ended()) return 0;
+                if (run.view().ended()) return smokeResult(options, run);
                 view = run.view();
                 continue;
             }
@@ -199,11 +223,12 @@ public final class ConsoleApp {
                         StepResult stepResult = run.apply(new Command.Choose(view.options().get(index).id()));
                         if (stepResult.accepted()) {
                             out.println(ConsoleRenderer.render(stepResult.view()));
+                            printGenerationSummary(run);
                         } else {
                             out.println(stepResult.issues().getFirst().message());
                         }
                         if (run.view().ended()) {
-                            return 0;
+                            return smokeResult(options, run);
                         }
                         view = run.view();
                         continue inputLoop;
@@ -216,11 +241,12 @@ public final class ConsoleApp {
                         StepResult stepResult = run.apply(new Command.Choose(option.id()));
                         if (stepResult.accepted()) {
                             out.println(ConsoleRenderer.render(stepResult.view()));
+                            printGenerationSummary(run);
                         } else {
                             out.println(stepResult.issues().getFirst().message());
                         }
                         if (run.view().ended()) {
-                            return 0;
+                            return smokeResult(options, run);
                         }
                         view = run.view();
                         continue inputLoop;
@@ -229,10 +255,11 @@ public final class ConsoleApp {
                 StepResult textResult = run.apply(new Command.SubmitText(line));
                 if (textResult.accepted()) {
                     out.println(ConsoleRenderer.render(textResult.view()));
+                    printGenerationSummary(run);
                 } else {
                     out.println(textResult.issues().getFirst().message());
                 }
-                if (run.view().ended()) return 0;
+                if (run.view().ended()) return smokeResult(options, run);
                 view = run.view();
                 continue;
             }
@@ -241,10 +268,11 @@ public final class ConsoleApp {
                 StepResult textResult = run.apply(new Command.SubmitText(line));
                 if (textResult.accepted()) {
                     out.println(ConsoleRenderer.render(textResult.view()));
+                    printGenerationSummary(run);
                 } else {
                     out.println(textResult.issues().getFirst().message());
                 }
-                if (run.view().ended()) return 0;
+                if (run.view().ended()) return smokeResult(options, run);
                 view = run.view();
                 continue;
             }
@@ -268,6 +296,50 @@ public final class ConsoleApp {
     }
 
     private String consoleUsage() {
-        return "Usage: java -jar engine-cli.jar --pack-dir <dir> [--locale <tag>] [--input <key=value>]... [--script <file>]";
+        return "Usage: java -jar engine-cli.jar --pack-dir <dir> [--locale <tag>] [--input <key=value>]... [--script <file>] [--generated]\n"
+                + "       Add --live-smoke --script <file> to call the configured provider (may incur cost).\n"
+                + "       Provider configuration: GENERATION_MODEL_ID and ANTHROPIC_API_KEY environment variables.";
+    }
+
+    private void printGenerationSummary(Run run) {
+        var summary = run.generationSummary();
+        if (summary.isEmpty()) return;
+        List<GenerationExecutionSummary.StageExecution> stages = summary.get().stages();
+        for (int index = printedGenerationStages; index < stages.size(); index++) {
+            var stage = stages.get(index);
+            String provider = stage.providerId() == null ? "none"
+                : stage.providerId().matches("[A-Za-z0-9._:-]{1,100}") ? stage.providerId() : "unknown";
+            out.println("Generation " + stage.stage() + " " + stage.outcome()
+                    + " calls=" + stage.providerCalls()
+                + " provider=" + provider
+                + (stage.usage() == null ? "" : " usage=" + stage.usage().inputTokens() + "/" + stage.usage().outputTokens())
+                    + (stage.failureCode() == null ? "" : " code=" + stage.failureCode()));
+        }
+        printedGenerationStages = stages.size();
+    }
+
+    private int smokeResult(ConsoleOptions options, Run run) {
+        if (!options.liveSmoke()) return 0;
+        GenerationExecutionSummary summary = run.generationSummary().orElse(null);
+        if (summary == null || summary.totalProviderCalls() == 0
+                || summary.stages().stream().anyMatch(stage -> stage.outcome() == GenerationArtifact.Outcome.FALLBACK)) {
+            return smokeIncomplete();
+        }
+        for (GenerationCatalog.Stage required : List.of(GenerationCatalog.Stage.SCENARIO,
+                GenerationCatalog.Stage.CAST, GenerationCatalog.Stage.QUEST)) {
+            if (summary.stages().stream().noneMatch(stage -> stage.stage() == required && stage.providerCalls() > 0)) {
+                return smokeIncomplete();
+            }
+        }
+        long liveScenes = summary.stages().stream().filter(stage -> stage.stage() == GenerationCatalog.Stage.SCENE
+                && stage.providerCalls() > 0 && stage.outcome() != GenerationArtifact.Outcome.FALLBACK).count();
+        if (liveScenes < 2) return smokeIncomplete();
+        out.println("Live generation smoke test passed.");
+        return 0;
+    }
+
+    private int smokeIncomplete() {
+        err.println("LIVE_SMOKE_INCOMPLETE: required stages and a lazily generated scene must succeed without fallback.");
+        return 4;
     }
 }

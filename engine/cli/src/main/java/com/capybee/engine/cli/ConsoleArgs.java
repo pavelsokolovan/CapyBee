@@ -27,12 +27,16 @@ public final class ConsoleArgs {
         Path script = null;
         Path save = null;
         Path load = null;
+        boolean generated = false;
+        boolean liveSmoke = false;
         boolean help = false;
 
         for (int index = 0; index < args.length; index++) {
             String arg = args[index];
             switch (arg) {
                 case "--help" -> help = true;
+                case "--generated" -> generated = true;
+                case "--live-smoke" -> { liveSmoke = true; generated = true; }
                 case "--pack-dir" -> {
                     if (index + 1 >= args.length) return new ParseResult(null, "Missing value for --pack-dir.");
                     packDir = Path.of(args[++index]);
@@ -76,7 +80,7 @@ public final class ConsoleArgs {
             }
         }
 
-        if (help && (packDir != null || locale != null || !inputs.isEmpty() || seed != null || script != null || save != null || load != null)) {
+        if (help && (packDir != null || locale != null || !inputs.isEmpty() || seed != null || script != null || save != null || load != null || generated || liveSmoke)) {
             return new ParseResult(null, "--help cannot be combined with other arguments.");
         }
 
@@ -84,6 +88,11 @@ public final class ConsoleArgs {
             return new ParseResult(null, "--load cannot be combined with --locale, --input or --seed.");
         }
 
-        return new ParseResult(new ConsoleOptions(packDir, locale, inputs, seed, script, save, load, help), null);
+        if (liveSmoke && (script == null || load != null)) {
+            return new ParseResult(null, "--live-smoke requires --script and cannot be combined with --load.");
+        }
+
+        return new ParseResult(new ConsoleOptions(packDir, locale, inputs, seed, script, save, load,
+            generated, liveSmoke, help), null);
     }
 }

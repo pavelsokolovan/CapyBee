@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "templates": [
+    {"id":"scenario-basic","stage":"SCENARIO"},
+    {"id":"cast-basic","stage":"CAST","actorSlots":["guide"]},
+    {"id":"quest-basic","stage":"QUEST","objectiveIds":[]},
+    {"id":"scene-basic","stage":"SCENE"}
+  ]
+}

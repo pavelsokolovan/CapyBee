@@ -6,6 +6,8 @@ import com.capybee.engine.content.SceneOption;
 import com.capybee.engine.content.SceneSet;
 import com.capybee.engine.content.Block;
 import com.capybee.engine.content.BlockKind;
+import com.capybee.engine.generation.GenerationPipeline;
+import com.capybee.engine.generation.GenerationExecutionSummary;
 import com.capybee.engine.input.InputContext;
 import com.capybee.engine.input.InputPolicy;
 import com.capybee.engine.input.InputResolution;
@@ -42,6 +44,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Optional;
 
 final class RunImpl implements Run {
     private final String id;
@@ -53,6 +56,7 @@ final class RunImpl implements Run {
     private Instant updatedAt;
     private final Clock clock;
     private final SceneSet sceneSet;
+    private final GenerationPipeline generationPipeline;
     private final Rules rules;
     private final PlaceMap placeMap;
     private final InputGuard inputGuard;
@@ -93,7 +97,7 @@ final class RunImpl implements Run {
         this(id, pack, locale, seed, startInputs, createdAt, updatedAt, step, sceneId, visited,
             ended, endReason, sceneSet, clock, rules, savedState,
             pack.manifest().features().contains(PackFeature.PLACES) ? PlacesParser.parse(pack) : null,
-            null, null, new PiiScrubber());
+            null, null, new PiiScrubber(), null);
         }
 
         RunImpl(String id, Pack pack, LocaleTag locale, long seed, Map<String, String> startInputs,
@@ -101,6 +105,17 @@ final class RunImpl implements Run {
             boolean ended, EndReason endReason, SceneSet sceneSet, Clock clock, Rules rules,
             RunState savedState, PlaceMap placeMap, InputGuard inputGuard,
             InputInterpreter inputInterpreter, PiiScrubber piiScrubber) {
+            this(id, pack, locale, seed, startInputs, createdAt, updatedAt, step, sceneId, visited,
+                ended, endReason, sceneSet, clock, rules, savedState, placeMap, inputGuard,
+                inputInterpreter, piiScrubber, null);
+            }
+
+            RunImpl(String id, Pack pack, LocaleTag locale, long seed, Map<String, String> startInputs,
+                Instant createdAt, Instant updatedAt, long step, String sceneId, List<String> visited,
+                boolean ended, EndReason endReason, SceneSet sceneSet, Clock clock, Rules rules,
+                RunState savedState, PlaceMap placeMap, InputGuard inputGuard,
+                InputInterpreter inputInterpreter, PiiScrubber piiScrubber,
+                GenerationPipeline generationPipeline) {
         this.id = id;
         this.pack = pack;
         this.locale = locale;
@@ -114,6 +129,7 @@ final class RunImpl implements Run {
         this.ended = ended;
         this.endReason = endReason;
         this.sceneSet = sceneSet;
+        this.generationPipeline = generationPipeline;
         this.clock = clock;
         this.rules = rules;
         this.placeMap = placeMap;
@@ -148,15 +164,33 @@ final class RunImpl implements Run {
     List<Event> startupEvents() { return List.copyOf(startupEvents); }
     List<Issue> startupIssues() { return List.copyOf(startupIssues); }
 
+    private Scene scene(String id) {
+        if (generationPipeline != null && generationPipeline.hasSceneSlot(id)) {
+            Scene generated = generationPipeline.resolveGeneratedScene(id);
+            if (generated != null) return generated;
+        }
+        return sceneSet.scenes().get(id);
+    }
+
+    private Scene resolveTarget(String id) {
+        try { return scene(id); }
+        catch (RuntimeException exception) { return null; }
+    }
+
     @Override
     public String id() { return id; }
+
+    @Override
+    public Optional<GenerationExecutionSummary> generationSummary() {
+        return generationPipeline == null ? Optional.empty() : Optional.of(generationPipeline.summary());
+    }
 
     @Override
     public View view() {
         if (ended && endReason == EndReason.ABANDONED) {
             return ViewBuilder.build(null, true, endReason, List.of(), List.of(), List.of(), null, buildPlacesView(true));
         }
-        return buildView(sceneSet.scenes().get(sceneId));
+        return buildView(scene(sceneId));
     }
 
     @Override
@@ -170,7 +204,7 @@ final class RunImpl implements Run {
             return new StepResult(true, view(), List.of(), List.of());
         }
         if (command instanceof Command.Move move) return move(move.placeId());
-        Scene current = sceneSet.scenes().get(sceneId);
+        Scene current = scene(sceneId);
         if (current == null) return reject("COMMAND_NOT_ALLOWED", "The current scene is missing");
         if (command instanceof Command.SubmitText submitText) return submitText(current, submitText.text());
         if (command instanceof Command.Choose choose) {
@@ -187,9 +221,14 @@ final class RunImpl implements Run {
                     break;
                 }
             }
+            Scene targetScene = resolveTarget(target);
+            if (targetScene == null) {
+                step--;
+                return reject("SCENE_RESOLUTION_FAILED", "The next scene could not be prepared");
+            }
             List<Event> events = new ArrayList<>();
             List<Issue> issues = new ArrayList<>();
-            enterTarget(target, events, issues);
+            enterTarget(target, targetScene, events, issues);
             updatedAt = clock.instant();
             return new StepResult(true, view(), events, issues);
         }
@@ -203,18 +242,22 @@ final class RunImpl implements Run {
         return new RunSnapshot(1, id, new PackRef(pack.manifest().id(), pack.manifest().version()),
                 locale, seed, persistentStartInputs(), createdAt, updatedAt, step,
                 new RunState(sceneId, List.copyOf(visited), ended, endReason,
-                    counters, flags, savedSets, objectives, outcome, currentPlaceId, visitedPlaces));
+                    counters, flags, savedSets, objectives, outcome, currentPlaceId, visitedPlaces,
+                    generationPipeline == null ? List.of() : generationPipeline.artifacts()));
     }
 
     private void initializeAtStart() {
-        Scene start = sceneSet.scenes().get(sceneId);
+        Scene start = scene(sceneId);
         applyEffects(start.onEnter(), startupEvents);
         evaluateObjectives(startupEvents, startupIssues);
         if (start.end() || endRequested) finish(EndReason.COMPLETED, start);
     }
 
     private void enterTarget(String targetId, List<Event> events, List<Issue> issues) {
-        Scene target = sceneSet.scenes().get(targetId);
+        enterTarget(targetId, scene(targetId), events, issues);
+    }
+
+    private void enterTarget(String targetId, Scene target, List<Event> events, List<Issue> issues) {
         if (target == null) {
             issues.add(new Issue(Issue.Severity.ERROR, "COMMAND_NOT_ALLOWED", "Target scene is missing: " + targetId));
             return;
@@ -323,11 +366,13 @@ final class RunImpl implements Run {
         SceneOption option = current.options().stream().filter(item -> item.id().equals(optionId)).findFirst().orElse(null);
         if (option == null) return reject("OPTION_UNKNOWN", "Unknown option id");
         if (!isEnabled(option)) return reject("OPTION_DISABLED", "Option is unavailable");
+        Scene target = resolveTarget(option.next());
+        if (target == null) return reject("SCENE_RESOLUTION_FAILED", "The selected scene could not be prepared");
         step++;
         List<Event> events = new ArrayList<>();
         List<Issue> issues = new ArrayList<>();
         applyEffects(option.effects(), events);
-        enterTarget(option.next(), events, issues);
+        enterTarget(option.next(), target, events, issues);
         updatedAt = clock.instant();
         return new StepResult(true, view(), events, issues);
     }
@@ -515,7 +560,7 @@ final class RunImpl implements Run {
         List<Event> events = new ArrayList<>();
         List<Issue> issues = new ArrayList<>();
         evaluateObjectives(events, issues);
-        if (endRequested) finish(EndReason.COMPLETED, sceneSet.scenes().get(sceneId));
+        if (endRequested) finish(EndReason.COMPLETED, scene(sceneId));
         updatedAt = clock.instant();
         return new StepResult(true, view(), events, issues);
     }

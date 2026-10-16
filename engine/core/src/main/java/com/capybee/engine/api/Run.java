@@ -1,5 +1,9 @@
 package com.capybee.engine.api;
 
+import com.capybee.engine.generation.GenerationExecutionSummary;
+
+import java.util.Optional;
+
 public interface Run {
     String id();
 
@@ -8,4 +12,6 @@ public interface Run {
     StepResult apply(Command command);
 
     RunSnapshot snapshot();
+
+    default Optional<GenerationExecutionSummary> generationSummary() { return Optional.empty(); }
 }

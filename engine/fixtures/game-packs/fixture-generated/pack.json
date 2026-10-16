@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture-generated",
+  "version": "1.0.0",
+  "name": "Fixture Generated",
+  "locales": ["en"],
+  "defaultLocale": "en",
+  "features": ["GENERATION"],
+  "startInputs": [],
+  "contentPolicy": {"freeTextAllowed": false},
+  "files": [
+    "strings/en.json",
+    "prompts/en/system.md",
+    "scenes/en/story.json",
+    "generation/catalog.json",
+    "generation/templates.json",
+    "generation/fallbacks/scenario.json",
+    "generation/fallbacks/cast.json",
+    "generation/fallbacks/quest.json",
+    "generation/fallbacks/opening.json",
+    "generation/fallbacks/meeting.json"
+  ]
+}

@@ -62,6 +62,20 @@ class AnthropicTextGeneratorTest {
     }
 
     @Test
+    void ignoresThinkingBlocksBeforeReturningTextOutput() throws IOException {
+        String withThinking = """
+                {"type":"message","model":"test-pinned-model","stop_reason":"end_turn",
+                 "content":[{"type":"thinking","thinking":"internal reasoning","signature":"sig"},
+                            {"type":"text","text":"{\\"resolution\\":\\"NO_MATCH\\"}"}],
+                 "usage":{"input_tokens":23,"output_tokens":7}}
+                """;
+        withServer(exchange -> respond(exchange, 200, withThinking), endpoint -> {
+            assertThat(new AnthropicTextGenerator(config(endpoint)).generate(request()).outputJson())
+                    .isEqualTo("{\"resolution\":\"NO_MATCH\"}");
+        });
+    }
+
+    @Test
     void mapsProviderErrorsWithoutExposingResponseBodiesOrCredentials() throws IOException {
         withServer(exchange -> respond(exchange, 429, "private-provider-error"), endpoint -> {
             var generator = new AnthropicTextGenerator(config(endpoint));
@@ -72,6 +86,21 @@ class AnthropicTextGeneratorTest {
                     .hasNoCause()
                     .hasToString("TextGenerationException[RATE_LIMITED]");
         });
+    }
+
+    @Test
+    void distinguishesRequestAuthenticationPermissionAndResourceErrorsWithoutLeakingBodies() throws IOException {
+        var expected = java.util.Map.of(400, "REQUEST_INVALID", 401, "AUTHENTICATION_FAILED",
+                403, "PERMISSION_DENIED", 404, "RESOURCE_NOT_FOUND");
+        for (var entry : expected.entrySet()) {
+            withServer(exchange -> respond(exchange, entry.getKey(), "private-provider-error " + API_KEY), endpoint -> {
+                assertThatThrownBy(() -> new AnthropicTextGenerator(config(endpoint)).generate(request()))
+                        .isInstanceOf(TextGenerationException.class)
+                        .hasMessage(entry.getValue())
+                        .hasNoCause()
+                        .hasToString("TextGenerationException[" + entry.getValue() + "]");
+            });
+        }
     }
 
     @Test
@@ -91,6 +120,27 @@ class AnthropicTextGeneratorTest {
             assertThat(new AnthropicTextGenerator(config(endpoint)).generate(request()).finishReason())
                     .isEqualTo(TextGenerationResult.FinishReason.REFUSED);
         });
+    }
+
+    @Test
+    void classifiesKnownBadRequestReasonsWithoutExposingProviderText() throws IOException {
+        var cases = java.util.Map.of(
+                "Your credit balance is too low to access the API.", "BILLING_UNAVAILABLE",
+                "Insufficient credits for this request.", "BILLING_UNAVAILABLE",
+                "output_config.format is not supported by this model.", "STRUCTURED_OUTPUT_UNSUPPORTED",
+                "This model does not support structured outputs.", "STRUCTURED_OUTPUT_UNSUPPORTED",
+                "Unknown request problem.", "REQUEST_INVALID");
+        for (var entry : cases.entrySet()) {
+            String body = MAPPER.writeValueAsString(java.util.Map.of("type", "error", "error",
+                    java.util.Map.of("type", "invalid_request_error", "message", entry.getKey() + " " + API_KEY)));
+            withServer(exchange -> respond(exchange, 400, body), endpoint -> {
+                assertThatThrownBy(() -> new AnthropicTextGenerator(config(endpoint)).generate(request()))
+                        .isInstanceOf(TextGenerationException.class)
+                        .hasMessage(entry.getValue())
+                        .hasNoCause()
+                        .hasToString("TextGenerationException[" + entry.getValue() + "]");
+            });
+        }
     }
 
     @Test

@@ -25,6 +25,10 @@ public final class PackLayout {
                 paths.add("prompts/" + locale.value() + "/system.md");
             }
         }
+        if (features.contains(PackFeature.GENERATION)) {
+            paths.add("generation/catalog.json");
+            paths.add("generation/templates.json");
+        }
         if (features.contains(PackFeature.PLACES)) paths.add("places.json");
         return List.copyOf(paths);
     }

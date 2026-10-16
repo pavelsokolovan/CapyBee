@@ -2,6 +2,9 @@ package com.capybee.engine.cli;
 
 import com.capybee.engine.adapter.Randoms;
 import com.capybee.engine.adapter.SequentialIdSource;
+import com.capybee.engine.port.StructuredGenerationRequest;
+import com.capybee.engine.port.TextGenerationResult;
+import com.capybee.engine.port.TextGenerator;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
@@ -13,6 +16,9 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -20,12 +26,14 @@ class ConsoleAppTest {
     private static final String MINIMAL_PACK = Path.of("..", "fixtures", "game-packs", "fixture-minimal").toString();
     private static final String DUNGEON_PACK = Path.of("..", "fixtures", "game-packs", "fixture-text-dungeon").toString();
     private static final String TEXT_INPUT_PACK = Path.of("..", "fixtures", "game-packs", "fixture-text-input").toString();
+    private static final String GENERATED_PACK = Path.of("..", "fixtures", "game-packs", "fixture-generated").toString();
 
     @Test
     void helpAndMissingPackDirectoryReturnUsageErrors() {
         var help = run(new String[]{"--help"}, "");
         assertThat(help.exitCode).isZero();
         assertThat(help.output).contains("--script <file>");
+        assertThat(help.output).contains("--live-smoke");
         assertThat(run(new String[0], "").exitCode).isEqualTo(2);
         assertThat(run(new String[]{"--pack-dir", "missing-pack"}, "").exitCode).isEqualTo(1);
     }
@@ -90,6 +98,71 @@ class ConsoleAppTest {
             System.setOut(previous);
         }
         assertThat(bytes.toString(StandardCharsets.UTF_8)).contains("Usage:");
+    }
+
+    @Test
+    void generatedCliRunsScriptAndPrintsStageOutcomesWithoutProviderBodies() throws Exception {
+        Path script = Files.createTempFile("generated-play", ".txt");
+        try {
+            Files.writeString(script, "1\n1\n", StandardCharsets.UTF_8);
+            ScriptedGenerator generator = new ScriptedGenerator(
+                    "{\"title\":\"An Evening\",\"premise\":\"A lantern waits.\",\"setting\":\"Observatory\",\"beats\":[\"opening-slot\",\"meeting-slot\"]}",
+                    "{\"characters\":[]}", "{\"objectives\":[]}",
+                    scene("opening", "A Quiet Start", "explore", "Look around", "rest", "Rest"),
+                    scene("meeting", "A New Room", "continue", "Continue", "finish", "Finish"));
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            ByteArrayOutputStream errors = new ByteArrayOutputStream();
+            ConsoleApp app = new ConsoleApp(new ByteArrayInputStream(new byte[0]),
+                    new PrintStream(output, true, StandardCharsets.UTF_8),
+                    new PrintStream(errors, true, StandardCharsets.UTF_8),
+                    Clock.fixed(Instant.parse("2026-10-12T10:00:00Z"), ZoneOffset.UTC),
+                    new SequentialIdSource("generated-cli"), Randoms.seeded(42), generator);
+
+            int exit = app.run(new String[]{"--pack-dir", GENERATED_PACK, "--generated", "--script", script.toString()});
+
+            assertThat(exit).isZero();
+                assertThat(output.toString(StandardCharsets.UTF_8)).contains("Generation SCENARIO GENERATED",
+                    "Generation SCENE GENERATED", "provider=scripted-test");
+            assertThat(output.toString(StandardCharsets.UTF_8)).contains("A Quiet Start", "A New Room");
+            assertThat(output.toString(StandardCharsets.UTF_8)).doesNotContain("raw-provider-body", "secret-key");
+            assertThat(errors.toString(StandardCharsets.UTF_8)).isEmpty();
+        } finally {
+            Files.deleteIfExists(script);
+        }
+    }
+
+    @Test
+    void liveSmokeRejectsAnInjectedFakeProvider() throws Exception {
+        Path script = Files.createTempFile("generated-smoke", ".txt");
+        try {
+            ByteArrayOutputStream errors = new ByteArrayOutputStream();
+            ConsoleApp app = new ConsoleApp(new ByteArrayInputStream(new byte[0]),
+                    new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                    new PrintStream(errors, true, StandardCharsets.UTF_8),
+                    Clock.systemUTC(), new SequentialIdSource("smoke"), Randoms.seeded(2),
+                    request -> new TextGenerationResult("{}", null, "fake", TextGenerationResult.FinishReason.COMPLETE));
+            int exit = app.run(new String[]{"--pack-dir", GENERATED_PACK, "--live-smoke", "--script", script.toString()});
+            assertThat(exit).isEqualTo(4);
+            assertThat(errors.toString(StandardCharsets.UTF_8)).contains("LIVE_PROVIDER_NOT_CONFIGURED");
+        } finally {
+            Files.deleteIfExists(script);
+        }
+    }
+
+    private static String scene(String sceneId, String title, String firstId, String firstLabel,
+                                String secondId, String secondLabel) {
+        String narration = sceneId.equals("opening") ? "Opening generated." : "Meeting generated.";
+        return "{\"title\":\"" + title + "\",\"narration\":\"" + narration + "\",\"dialogue\":[],\"choices\":["
+                + "{\"id\":\"" + firstId + "\",\"label\":\"" + firstLabel + "\"},"
+                + "{\"id\":\"" + secondId + "\",\"label\":\"" + secondLabel + "\"}]}";
+    }
+
+    private static final class ScriptedGenerator implements TextGenerator {
+        private final Deque<String> outputs = new ArrayDeque<>();
+        private ScriptedGenerator(String... outputs) { this.outputs.addAll(List.of(outputs)); }
+        @Override public TextGenerationResult generate(StructuredGenerationRequest request) {
+            return new TextGenerationResult(outputs.removeFirst(), null, "scripted-test", TextGenerationResult.FinishReason.COMPLETE);
+        }
     }
 
     private ConsoleResult run(String[] args, String input) {

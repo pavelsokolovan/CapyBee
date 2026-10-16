@@ -40,16 +40,23 @@ All of the above are implemented; see [../../.github/copilot-instructions.md](..
 Spec 22 lives in the independent `engine/` Maven module. Console-first runtime
 and host integration follow in the series below.
 
-## Planned Documents
+## Engine Roadmap Reconciliation
 
-- 23 - Engine API and minimal authored console loop
+The earlier planned list below used different ownership for several numbers.
+Keep existing numbered files stable; do not renumber them to match that older
+list. The current implementation boundary is:
+
+- 23 - Engine API and authored runtime
 - 24 - Rules, state, and snapshots
 - 24.1 - Places and map runtime
-- 25 - Templates, kinds, and generation stages
-- 26 - Input and safety policy
-- 27 - Generation pipeline and reference adapters
-- 28 - Console host, scripted playthroughs, and golden transcripts
-- 29 - Web host integration
-- 30 - Client rendering and asset catalog
-- 31 - Polish game pack, Play tab entry, and rewards
-- deployment checklist
+- 25 - Input and safety policy
+- 26 - Provider-neutral generation pipeline
+- 26.1 - Generation catalog/contracts, generated runtime integration, CLI mode,
+  fallback/repair behavior, and artifact snapshot continuity (implemented)
+- 27 - Public session lifecycle and host-facing API contract
+- 28 - Expanded console host and scripted playthroughs
+- 29-31 - Web host, client rendering, and game-pack integration
+
+Spec 26.1 found no existing Spec 24 template-definition package. It therefore
+adds the smallest versioned `generation/templates.json` registry and documents
+that compatibility addition in [the engine guide](../../engine/README.md).

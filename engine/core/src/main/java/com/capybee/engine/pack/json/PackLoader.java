@@ -1,5 +1,7 @@
 package com.capybee.engine.pack.json;
 
+import com.capybee.engine.generation.GenerationPipeline;
+import com.capybee.engine.generation.json.GenerationCatalogParser;
 import com.capybee.engine.pack.*;
 import tools.jackson.databind.JsonNode;
 
@@ -69,7 +71,26 @@ public final class PackLoader {
         Pack pack = null;
         if (!context.hasErrors()) {
             pack = new Pack(manifest.manifest(), files);
+            if (manifest.features().contains(PackFeature.GENERATION)) {
+                GenerationCatalogParser.validate(pack, documents.get("generation/catalog.json"),
+                        documents.get("generation/templates.json"), context);
+            }
             for (SectionValidator validator : sectionValidators) validator.validate(pack, context);
+            if (!context.hasErrors() && manifest.features().contains(PackFeature.GENERATION)) {
+                var catalog = GenerationCatalogParser.parse(pack);
+                for (String locale : catalog.supportedLocales()) {
+                    try {
+                        GenerationPipeline.validatePack(pack, new LocaleTag(locale));
+                    } catch (RuntimeException exception) {
+                        boolean invalidReference = "GENERATION_REFERENCE_INVALID".equals(exception.getMessage());
+                        context.error(invalidReference ? "GENERATION_REFERENCE_INVALID" : "GENERATION_FALLBACK_INVALID",
+                                "generation/catalog.json", "", invalidReference
+                                        ? "A generation template references an undeclared objective"
+                                        : "A configured generation fallback is invalid");
+                        break;
+                    }
+                }
+            }
         }
         return result(pack, context);
     }
