@@ -20,6 +20,8 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import com.capybee.server.domain.user.UserAccount;
 import com.capybee.server.service.SessionRestoreTokenService;
 import com.capybee.server.service.UserService;
+import com.capybee.engine.session.wire.ErrorDto;
+import com.capybee.engine.session.wire.SessionJson;
 
 @Configuration
 public class SecurityConfig {
@@ -57,6 +59,16 @@ public class SecurityConfig {
                         .anyRequest()
                         .authenticated())
                 .exceptionHandling(exceptions -> exceptions
+                        .defaultAuthenticationEntryPointFor(
+                                (request, response, exception) -> {
+                                    response.setStatus(HttpStatus.UNAUTHORIZED.value());
+                                    response.setContentType("application/json");
+                                    response.setCharacterEncoding(java.nio.charset.StandardCharsets.UTF_8.name());
+                                    response.getWriter().write(SessionJson.encode(new ErrorDto(
+                                            new ErrorDto.Error("UNAUTHENTICATED",
+                                                    "Sign in to continue.", java.util.Map.of()))));
+                                },
+                                (RequestMatcher) request -> request.getRequestURI().startsWith("/api/game/"))
                         .defaultAuthenticationEntryPointFor(
                                 new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),
                                 (RequestMatcher) request -> request.getRequestURI().startsWith("/api/")))

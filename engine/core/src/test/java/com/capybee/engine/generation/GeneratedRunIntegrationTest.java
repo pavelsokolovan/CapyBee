@@ -82,6 +82,44 @@ class GeneratedRunIntegrationTest {
         assertThat(generator.requests).hasSize(5);
     }
 
+    @Test
+    void prefetchResolvesReachableGeneratedSceneWithoutChangingRunAndReusesItOnEntry() {
+        var pack = new PackLoader(Engine.sectionValidators())
+                .load(new PackId("fixture-generated"), new DirectoryPackSource(PACK_PATH));
+        ScriptedGenerator generator = new ScriptedGenerator(
+                "{\"title\":\"An Evening\",\"premise\":\"A lantern waits.\",\"setting\":\"Observatory\",\"beats\":[\"opening-slot\",\"meeting-slot\"]}",
+                "{\"characters\":[]}",
+                "{\"objectives\":[]}",
+                scene("opening", "A Quiet Start", "explore", "Look around", "rest", "Rest"),
+                scene("meeting", "A New Room", "continue", "Continue", "finish", "Finish"));
+        Engine engine = Engine.builder(new PackRegistry(List.of(pack)))
+                .clock(Clock.fixed(Instant.parse("2026-10-14T12:00:00Z"), ZoneOffset.UTC))
+                .random(Randoms.seeded(17))
+                .ids(new SequentialIdSource("generated-run"))
+                .textGenerator(generator)
+                .build();
+
+        var run = engine.start(new RunRequest(new PackId("fixture-generated"), new LocaleTag("en"),
+                java.util.Map.of(), 17L, true)).run();
+        var before = run.snapshot();
+        var viewBefore = run.view();
+
+        assertThat(run.prefetchCandidates()).containsExactly("meeting");
+        var prefetched = run.prefetch("meeting");
+
+        assertThat(prefetched).isPresent();
+        assertThat(prefetched.orElseThrow().outcome()).isEqualTo(GenerationArtifact.Outcome.GENERATED);
+        assertThat(run.snapshot().step()).isEqualTo(before.step());
+        assertThat(run.snapshot().state().sceneId()).isEqualTo(before.state().sceneId());
+        assertThat(run.snapshot().state().counters()).isEqualTo(before.state().counters());
+        assertThat(run.snapshot().updatedAt()).isEqualTo(before.updatedAt());
+        assertThat(run.view()).isEqualTo(viewBefore);
+        assertThat(generator.requests).hasSize(5);
+
+        assertThat(run.apply(new Command.Choose("explore")).accepted()).isTrue();
+        assertThat(generator.requests).hasSize(5);
+    }
+
     private static String scene(String ignoredSceneId, String title, String firstId, String firstLabel,
                                 String secondId, String secondLabel) {
         String narration = ignoredSceneId.equals("opening") ? "Opening generated." : "Meeting generated.";

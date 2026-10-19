@@ -1,0 +1,23 @@
+{
+  "runId": "5f2fc4c8-bfc4-4b2f-8fd6-04fd187d687e",
+  "status": "ACTIVE",
+  "revision": 4,
+  "packId": "fixture-minimal",
+  "packVersion": "1.0.0",
+  "locale": "en",
+  "endReason": null,
+  "failureCode": null,
+  "viewSchema": 1,
+  "view": {
+    "blocks": [],
+    "options": [],
+    "input": null,
+    "status": [],
+    "ended": false,
+    "endReason": null,
+    "objectives": [],
+    "outcome": null,
+    "places": null
+  },
+  "updatedAt": "2026-10-16T20:11:03Z"
+}

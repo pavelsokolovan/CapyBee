@@ -5,6 +5,7 @@ import com.capybee.engine.pack.LocaleTag;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 
 public final class ConsoleArgs {
     private ConsoleArgs() {}
@@ -30,6 +31,11 @@ public final class ConsoleArgs {
         boolean generated = false;
         boolean liveSmoke = false;
         boolean help = false;
+        boolean session = false;
+        Path storeDir = null;
+        UUID runId = null;
+        boolean newRun = false;
+        boolean debug = false;
 
         for (int index = 0; index < args.length; index++) {
             String arg = args[index];
@@ -37,6 +43,9 @@ public final class ConsoleArgs {
                 case "--help" -> help = true;
                 case "--generated" -> generated = true;
                 case "--live-smoke" -> { liveSmoke = true; generated = true; }
+                case "--session" -> session = true;
+                case "--new" -> newRun = true;
+                case "--debug" -> debug = true;
                 case "--pack-dir" -> {
                     if (index + 1 >= args.length) return new ParseResult(null, "Missing value for --pack-dir.");
                     packDir = Path.of(args[++index]);
@@ -74,13 +83,27 @@ public final class ConsoleArgs {
                     if (index + 1 >= args.length) return new ParseResult(null, "Missing value for --load.");
                     load = Path.of(args[++index]);
                 }
+                case "--store-dir" -> {
+                    if (index + 1 >= args.length) return new ParseResult(null, "Missing value for --store-dir.");
+                    storeDir = Path.of(args[++index]);
+                }
+                case "--run" -> {
+                    if (index + 1 >= args.length) return new ParseResult(null, "Missing value for --run.");
+                    try {
+                        runId = UUID.fromString(args[++index]);
+                    } catch (IllegalArgumentException exception) {
+                        return new ParseResult(null, "--run must be a UUID.");
+                    }
+                }
                 default -> {
                     return new ParseResult(null, "Unknown argument: " + arg);
                 }
             }
         }
 
-        if (help && (packDir != null || locale != null || !inputs.isEmpty() || seed != null || script != null || save != null || load != null || generated || liveSmoke)) {
+        if (help && (packDir != null || locale != null || !inputs.isEmpty() || seed != null || script != null
+                || save != null || load != null || generated || liveSmoke || session || storeDir != null
+                || runId != null || newRun || debug)) {
             return new ParseResult(null, "--help cannot be combined with other arguments.");
         }
 
@@ -92,7 +115,17 @@ public final class ConsoleArgs {
             return new ParseResult(null, "--live-smoke requires --script and cannot be combined with --load.");
         }
 
+        if (!session && (storeDir != null || runId != null || newRun || debug)) {
+            return new ParseResult(null, "--store-dir, --run, --new and --debug require --session.");
+        }
+        if (session && (save != null || load != null || liveSmoke)) {
+            return new ParseResult(null, "--session cannot be combined with --save, --load or --live-smoke.");
+        }
+        if (runId != null && newRun) {
+            return new ParseResult(null, "--run cannot be combined with --new.");
+        }
+
         return new ParseResult(new ConsoleOptions(packDir, locale, inputs, seed, script, save, load,
-            generated, liveSmoke, help), null);
+            generated, liveSmoke, help, session, storeDir, runId, newRun, debug), null);
     }
 }

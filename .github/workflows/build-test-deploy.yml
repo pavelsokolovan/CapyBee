@@ -93,16 +93,14 @@ jobs:
           cache: maven
 
       - name: Run backend tests
-        working-directory: app/server
-        run: mvn -B verify
+        run: mvn -B -pl app/server -am verify
         env:
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/capybee
           SPRING_DATASOURCE_USERNAME: capybee
           SPRING_DATASOURCE_PASSWORD: capybee
 
       - name: Build backend JAR
-        working-directory: app/server
-        run: mvn -B -DskipTests package
+        run: mvn -B -DskipTests -pl app/server -am package
 
       - name: Upload test results
         if: always()

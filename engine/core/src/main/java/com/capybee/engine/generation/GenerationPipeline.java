@@ -182,11 +182,16 @@ public final class GenerationPipeline {
     }
 
     public Scene resolveGeneratedScene(String sceneId) {
+        SceneResolution resolution = resolveGeneratedSceneResolution(sceneId);
+        return resolution == null ? null : resolution.scene();
+    }
+
+    public SceneResolution resolveGeneratedSceneResolution(String sceneId) {
         GenerationCatalog.SceneSlot slot = catalog.sceneSlots().stream()
                 .filter(candidate -> candidate.sceneId().equals(sceneId)).findFirst().orElse(null);
         if (slot == null) return null;
         if (!initialized) initialize();
-        return resolveScene(slot.slotId()).scene();
+        return resolveScene(slot.slotId());
     }
 
     private InitialContent initialContent() {

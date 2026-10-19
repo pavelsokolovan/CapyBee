@@ -2,6 +2,7 @@ package com.capybee.engine.cli;
 
 import com.capybee.engine.adapter.anthropic.AnthropicTextGenerator;
 import com.capybee.engine.adapter.Randoms;
+import com.capybee.engine.adapter.StructuredInputInterpreter;
 import com.capybee.engine.adapter.UuidIdSource;
 import com.capybee.engine.api.Command;
 import com.capybee.engine.api.Engine;
@@ -24,6 +25,14 @@ import com.capybee.engine.port.TextGenerator;
 import com.capybee.engine.generation.GenerationArtifact;
 import com.capybee.engine.generation.GenerationCatalog;
 import com.capybee.engine.generation.GenerationExecutionSummary;
+import com.capybee.engine.session.MeteredTextGenerator;
+import com.capybee.engine.session.RunSessionService;
+import com.capybee.engine.session.SessionLimits;
+import com.capybee.engine.session.SessionPorts;
+import com.capybee.engine.session.SessionException;
+import com.capybee.engine.session.SessionTypes;
+import com.capybee.engine.session.adapter.FileRunRepository;
+import com.capybee.engine.session.adapter.InMemorySessionStore;
 
 import java.io.InputStream;
 import java.io.BufferedReader;
@@ -33,8 +42,13 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.random.RandomGenerator;
 
 public final class ConsoleApp {
@@ -103,6 +117,8 @@ public final class ConsoleApp {
         }
 
         var pack = load.pack().orElseThrow();
+        if (options.session()) return runSessionMode(options, packId, pack);
+
         var engineBuilder = Engine.builder(new PackRegistry(List.of(pack)))
                 .clock(clock)
                 .random(random)
@@ -297,8 +313,197 @@ public final class ConsoleApp {
 
     private String consoleUsage() {
         return "Usage: java -jar engine-cli.jar --pack-dir <dir> [--locale <tag>] [--input <key=value>]... [--script <file>] [--generated]\n"
+                + "       Add --session for resumable play; use --store-dir <dir> for local persistence and --run <uuid> to resume.\n"
                 + "       Add --live-smoke --script <file> to call the configured provider (may incur cost).\n"
                 + "       Provider configuration: GENERATION_MODEL_ID and ANTHROPIC_API_KEY environment variables.";
+    }
+
+    private int runSessionMode(ConsoleOptions options, PackId packId, com.capybee.engine.pack.Pack pack) {
+        InMemorySessionStore memory = new InMemorySessionStore(clock);
+        SessionPorts.RunRepository runs = options.storeDir() == null ? memory
+                : new FileRunRepository(options.storeDir(), clock);
+        SessionPorts.PackCatalog catalog = new SessionPorts.PackCatalog() {
+            @Override public List<com.capybee.engine.pack.Pack> all() { return List.of(pack); }
+            @Override public java.util.Optional<com.capybee.engine.pack.Pack> find(String id) {
+                return pack.manifest().id().value().equals(id)
+                        ? java.util.Optional.of(pack) : java.util.Optional.empty();
+            }
+        };
+        SessionPorts.EngineFactory factory = (owner, runId, priority) -> {
+            var builder = Engine.builder(new PackRegistry(List.of(pack))).clock(clock)
+                    .random(Randoms.seeded(runId.getMostSignificantBits() ^ runId.getLeastSignificantBits()))
+                    .ids(ids);
+            if (textGenerator != null) {
+                var metered = new MeteredTextGenerator(textGenerator, memory,
+                        new SessionTypes.LedgerScope("profile:local", 40),
+                        new SessionTypes.LedgerScope("global", 1500), LocalDate.now(clock),
+                        runId, 24, priority, 8, 100, 4);
+                builder.textGenerator(metered)
+                        .inputInterpreter(new StructuredInputInterpreter(metered));
+            }
+            return builder.build();
+        };
+        try (ExecutorService workers = Executors.newFixedThreadPool(2)) {
+            RunSessionService sessions = new RunSessionService(catalog, runs, memory, memory, memory,
+                    factory, clock::instant, SessionLimits.defaults(), memory, workers, new byte[32]);
+            SessionTypes.OwnerRef owner = new SessionTypes.OwnerRef("local-console");
+            SessionTypes.RunSummary summary;
+            if (options.runId() != null) {
+                summary = sessions.get(owner, options.runId());
+            } else if (!options.newRun() && runs.findCurrent(owner).isPresent()) {
+                summary = sessions.get(owner, runs.findCurrent(owner).orElseThrow().id());
+            } else {
+                SessionTypes.StartRequest start = new SessionTypes.StartRequest(UUID.randomUUID(), packId,
+                        options.locale() == null ? pack.manifest().defaultLocale() : options.locale(),
+                        options.inputs(), options.seed(), options.generated());
+                SessionTypes.StartAccepted accepted = sessions.start(owner, start, Duration.ofSeconds(8));
+                summary = sessions.get(owner, accepted.runId());
+            }
+            summary = awaitActive(sessions, owner, summary);
+            if (summary == null) return 3;
+            return runSessionLoop(options, sessions, owner, summary);
+        } catch (SessionException failure) {
+            err.println(failure.code().name());
+            return 3;
+        } catch (RuntimeException failure) {
+            err.println("SESSION_UNAVAILABLE");
+            return 3;
+        }
+    }
+
+    private SessionTypes.RunSummary awaitActive(RunSessionService sessions, SessionTypes.OwnerRef owner,
+                                                 SessionTypes.RunSummary summary) {
+        while (summary.status() == SessionTypes.RunStatus.PREPARING) {
+            out.println("CapyBee is thinking…");
+            sleep(Duration.ofMillis(1500));
+            summary = sessions.get(owner, summary.runId());
+        }
+        if (summary.status() != SessionTypes.RunStatus.ACTIVE) {
+            err.println(summary.failureCode() == null ? "START_REJECTED" : summary.failureCode());
+            return null;
+        }
+        return summary;
+    }
+
+    private int runSessionLoop(ConsoleOptions options, RunSessionService sessions, SessionTypes.OwnerRef owner,
+                               SessionTypes.RunSummary initialSummary) {
+        BufferedReader reader;
+        try {
+            reader = options.script() == null
+                    ? new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))
+                    : Files.newBufferedReader(options.script(), StandardCharsets.UTF_8);
+        } catch (Exception failure) {
+            err.println("SCRIPT_INVALID");
+            return 2;
+        }
+        SessionTypes.RunSummary summary = initialSummary;
+        View view = summary.view();
+        out.println("Run " + summary.runId());
+        out.println("Running " + summary.packId().value() + " in locale " + summary.locale().value());
+        out.println(ConsoleRenderer.render(view));
+        printSessionDebug(options.debug(), sessions, owner, summary);
+        while (!view.ended()) {
+            if (options.script() == null) out.print("> ");
+            String line = readLine(reader);
+            if (line == null) return 0;
+            if (options.script() != null) out.println("> " + line);
+            String trimmed = line.trim();
+            if (trimmed.equalsIgnoreCase("/quit") || trimmed.equalsIgnoreCase("/q")) return 0;
+            if (trimmed.equalsIgnoreCase("/status")) {
+                out.println(ConsoleRenderer.render(view));
+                printSessionDebug(options.debug(), sessions, owner, summary);
+                continue;
+            }
+            if (trimmed.equalsIgnoreCase("/events")) {
+                sessions.events(owner, summary.runId(), 0, 100)
+                        .forEach(event -> out.println(event.seq() + " " + event.event().id()));
+                continue;
+            }
+            if (trimmed.equalsIgnoreCase("/debug on")) {
+                options = withDebug(options, true);
+                printSessionDebug(true, sessions, owner, summary);
+                continue;
+            }
+            if (trimmed.equalsIgnoreCase("/debug off")) {
+                options = withDebug(options, false);
+                continue;
+            }
+            if (trimmed.equals("?")) {
+                out.println("/text <words>, /move <placeId>, /status, /events, /abandon, /quit");
+                continue;
+            }
+            Command command;
+            if (trimmed.equalsIgnoreCase("/abandon") || trimmed.equalsIgnoreCase("q")) {
+                command = new Command.Abandon();
+            } else if (trimmed.startsWith("/text ")) {
+                command = new Command.SubmitText(line.substring(line.indexOf(' ') + 1));
+            } else if (trimmed.startsWith("/move ")) {
+                command = new Command.Move(trimmed.substring(6).trim());
+            } else if (trimmed.isEmpty()) {
+                command = new Command.Advance();
+            } else {
+                String optionId = sessionOption(trimmed, view);
+                if (optionId != null) command = new Command.Choose(optionId);
+                else if (view.input() != null && (view.input().mode() == com.capybee.engine.api.InputMode.TEXT
+                        || view.input().mode() == com.capybee.engine.api.InputMode.CHOICE_OR_TEXT)) {
+                    command = new Command.SubmitText(line);
+                } else {
+                    out.println("! Choose an option, or press Enter to continue.");
+                    continue;
+                }
+            }
+            SessionTypes.CommandOutcome outcome = sessions.command(owner, summary.runId(),
+                    new SessionTypes.CommandRequest(UUID.randomUUID(), summary.revision(), command),
+                    Duration.ofSeconds(8));
+            while (outcome.outcome() == SessionTypes.Outcome.PROCESSING) {
+                out.print(".");
+                sleep(Duration.ofMillis(1500));
+                outcome = sessions.commandStatus(owner, summary.runId(), outcome.commandId()).outcome();
+            }
+            summary = sessions.get(owner, summary.runId());
+            view = summary.view();
+            if (view != null) out.println(ConsoleRenderer.render(view));
+            printSessionDebug(options.debug(), sessions, owner, summary);
+            if (outcome.outcome() == SessionTypes.Outcome.REJECTED) {
+                outcome.issues().forEach(issue -> out.println(issue.code()));
+            }
+        }
+        return 0;
+    }
+
+    private String sessionOption(String input, View view) {
+        if (view.options() == null) return null;
+        try {
+            int index = Integer.parseInt(input) - 1;
+            if (index >= 0 && index < view.options().size()) return view.options().get(index).id();
+        } catch (NumberFormatException ignored) {
+            // Check ids below.
+        }
+        return view.options().stream().map(option -> option.id())
+                .filter(id -> id.equalsIgnoreCase(input)).findFirst().orElse(null);
+    }
+
+    private void printSessionDebug(boolean debug, RunSessionService sessions, SessionTypes.OwnerRef owner,
+                                   SessionTypes.RunSummary summary) {
+        if (!debug) return;
+        SessionTypes.Diagnostics diagnostics = sessions.diagnostics(owner, summary.runId());
+        out.println("revision=" + diagnostics.revision() + " calls=" + diagnostics.generationCalls()
+                + "/" + diagnostics.runCallCeiling() + " prefetchReady=" + diagnostics.readyPrefetch()
+                + " prefetchInFlight=" + diagnostics.inFlightPrefetch());
+    }
+
+    private void sleep(Duration duration) {
+        try {
+            Thread.sleep(duration.toMillis());
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private ConsoleOptions withDebug(ConsoleOptions options, boolean debug) {
+        return new ConsoleOptions(options.packDir(), options.locale(), options.inputs(), options.seed(),
+                options.script(), options.save(), options.load(), options.generated(), options.liveSmoke(),
+                options.help(), options.session(), options.storeDir(), options.runId(), options.newRun(), debug);
     }
 
     private void printGenerationSummary(Run run) {

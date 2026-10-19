@@ -65,3 +65,25 @@ logging:
   level:
     root: INFO
     com.capybee: INFO
+
+capybee:
+  game:
+    enabled: ${CAPYBEE_GAME_ENABLED:false}
+    generation-enabled: ${CAPYBEE_GAME_GENERATION_ENABLED:false}
+    allow-seed: ${CAPYBEE_GAME_ALLOW_SEED:false}
+    pack-ids: ${CAPYBEE_GAME_PACK_IDS:}
+    command-hmac-key: ${CAPYBEE_GAME_COMMAND_HMAC_KEY:${APP_SECRET:}}
+    sync-wait-ms: ${CAPYBEE_GAME_SYNC_WAIT_MS:8000}
+    lease-seconds: ${CAPYBEE_GAME_LEASE_SECONDS:30}
+    start-ttl-seconds: ${CAPYBEE_GAME_START_TTL_SECONDS:600}
+    max-concurrent-generation: ${CAPYBEE_GAME_MAX_CONCURRENT_GENERATION:2}
+    day-zone: ${CAPYBEE_GAME_DAY_ZONE:UTC}
+    limits:
+      commands-per-minute: ${CAPYBEE_GAME_COMMANDS_PER_MINUTE:60}
+      profile-calls-per-day: ${CAPYBEE_GAME_PROFILE_CALLS_PER_DAY:40}
+      global-calls-per-day: ${CAPYBEE_GAME_GLOBAL_CALLS_PER_DAY:1500}
+      run-calls: ${CAPYBEE_GAME_RUN_CALLS:24}
+    prefetch:
+      profile-reserve: ${CAPYBEE_GAME_PREFETCH_PROFILE_RESERVE:8}
+      global-reserve: ${CAPYBEE_GAME_PREFETCH_GLOBAL_RESERVE:100}
+      run-reserve: ${CAPYBEE_GAME_PREFETCH_RUN_RESERVE:4}

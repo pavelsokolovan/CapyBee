@@ -13,11 +13,13 @@ Includes:
 - mission catalog and mission completion history
 - friendship tracker entries
 - memory entries (old world and new world)
+- engine run sessions, idempotent commands, and domain-event polling
 
 Excludes:
 - real-time features
 - user-to-user communication
 - admin-only operational endpoints
+- game-screen rendering; spec 28 owns the client view model
 
 ## Design Decisions Applied
 
@@ -84,6 +86,51 @@ All non-2xx responses should use:
   }
 }
 ```
+
+The engine API uses the same envelope with stable machine-readable codes and
+generic messages. Its scoped errors never include prompts, generated output,
+player text, provider details, or stack traces.
+
+## Engine run sessions (spec 27)
+
+All game endpoints require the existing authenticated Google session. Runs are
+owned by the authenticated account; an unknown run and a run owned by another
+account both return `404 RUN_NOT_FOUND`.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/game/packs` | List available packs and their start-input definitions |
+| `POST` | `/api/game/runs` | Start an idempotent run using a client-generated UUID |
+| `GET` | `/api/game/runs/current` | Get the owner's `PREPARING` or `ACTIVE` run |
+| `GET` | `/api/game/runs/{runId}` | Get status, revision and current view |
+| `POST` | `/api/game/runs/{runId}/commands` | Submit a revision-checked engine command |
+| `GET` | `/api/game/runs/{runId}/commands/{commandId}` | Poll a command submitted asynchronously |
+| `GET` | `/api/game/runs/{runId}/events?after={seq}&limit=50` | Read the run's ordered domain-event outbox |
+| `DELETE` | `/api/game/runs/{runId}` | Delete a run and its dependent records |
+
+Commands are `CHOOSE`, `ADVANCE`, `SUBMIT_TEXT`, `MOVE`, and `ABANDON`.
+Every command includes a client UUID and `expectedRevision`. Replaying the
+same UUID and payload returns the original result without applying the state
+change again; reusing it with a different payload returns
+`422 COMMAND_ID_REUSED`. A revision mismatch returns
+`409 REVISION_CONFLICT` with `details.currentRevision`.
+
+Slow generation operations use `202` with `retryAfterMs`; clients poll the run
+or command resource rather than enqueueing poll requests. The run response has
+`viewSchema: 1` and a direct mapping of the engine's `View`; spec 28 may add a
+new view schema without changing v1.
+
+### Error handling for queued game writes
+
+- `REVISION_CONFLICT` and `RUN_NOT_ACTIVE` are stale outcomes: drop the queued
+  command and refetch the current run.
+- `RUN_BUSY`, `GENERATION_BUSY`, `RATE_LIMITED`, network failures, `408`, `429`,
+  and `5xx` responses are retryable.
+- Other `4xx` responses are terminal. `401` pauses queue flushing until the
+  session is restored.
+- A successful game write delivers its JSON response to the subscribed
+  screen; the four existing queue action families keep their current payload
+  conventions.
 
 Standard codes:
 - `UNAUTHORIZED` (401)

@@ -4,11 +4,19 @@ import com.capybee.engine.pack.LocaleTag;
 
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.UUID;
 
 public record ConsoleOptions(Path packDir, LocaleTag locale, Map<String, String> inputs, Long seed,
-                            Path script, Path save, Path load, boolean generated, boolean liveSmoke, boolean help) {
+                            Path script, Path save, Path load, boolean generated, boolean liveSmoke, boolean help,
+                            boolean session, Path storeDir, UUID runId, boolean newRun, boolean debug) {
     public ConsoleOptions {
         inputs = inputs == null ? Map.of() : Map.copyOf(inputs);
+    }
+
+    public ConsoleOptions(Path packDir, LocaleTag locale, Map<String, String> inputs, Long seed,
+                          Path script, Path save, Path load, boolean generated, boolean liveSmoke, boolean help) {
+        this(packDir, locale, inputs, seed, script, save, load, generated, liveSmoke, help,
+                false, null, null, false, false);
     }
 
     public ConsoleOptions(Path packDir, LocaleTag locale, Map<String, String> inputs, Long seed,

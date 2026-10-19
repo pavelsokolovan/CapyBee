@@ -8,6 +8,7 @@ import com.capybee.engine.content.Block;
 import com.capybee.engine.content.BlockKind;
 import com.capybee.engine.generation.GenerationPipeline;
 import com.capybee.engine.generation.GenerationExecutionSummary;
+import com.capybee.engine.generation.GenerationArtifact;
 import com.capybee.engine.input.InputContext;
 import com.capybee.engine.input.InputPolicy;
 import com.capybee.engine.input.InputResolution;
@@ -183,6 +184,33 @@ final class RunImpl implements Run {
     @Override
     public Optional<GenerationExecutionSummary> generationSummary() {
         return generationPipeline == null ? Optional.empty() : Optional.of(generationPipeline.summary());
+    }
+
+    @Override
+    public List<String> prefetchCandidates() {
+        if (ended || generationPipeline == null) return List.of();
+        Scene current = scene(sceneId);
+        if (current == null) return List.of();
+        LinkedHashSet<String> candidates = new LinkedHashSet<>();
+        current.options().forEach(option -> addPrefetchCandidate(candidates, option.next()));
+        addPrefetchCandidate(candidates, current.next());
+        current.branches().forEach(branch -> addPrefetchCandidate(candidates, branch.next()));
+        return List.copyOf(candidates);
+    }
+
+    @Override
+    public Optional<GenerationArtifact> prefetch(String candidateId) {
+        if (candidateId == null || generationPipeline == null
+                || !prefetchCandidates().contains(candidateId)) return Optional.empty();
+        GenerationPipeline.SceneResolution resolution = generationPipeline.resolveGeneratedSceneResolution(candidateId);
+        return resolution == null ? Optional.empty() : Optional.of(resolution.artifact());
+    }
+
+    private void addPrefetchCandidate(Set<String> candidates, String targetId) {
+        if (targetId != null && generationPipeline.hasSceneSlot(targetId)
+                && !generationPipeline.hasCachedScene(targetId)) {
+            candidates.add(targetId);
+        }
     }
 
     @Override

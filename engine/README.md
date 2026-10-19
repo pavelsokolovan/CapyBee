@@ -2,8 +2,10 @@
 
 A standalone Java 25 Maven module. It does not inherit from Spring Boot and
 does not depend on the web application, a database, network services, or API
-keys. The published artifact is `com.capybee:game-engine:0.0.1-SNAPSHOT`, a
-plain JAR, not a Boot executable JAR. The working Java namespace remains
+keys. Its artifacts are `com.capybee:engine-core`,
+`com.capybee:engine-adapter-anthropic`, `com.capybee:engine-cli`, and
+`com.capybee:engine-session`, all at `0.1.0-SNAPSHOT`; each is a plain JAR,
+not a Boot executable JAR. The working Java namespace remains
 `com.capybee.engine`; it is not a dependency on the product.
 
 ## Build And Test
@@ -56,6 +58,12 @@ It exits non-zero unless the real adapter generates or repairs the required
 stages and at least one later scene without fallback. It is excluded from
 ordinary tests and builds.
 
+Use `--session` for the session-backed local console. `/quit` leaves the run
+active; `/abandon` ends it. `--store-dir <dir>` preserves run snapshots between
+console launches, while omitting it keeps runs in memory. `--run <uuid>` selects
+a specific saved run; otherwise the current open run is resumed unless
+`--new` is supplied. `--debug` prints in-process call and prefetch diagnostics.
+
 Live-provider failures are reported as fixed codes, never raw response bodies:
 `PROVIDER_BILLING_UNAVAILABLE` indicates insufficient API credits;
 `PROVIDER_STRUCTURED_OUTPUT_UNSUPPORTED` indicates the configured model rejects
@@ -73,9 +81,10 @@ responses, player text, and credentials are not logged.
 
 The root POM is an aggregator, not a shared parent. `mvn verify` at the
 repository root verifies both the engine and backend; backend tests still
-need their existing environment. Backend-only builds and Docker deployment
-remain unchanged. The backend will depend on the SDK when its host is added
-in spec 29, not before.
+need their existing environment. Spec 27 adds the framework-neutral session
+contract and the backend's engine dependency. Packs are only available to the
+web host when copied into its classpath under `game-packs/<pack-id>`; the
+CapyBee Polish pack remains the responsibility of spec 29.
 
 ## Pack API
 
@@ -106,12 +115,13 @@ The source boundary scanner has self-tests for every enforced rule.
 Section validators run in registration order and share a reference index
 for cross-file links.
 
-## Console-First Roadmap
+## Roadmap Reconciliation
 
 [Spec 22](../docs/specifications/22-engine-core-and-pack-format-instruction.md)
 delivers the pack SDK. Specs 23-26.1 now provide the in-process runtime,
 rules/state, safety boundary, generation pipeline, generated-play CLI, and
-artifact continuity. Spec 27 retains ownership of the public session lifecycle
-and host-facing API contract; specs 28-31 cover the expanded console, web host,
-client rendering, and game pack. None of these engine modules needs Spring or
-the web application.
+artifact continuity. The web host and server-side SDK wiring move from the
+earlier spec 29 plan to spec 27. The expanded local console host is included
+in spec 27 rather than being a separate numbered spec. Spec 28 owns the client
+rendering contract, and spec 29 owns the CapyBee Polish pack. The framework-
+neutral session module does not depend on Spring or the web application.

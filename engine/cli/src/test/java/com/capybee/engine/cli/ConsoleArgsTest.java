@@ -59,4 +59,24 @@ class ConsoleArgsTest {
         assertThat(smoke.options().generated()).isTrue();
         assertThat(smoke.options().liveSmoke()).isTrue();
     }
+
+    @Test
+    void parsesSessionPersistenceAndResumeOptions() {
+        var runId = java.util.UUID.randomUUID();
+        var result = ConsoleArgs.parse(new String[]{"--pack-dir", "packs/demo", "--session",
+                "--store-dir", "runs", "--run", runId.toString(), "--debug", "--script", "play.txt"});
+
+        assertThat(result.ok()).isTrue();
+        assertThat(result.options().session()).isTrue();
+        assertThat(result.options().storeDir()).isEqualTo(Path.of("runs"));
+        assertThat(result.options().runId()).isEqualTo(runId);
+        assertThat(result.options().debug()).isTrue();
+        assertThat(result.options().script()).isEqualTo(Path.of("play.txt"));
+        assertThat(ConsoleArgs.parse(new String[]{"--pack-dir", "packs/demo", "--store-dir", "runs"}).ok())
+                .isFalse();
+        assertThat(ConsoleArgs.parse(new String[]{"--pack-dir", "packs/demo", "--session", "--run", "bad"}).ok())
+                .isFalse();
+        assertThat(ConsoleArgs.parse(new String[]{"--pack-dir", "packs/demo", "--session",
+                "--run", runId.toString(), "--new"}).ok()).isFalse();
+    }
 }

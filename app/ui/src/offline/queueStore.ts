@@ -5,6 +5,8 @@ export type QueueActionType =
   | 'missionCompletion'
   | 'friendship'
   | 'memory'
+  | 'gameStart'
+  | 'gameCommand'
   | 'gameResult'
   | 'checkInDelete'
   | 'missionCompletionDelete'
@@ -19,6 +21,7 @@ export interface QueuedAction {
   payload?: Record<string, unknown>;
   createdAt: number;
   attempts: number;
+  notBefore?: number;
   status: 'pending' | 'syncing' | 'failed';
 }
 

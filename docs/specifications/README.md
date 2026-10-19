@@ -53,9 +53,16 @@ list. The current implementation boundary is:
 - 26 - Provider-neutral generation pipeline
 - 26.1 - Generation catalog/contracts, generated runtime integration, CLI mode,
   fallback/repair behavior, and artifact snapshot continuity (implemented)
-- 27 - Public session lifecycle and host-facing API contract
-- 28 - Expanded console host and scripted playthroughs
-- 29-31 - Web host, client rendering, and game-pack integration
+- 27 - Public session lifecycle, host-facing API contract, web host and queue integration
+- 28 - Client rendering contract
+- 29 - CapyBee Polish game pack and game-pack integration
+
+### Roadmap reconciliation
+
+The web host and server-side SDK wiring move from the earlier "spec 29" plan
+to spec 27. The expanded local console host is part of the spec 27 session
+contract rather than a separate numbered spec. Existing numbered specification
+files remain unchanged.
 
 Spec 26.1 found no existing Spec 24 template-definition package. It therefore
 adds the smallest versioned `generation/templates.json` registry and documents

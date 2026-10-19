@@ -132,6 +132,38 @@ class ConsoleAppTest {
     }
 
     @Test
+    void sessionModeResumesPersistentRunAfterConsoleRestart() throws Exception {
+        Path store = Files.createTempDirectory("capybee-session-store");
+        Path quitScript = Files.createTempFile("session-quit", ".txt");
+        Path abandonScript = Files.createTempFile("session-abandon", ".txt");
+        try {
+            Files.writeString(quitScript, "/quit\n", StandardCharsets.UTF_8);
+            Files.writeString(abandonScript, "/abandon\n", StandardCharsets.UTF_8);
+            var first = run(new String[]{"--pack-dir", MINIMAL_PACK, "--session", "--store-dir",
+                    store.toString(), "--script", quitScript.toString()}, "");
+            var second = run(new String[]{"--pack-dir", MINIMAL_PACK, "--session", "--store-dir",
+                    store.toString(), "--script", abandonScript.toString()}, "");
+
+            assertThat(first.exitCode).isZero();
+            assertThat(second.exitCode).isZero();
+            assertThat(second.output).contains("[abandoned]");
+            String firstRun = first.output.lines().filter(line -> line.startsWith("Run "))
+                    .findFirst().orElseThrow();
+            String secondRun = second.output.lines().filter(line -> line.startsWith("Run "))
+                    .findFirst().orElseThrow();
+            assertThat(secondRun).isEqualTo(firstRun);
+        } finally {
+            Files.deleteIfExists(quitScript);
+            Files.deleteIfExists(abandonScript);
+            try (var paths = Files.walk(store)) {
+                for (Path path : paths.sorted(java.util.Comparator.reverseOrder()).toList()) {
+                    Files.deleteIfExists(path);
+                }
+            }
+        }
+    }
+
+    @Test
     void liveSmokeRejectsAnInjectedFakeProvider() throws Exception {
         Path script = Files.createTempFile("generated-smoke", ".txt");
         try {

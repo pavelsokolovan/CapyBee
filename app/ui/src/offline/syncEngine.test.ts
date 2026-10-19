@@ -13,7 +13,7 @@ vi.mock('./queueStore', () => ({
   removeAction: queueStore.removeAction
 }));
 
-import { flushQueue, onSyncStatusChange, startSyncLoop } from './syncEngine';
+import { flushQueue, onSynced, onSyncStatusChange, startSyncLoop } from './syncEngine';
 
 const createAction = (overrides: Partial<QueuedAction> = {}): QueuedAction => ({
   clientId: 'action-id',
@@ -90,7 +90,7 @@ describe('offline sync engine', () => {
     expect(queueStore.removeAction).toHaveBeenCalledWith('action-id');
   });
 
-  it('marks the final failed attempt and does not retry it in a later flush', async () => {
+  it('pauses the queue on authentication failure without consuming an attempt', async () => {
     const action = createAction({ attempts: 7 });
     queueStore.listQueuedActions.mockResolvedValueOnce([action]).mockResolvedValueOnce([action]).mockResolvedValueOnce([action]);
     vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 401 }));
@@ -98,9 +98,101 @@ describe('offline sync engine', () => {
     await flushQueue();
     await flushQueue();
 
-    expect(queueStore.updateAction).toHaveBeenLastCalledWith({ ...action, attempts: 8, status: 'failed' });
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(queueStore.updateAction).toHaveBeenLastCalledWith({ ...action, status: 'pending' });
+    expect(fetch).toHaveBeenCalledTimes(2);
     expect(queueStore.removeAction).not.toHaveBeenCalled();
+  });
+
+  it('delivers game response bodies and reports stale outcomes to subscribers', async () => {
+    const action = createAction({ type: 'gameCommand', path: '/api/game/runs/run/commands' });
+    const listener = vi.fn();
+    const unsubscribe = onSynced(listener);
+    queueStore.listQueuedActions.mockResolvedValueOnce([action]).mockResolvedValueOnce([]);
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ error: { code: 'REVISION_CONFLICT' } }), {
+      status: 409,
+      headers: { 'Content-Type': 'application/json' }
+    }));
+
+    await flushQueue();
+    unsubscribe();
+
+    expect(queueStore.removeAction).toHaveBeenCalledWith(action.clientId);
+    expect(listener).toHaveBeenCalledWith({ action, body: undefined, status: 409, outcome: 'stale' });
+  });
+
+  it('delivers successful game response bodies to subscribers', async () => {
+    const action = createAction({ type: 'gameStart', path: '/api/game/runs' });
+    const listener = vi.fn();
+    const body = { runId: 'run-id', status: 'ACTIVE' };
+    const unsubscribe = onSynced(listener);
+    queueStore.listQueuedActions.mockResolvedValueOnce([action]).mockResolvedValueOnce([]);
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    }));
+
+    await flushQueue();
+    unsubscribe();
+
+    expect(listener).toHaveBeenCalledWith({ action, body, status: 200, outcome: 'done' });
+  });
+
+  it('uses retryAfterMs for queued processing responses', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    const action = createAction({ type: 'gameCommand' });
+    queueStore.listQueuedActions.mockResolvedValueOnce([action]).mockResolvedValueOnce([]);
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({
+      status: 'PROCESSING',
+      retryAfterMs: 4_000
+    }), {
+      status: 202,
+      headers: { 'Content-Type': 'application/json' }
+    }));
+
+    await flushQueue();
+
+    expect(queueStore.updateAction).toHaveBeenCalledWith(expect.objectContaining({
+      clientId: action.clientId,
+      attempts: 1,
+      status: 'pending',
+      notBefore: 14_000
+    }));
+  });
+
+  it('removes terminal game failures without delaying later queue items', async () => {
+    const terminal = createAction({ clientId: 'bad', type: 'gameStart' });
+    const next = createAction({ clientId: 'next' });
+    queueStore.listQueuedActions.mockResolvedValueOnce([terminal, next]).mockResolvedValueOnce([]);
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 422 }))
+      .mockResolvedValueOnce(new Response(null, { status: 201 }));
+
+    await flushQueue();
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(queueStore.removeAction).toHaveBeenNthCalledWith(1, 'bad');
+    expect(queueStore.removeAction).toHaveBeenNthCalledWith(2, 'next');
+  });
+
+  it('keeps processing pending actions while a retry is deferred', async () => {
+    const retry = createAction({ clientId: 'retry', type: 'gameCommand' });
+    const next = createAction({ clientId: 'next' });
+    queueStore.listQueuedActions.mockResolvedValueOnce([retry, next]).mockResolvedValueOnce([]);
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValueOnce(new Response(null, { status: 201 }));
+
+    await flushQueue();
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(queueStore.updateAction).toHaveBeenCalledWith(expect.objectContaining({
+      clientId: 'retry',
+      attempts: 1,
+      status: 'pending',
+      notBefore: expect.any(Number)
+    }));
+    expect(queueStore.removeAction).toHaveBeenCalledWith('next');
   });
 
   it('notifies subscribers with the remaining synchronizable count', async () => {

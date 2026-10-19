@@ -178,6 +178,31 @@ Indexes:
 Decision note:
 - MVP decision: one child profile per parent account.
 - Therefore, existing `check_ins.user_id` remains in MVP.
+
+## Engine run persistence (spec 27)
+
+Migration `V12__game_runs.sql` adds owner-scoped game sessions and their
+idempotency, event, prefetch, and generation-usage records:
+
+- `game_runs` stores the owner, pack/version/locale, lifecycle status,
+  revision, generation-call count, JSON snapshot, and a temporary
+  `pending_start` payload. Free-text start inputs exist only in
+  `pending_start` while a run is `PREPARING`; they are cleared once the run is
+  active or failed.
+- `game_run_commands` stores a keyed payload MAC (not the command body),
+  progress/result metadata, and the revision range for each command. A
+  repeated command ID cannot apply a second state change.
+- `game_run_events` is an ordered, per-run outbox. Its sequence and revision
+  allow consumers to resume safely from their last event.
+- `game_run_prefetch` stores validated, non-fallback generated scene artifacts
+  that can be merged into a later run snapshot.
+- `game_generation_usage` stores per-day call counts and token totals for the
+  global and profile scopes; caps apply to calls, not tokens.
+
+Open runs are limited to one per account by a partial unique index. Child
+tables cascade when a run is deleted. Completed/failed runs, command records,
+prefetch artifacts, and daily usage are subject to the retention windows
+defined in spec 27; no event handler or reward record is introduced here.
 - Revisit `profile_check_ins` only when multi-child support is introduced.
 
 ## Entity Relationship Summary
