@@ -240,6 +240,7 @@ public final class RunSessionService {
     }
 
     public void ensurePrefetch(OwnerRef owner, UUID runId) {
+        if (!limits.prefetchEnabled()) return;
         try {
             StoredRun stored = requireRun(owner, runId);
             if (stored.status() != RunStatus.ACTIVE || stored.snapshot() == null) return;

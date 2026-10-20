@@ -36,6 +36,9 @@ public final class ConsoleArgs {
         UUID runId = null;
         boolean newRun = false;
         boolean debug = false;
+        Boolean prefetch = null;
+        Integer callsPerDay = null;
+        Integer runCalls = null;
 
         for (int index = 0; index < args.length; index++) {
             String arg = args[index];
@@ -46,6 +49,25 @@ public final class ConsoleArgs {
                 case "--session" -> session = true;
                 case "--new" -> newRun = true;
                 case "--debug" -> debug = true;
+                case "--prefetch" -> {
+                    if (index + 1 >= args.length) return new ParseResult(null, "Missing value for --prefetch.");
+                    String value = args[++index];
+                    if (value.equalsIgnoreCase("on")) prefetch = true;
+                    else if (value.equalsIgnoreCase("off")) prefetch = false;
+                    else return new ParseResult(null, "--prefetch must be on or off.");
+                }
+                case "--calls-per-day" -> {
+                    if (index + 1 >= args.length) return new ParseResult(null, "Missing value for --calls-per-day.");
+                    try { callsPerDay = Integer.parseInt(args[++index]); } catch (NumberFormatException e) { callsPerDay = -1; }
+                    if (callsPerDay < 0 || callsPerDay > 100000)
+                        return new ParseResult(null, "--calls-per-day must be an integer from 0 to 100000.");
+                }
+                case "--run-calls" -> {
+                    if (index + 1 >= args.length) return new ParseResult(null, "Missing value for --run-calls.");
+                    try { runCalls = Integer.parseInt(args[++index]); } catch (NumberFormatException e) { runCalls = -1; }
+                    if (runCalls < 1 || runCalls > 1000)
+                        return new ParseResult(null, "--run-calls must be an integer from 1 to 1000.");
+                }
                 case "--pack-dir" -> {
                     if (index + 1 >= args.length) return new ParseResult(null, "Missing value for --pack-dir.");
                     packDir = Path.of(args[++index]);
@@ -103,7 +125,7 @@ public final class ConsoleArgs {
 
         if (help && (packDir != null || locale != null || !inputs.isEmpty() || seed != null || script != null
                 || save != null || load != null || generated || liveSmoke || session || storeDir != null
-                || runId != null || newRun || debug)) {
+                || runId != null || newRun || debug || prefetch != null || callsPerDay != null || runCalls != null)) {
             return new ParseResult(null, "--help cannot be combined with other arguments.");
         }
 
@@ -115,8 +137,8 @@ public final class ConsoleArgs {
             return new ParseResult(null, "--live-smoke requires --script and cannot be combined with --load.");
         }
 
-        if (!session && (storeDir != null || runId != null || newRun || debug)) {
-            return new ParseResult(null, "--store-dir, --run, --new and --debug require --session.");
+        if (!session && (storeDir != null || runId != null || newRun || debug || prefetch != null || callsPerDay != null || runCalls != null)) {
+            return new ParseResult(null, "--store-dir, --run, --new, --debug, --prefetch, --calls-per-day and --run-calls require --session.");
         }
         if (session && (save != null || load != null || liveSmoke)) {
             return new ParseResult(null, "--session cannot be combined with --save, --load or --live-smoke.");
@@ -124,8 +146,11 @@ public final class ConsoleArgs {
         if (runId != null && newRun) {
             return new ParseResult(null, "--run cannot be combined with --new.");
         }
+        if (runId != null && (locale != null || !inputs.isEmpty() || seed != null || generated)) {
+            return new ParseResult(null, "--run cannot be combined with --locale, --input, --seed or --generated.");
+        }
 
         return new ParseResult(new ConsoleOptions(packDir, locale, inputs, seed, script, save, load,
-            generated, liveSmoke, help, session, storeDir, runId, newRun, debug), null);
+            generated, liveSmoke, help, session, storeDir, runId, newRun, debug, prefetch, callsPerDay, runCalls), null);
     }
 }

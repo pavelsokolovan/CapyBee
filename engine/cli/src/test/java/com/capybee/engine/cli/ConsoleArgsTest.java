@@ -79,4 +79,21 @@ class ConsoleArgsTest {
         assertThat(ConsoleArgs.parse(new String[]{"--pack-dir", "packs/demo", "--session",
                 "--run", runId.toString(), "--new"}).ok()).isFalse();
     }
+
+    @Test
+    void parsesAndValidatesSessionGenerationTuning() {
+        var options = ConsoleArgs.parse(new String[]{"--pack-dir", "packs/demo", "--session",
+                "--prefetch", "ON", "--calls-per-day", "0", "--run-calls", "1000"});
+        assertThat(options.ok()).isTrue();
+        assertThat(options.options().prefetch()).isTrue();
+        assertThat(options.options().callsPerDay()).isZero();
+        assertThat(options.options().runCalls()).isEqualTo(1000);
+
+        assertThat(ConsoleArgs.parse(new String[]{"--pack-dir", "packs/demo", "--prefetch", "off"}).error())
+                .isEqualTo("--store-dir, --run, --new, --debug, --prefetch, --calls-per-day and --run-calls require --session.");
+        assertThat(ConsoleArgs.parse(new String[]{"--session", "--prefetch", "maybe"}).error())
+                .isEqualTo("--prefetch must be on or off.");
+        assertThat(ConsoleArgs.parse(new String[]{"--session", "--calls-per-day", "100001"}).ok()).isFalse();
+        assertThat(ConsoleArgs.parse(new String[]{"--session", "--run-calls", "0"}).ok()).isFalse();
+    }
 }

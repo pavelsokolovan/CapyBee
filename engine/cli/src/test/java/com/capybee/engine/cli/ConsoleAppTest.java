@@ -164,6 +164,32 @@ class ConsoleAppTest {
     }
 
     @Test
+        void sessionCommandsRenderStatusEventsAndDebugWithoutEndingTheRun() {
+        var result = run(new String[]{"--pack-dir", DUNGEON_PACK, "--session", "--prefetch", "off",
+                "--calls-per-day", "0", "--run-calls", "5"},
+            "/help\n/status\n/events\n/events 0\n/events invalid\n/debug on\n/debug off\n"
+                + "/unknown\nunknown-option\n999\n\n/move corridor\n/text private-marker@example.com\n/quit\n");
+
+        assertThat(result.exitCode).isZero();
+        assertThat(result.errors).isEmpty();
+        assertThat(result.output).contains("/debug on|off", "! Unknown command. Type ? for help.",
+            "! Choose an option, or press Enter to continue.", "revision=", "calls=0/5",
+            "prefetchReady=[]", "Place: Cell", "Place: Corridor", "COMMAND_NOT_ALLOWED", "INPUT_NOT_EXPECTED");
+        assertThat(result.output).doesNotContain("[abandoned]", "private-marker@example.com");
+        assertThat(result.output.lines().filter(line -> line.contains("revision="))).hasSize(1);
+        }
+
+        @Test
+        void interactiveSessionAbandonCanBeCancelledThenConfirmed() {
+        var result = run(new String[]{"--pack-dir", MINIMAL_PACK, "--session"},
+            "q\nn\n/abandon\nyes\n");
+
+        assertThat(result.exitCode).isZero();
+        assertThat(result.errors).isEmpty();
+        assertThat(result.output).contains("Abandon this run for good? (y/N)", "Cancelled.", "[abandoned]");
+        }
+
+        @Test
     void liveSmokeRejectsAnInjectedFakeProvider() throws Exception {
         Path script = Files.createTempFile("generated-smoke", ".txt");
         try {

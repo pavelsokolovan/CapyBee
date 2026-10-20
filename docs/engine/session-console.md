@@ -1,0 +1,20 @@
+# Session console
+
+Use `--session` to run the engine through the resumable local-session host. Without
+`--store-dir`, data exists only for the life of the console process. With a store
+directory, the current run, command history, outbox events, usage ledger, and
+prefetched scenes are retained.
+
+Useful session options are `--run <uuid>`, `--new`, `--debug`, `--prefetch on|off`,
+`--calls-per-day <0..100000>`, and `--run-calls <1..1000>`. Prefetch defaults to on
+for generated runs and off otherwise. `--calls-per-day` applies to both local profile
+and global limits, so `0` is useful for rehearsing fallback scenes.
+
+Inside a session, use `/text <words>`, `/move <placeId>`, `/status`,
+`/events [afterSeq]`, `/debug on|off`, `/abandon`, `/quit` (or `/q`), and `?` or
+`/help`. Unknown slash commands are never submitted as player text; use `/text` for
+text beginning with a slash. Interactive abandonment asks for confirmation; scripts
+do not.
+
+Recoverable errors are printed as `! CODE: hint` and leave the session open. Startup
+and storage failures print the code and a hint to stderr and exit with code 3.

@@ -314,7 +314,9 @@ public final class ConsoleApp {
 
     private String consoleUsage() {
         return "Usage: java -jar engine-cli.jar --pack-dir <dir> [--locale <tag>] [--input <key=value>]... [--script <file>] [--generated]\n"
-                + "       Add --session for resumable play; --store-dir keeps runs, commands, events, prefetched scenes and usage.\n"
+                + "       Add --session for resumable play; without --store-dir session data is in memory only.\n"
+                + "       Session options: --store-dir <dir>, --run <id>, --new, --debug, --prefetch on|off.\n"
+                + "                        --calls-per-day <0..100000>, --run-calls <1..1000>.\n"
                 + "       Add --live-smoke --script <file> to call the configured provider (may incur cost).\n"
                 + "       Provider configuration: GENERATION_MODEL_ID and ANTHROPIC_API_KEY environment variables.";
     }
@@ -325,6 +327,12 @@ public final class ConsoleApp {
         if (options.storeDir() == null) store = new InMemorySessionStore(clock);
         else { local = LocalSessionStore.open(options.storeDir(), clock); store = local; }
         byte[] commandKey = local == null ? new byte[32] : local.commandKey();
+        SessionLimits defaults = SessionLimits.defaults();
+        int callsPerDay = options.callsPerDay() == null ? defaults.profileCallsPerDay() : options.callsPerDay();
+        int runCalls = options.runCalls() == null ? defaults.runCalls() : options.runCalls();
+        boolean prefetch = options.prefetch() == null ? options.generated() : options.prefetch();
+        SessionLimits limits = new SessionLimits(defaults.leaseDuration(), defaults.startTtl(), runCalls,
+                callsPerDay, defaults.maxConcurrentGeneration(), callsPerDay, prefetch);
         SessionPorts.PackCatalog catalog = new SessionPorts.PackCatalog() {
             @Override public List<com.capybee.engine.pack.Pack> all() { return List.of(pack); }
             @Override public java.util.Optional<com.capybee.engine.pack.Pack> find(String id) {
@@ -338,9 +346,9 @@ public final class ConsoleApp {
                     .ids(ids);
             if (textGenerator != null) {
                 var metered = new MeteredTextGenerator(textGenerator, store,
-                        new SessionTypes.LedgerScope("profile:local", 40),
-                        new SessionTypes.LedgerScope("global", 1500), LocalDate.now(clock),
-                        runId, 24, priority, 8, 100, 4);
+                        new SessionTypes.LedgerScope("profile:local", limits.profileCallsPerDay()),
+                        new SessionTypes.LedgerScope("global", limits.globalCallsPerDay()), LocalDate.now(clock),
+                        runId, limits.runCalls(), priority, 8, 100, 4);
                 builder.textGenerator(metered)
                         .inputInterpreter(new StructuredInputInterpreter(metered));
             }
@@ -348,14 +356,22 @@ public final class ConsoleApp {
         };
         try (ExecutorService workers = Executors.newFixedThreadPool(2)) {
             RunSessionService sessions = new RunSessionService(catalog, store, store, store, store,
-                    factory, clock::instant, SessionLimits.defaults(), store, workers, commandKey);
+                    factory, clock::instant, limits, store, workers, commandKey);
             SessionTypes.OwnerRef owner = new SessionTypes.OwnerRef("local-console");
             SessionTypes.RunSummary summary;
             if (options.runId() != null) {
                 summary = sessions.get(owner, options.runId());
             } else if (!options.newRun() && store.findCurrent(owner).isPresent()) {
                 summary = sessions.get(owner, store.findCurrent(owner).orElseThrow().id());
+                if (options.locale() != null || !options.inputs().isEmpty() || options.seed() != null || options.generated()) {
+                    out.println("Note: resuming run " + summary.runId() + "; start options are ignored. Use --new to start over.");
+                }
             } else {
+                if (options.newRun() && store.findCurrent(owner).isPresent()) {
+                    UUID previous = store.findCurrent(owner).orElseThrow().id();
+                    sessions.delete(owner, previous);
+                    out.println("Discarded previous run " + previous + ".");
+                }
                 SessionTypes.StartRequest start = new SessionTypes.StartRequest(UUID.randomUUID(), packId,
                         options.locale() == null ? pack.manifest().defaultLocale() : options.locale(),
                         options.inputs(), options.seed(), options.generated());
@@ -367,10 +383,11 @@ public final class ConsoleApp {
             return runSessionLoop(options, sessions, owner, summary);
         } catch (SessionException failure) {
             err.println(failure.code().name());
+            err.println("  " + sessionHint(failure.code().name()));
             return 3;
         } catch (StoreException failure) {
             err.println(failure.code().name());
-            err.println(storeHint(failure.code()));
+            err.println("  " + storeHint(failure.code()));
             return 3;
         } catch (RuntimeException failure) {
             err.println("SESSION_UNAVAILABLE");
@@ -378,6 +395,17 @@ public final class ConsoleApp {
         } finally {
             if (local != null) local.close();
         }
+    }
+
+    private String sessionHint(String code) {
+        return switch (code) {
+            case "RUN_UNRECOVERABLE" -> "The saved run cannot be continued. Start a new run with --new.";
+            case "RUN_NOT_FOUND" -> "No such run for the local player. Omit --run to continue the current run.";
+            case "RUN_ALREADY_ACTIVE" -> "A run is already open. Continue it or use --new.";
+            case "START_REJECTED" -> "The pack or inputs were rejected. Check --pack-dir, --locale and --input.";
+            case "START_TIMEOUT" -> "Starting took too long. Run again with --new.";
+            default -> "Unexpected internal error. Nothing was changed.";
+        };
     }
 
     private String storeHint(StoreException.Code code) {
@@ -392,11 +420,16 @@ public final class ConsoleApp {
 
     private SessionTypes.RunSummary awaitActive(RunSessionService sessions, SessionTypes.OwnerRef owner,
                                                  SessionTypes.RunSummary summary) {
+        boolean thinking = false;
         while (summary.status() == SessionTypes.RunStatus.PREPARING) {
-            out.println("CapyBee is thinking…");
-            sleep(Duration.ofMillis(1500));
+            if (!thinking) {
+                out.println("CapyBee is thinking…");
+                thinking = true;
+            } else out.print(".");
+            sleep(Duration.ofMillis(250));
             summary = sessions.get(owner, summary.runId());
         }
+        if (thinking) out.println();
         if (summary.status() != SessionTypes.RunStatus.ACTIVE) {
             err.println(summary.failureCode() == null ? "START_REJECTED" : summary.failureCode());
             return null;
@@ -433,9 +466,16 @@ public final class ConsoleApp {
                 printSessionDebug(options.debug(), sessions, owner, summary);
                 continue;
             }
-            if (trimmed.equalsIgnoreCase("/events")) {
-                sessions.events(owner, summary.runId(), 0, 100)
-                        .forEach(event -> out.println(event.seq() + " " + event.event().id()));
+            if (trimmed.startsWith("/events")) {
+                long after = 0;
+                try { if (trimmed.length() > 7) after = Long.parseLong(trimmed.substring(7).trim()); }
+                catch (NumberFormatException ignored) { out.println("! Unknown command. Type ? for help."); continue; }
+                while (true) {
+                    var events = sessions.events(owner, summary.runId(), after, 100);
+                    events.forEach(event -> out.println(event.seq() + " " + event.event().id()));
+                    if (events.size() < 100) break;
+                    after = events.get(events.size() - 1).seq();
+                }
                 continue;
             }
             if (trimmed.equalsIgnoreCase("/debug on")) {
@@ -447,17 +487,28 @@ public final class ConsoleApp {
                 options = withDebug(options, false);
                 continue;
             }
-            if (trimmed.equals("?")) {
-                out.println("/text <words>, /move <placeId>, /status, /events, /abandon, /quit");
+            if (trimmed.equals("?") || trimmed.equalsIgnoreCase("/help")) {
+                out.println("/text <words>, /move <placeId>, /status, /events [afterSeq], /debug on|off, /abandon, /quit");
                 continue;
             }
             Command command;
-            if (trimmed.equalsIgnoreCase("/abandon") || trimmed.equalsIgnoreCase("q")) {
+            if (trimmed.equalsIgnoreCase("/abandon") || (trimmed.equalsIgnoreCase("q") && sessionOption(trimmed, view) == null)) {
+                if (options.script() == null) {
+                    out.print("Abandon this run for good? (y/N) ");
+                    String answer = readLine(reader);
+                    if (answer == null || !(answer.equalsIgnoreCase("y") || answer.equalsIgnoreCase("yes"))) {
+                        out.println("Cancelled.");
+                        continue;
+                    }
+                }
                 command = new Command.Abandon();
             } else if (trimmed.startsWith("/text ")) {
                 command = new Command.SubmitText(line.substring(line.indexOf(' ') + 1));
             } else if (trimmed.startsWith("/move ")) {
                 command = new Command.Move(trimmed.substring(6).trim());
+            } else if (trimmed.startsWith("/")) {
+                out.println("! Unknown command. Type ? for help.");
+                continue;
             } else if (trimmed.isEmpty()) {
                 command = new Command.Advance();
             } else {
@@ -471,13 +522,22 @@ public final class ConsoleApp {
                     continue;
                 }
             }
-            SessionTypes.CommandOutcome outcome = sessions.command(owner, summary.runId(),
-                    new SessionTypes.CommandRequest(UUID.randomUUID(), summary.revision(), command),
-                    Duration.ofSeconds(8));
-            while (outcome.outcome() == SessionTypes.Outcome.PROCESSING) {
-                out.print(".");
-                sleep(Duration.ofMillis(1500));
-                outcome = sessions.commandStatus(owner, summary.runId(), outcome.commandId()).outcome();
+            SessionTypes.CommandOutcome outcome;
+            try {
+                outcome = sessions.command(owner, summary.runId(),
+                        new SessionTypes.CommandRequest(UUID.randomUUID(), summary.revision(), command),
+                        Duration.ofSeconds(8));
+                if (outcome.outcome() == SessionTypes.Outcome.PROCESSING) out.println("CapyBee is thinking…");
+                while (outcome.outcome() == SessionTypes.Outcome.PROCESSING) {
+                    var status = sessions.commandStatus(owner, summary.runId(), outcome.commandId());
+                    if (!status.processing()) { outcome = status.outcome(); break; }
+                    out.print(".");
+                    sleep(Duration.ofMillis(Math.max(250, Math.min(5000, status.retryAfterMs()))));
+                }
+                if (outcome.outcome() != SessionTypes.Outcome.PROCESSING) out.println();
+            } catch (SessionException failure) {
+                out.println("! " + failure.code().name() + ": " + sessionHint(failure.code().name()));
+                continue;
             }
             summary = sessions.get(owner, summary.runId());
             view = summary.view();
@@ -522,7 +582,8 @@ public final class ConsoleApp {
     private ConsoleOptions withDebug(ConsoleOptions options, boolean debug) {
         return new ConsoleOptions(options.packDir(), options.locale(), options.inputs(), options.seed(),
                 options.script(), options.save(), options.load(), options.generated(), options.liveSmoke(),
-                options.help(), options.session(), options.storeDir(), options.runId(), options.newRun(), debug);
+                options.help(), options.session(), options.storeDir(), options.runId(), options.newRun(), debug,
+                options.prefetch(), options.callsPerDay(), options.runCalls());
     }
 
     private void printGenerationSummary(Run run) {
