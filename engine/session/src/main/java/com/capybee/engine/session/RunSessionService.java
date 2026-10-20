@@ -226,6 +226,8 @@ public final class RunSessionService {
     public void delete(OwnerRef owner, UUID runId) {
         requireRun(owner, runId);
         runs.delete(runId, owner);
+        String prefix = runId + ":";
+        prefetchJobs.entrySet().removeIf(entry -> entry.getKey().startsWith(prefix));
     }
 
     public List<PackInfoDto> packs(java.util.Locale hint) {
@@ -427,6 +429,13 @@ public final class RunSessionService {
                 generationSlots.release();
             }
         } catch (RuntimeException failure) {
+            if (failure instanceof StoreException) {
+                if (lease != null) {
+                    try { runs.releaseLease(runId, lease); } catch (StoreException ignored) { }
+                }
+                resultFuture.completeExceptionally(new SessionException(ErrorCode.SERVICE_UNAVAILABLE));
+                return;
+            }
             if (failure instanceof SessionException sessionException) {
                 if (sessionException.code() == ErrorCode.RUN_UNRECOVERABLE && lease != null) {
                     Lease failedLease = lease;

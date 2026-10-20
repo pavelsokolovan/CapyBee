@@ -71,6 +71,10 @@ public final class SessionPorts {
         void deleteForScenes(UUID runId, Collection<String> sceneIds);
     }
 
+    /** A complete, internally consistent store for one local session domain. */
+    public interface SessionStore extends RunRepository, CommandLog, GenerationLedger,
+            EventOutbox, PrefetchStore, Transaction {}
+
     @FunctionalInterface
     public interface EngineFactory {
         Engine create(OwnerRef owner, UUID runId, MeteredTextGenerator.Priority priority);

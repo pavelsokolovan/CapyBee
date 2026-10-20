@@ -30,9 +30,10 @@ import com.capybee.engine.session.RunSessionService;
 import com.capybee.engine.session.SessionLimits;
 import com.capybee.engine.session.SessionPorts;
 import com.capybee.engine.session.SessionException;
+import com.capybee.engine.session.StoreException;
 import com.capybee.engine.session.SessionTypes;
-import com.capybee.engine.session.adapter.FileRunRepository;
 import com.capybee.engine.session.adapter.InMemorySessionStore;
+import com.capybee.engine.session.adapter.LocalSessionStore;
 
 import java.io.InputStream;
 import java.io.BufferedReader;
@@ -313,15 +314,17 @@ public final class ConsoleApp {
 
     private String consoleUsage() {
         return "Usage: java -jar engine-cli.jar --pack-dir <dir> [--locale <tag>] [--input <key=value>]... [--script <file>] [--generated]\n"
-                + "       Add --session for resumable play; use --store-dir <dir> for local persistence and --run <uuid> to resume.\n"
+                + "       Add --session for resumable play; --store-dir keeps runs, commands, events, prefetched scenes and usage.\n"
                 + "       Add --live-smoke --script <file> to call the configured provider (may incur cost).\n"
                 + "       Provider configuration: GENERATION_MODEL_ID and ANTHROPIC_API_KEY environment variables.";
     }
 
     private int runSessionMode(ConsoleOptions options, PackId packId, com.capybee.engine.pack.Pack pack) {
-        InMemorySessionStore memory = new InMemorySessionStore(clock);
-        SessionPorts.RunRepository runs = options.storeDir() == null ? memory
-                : new FileRunRepository(options.storeDir(), clock);
+        LocalSessionStore local = null;
+        SessionPorts.SessionStore store;
+        if (options.storeDir() == null) store = new InMemorySessionStore(clock);
+        else { local = LocalSessionStore.open(options.storeDir(), clock); store = local; }
+        byte[] commandKey = local == null ? new byte[32] : local.commandKey();
         SessionPorts.PackCatalog catalog = new SessionPorts.PackCatalog() {
             @Override public List<com.capybee.engine.pack.Pack> all() { return List.of(pack); }
             @Override public java.util.Optional<com.capybee.engine.pack.Pack> find(String id) {
@@ -334,7 +337,7 @@ public final class ConsoleApp {
                     .random(Randoms.seeded(runId.getMostSignificantBits() ^ runId.getLeastSignificantBits()))
                     .ids(ids);
             if (textGenerator != null) {
-                var metered = new MeteredTextGenerator(textGenerator, memory,
+                var metered = new MeteredTextGenerator(textGenerator, store,
                         new SessionTypes.LedgerScope("profile:local", 40),
                         new SessionTypes.LedgerScope("global", 1500), LocalDate.now(clock),
                         runId, 24, priority, 8, 100, 4);
@@ -344,14 +347,14 @@ public final class ConsoleApp {
             return builder.build();
         };
         try (ExecutorService workers = Executors.newFixedThreadPool(2)) {
-            RunSessionService sessions = new RunSessionService(catalog, runs, memory, memory, memory,
-                    factory, clock::instant, SessionLimits.defaults(), memory, workers, new byte[32]);
+            RunSessionService sessions = new RunSessionService(catalog, store, store, store, store,
+                    factory, clock::instant, SessionLimits.defaults(), store, workers, commandKey);
             SessionTypes.OwnerRef owner = new SessionTypes.OwnerRef("local-console");
             SessionTypes.RunSummary summary;
             if (options.runId() != null) {
                 summary = sessions.get(owner, options.runId());
-            } else if (!options.newRun() && runs.findCurrent(owner).isPresent()) {
-                summary = sessions.get(owner, runs.findCurrent(owner).orElseThrow().id());
+            } else if (!options.newRun() && store.findCurrent(owner).isPresent()) {
+                summary = sessions.get(owner, store.findCurrent(owner).orElseThrow().id());
             } else {
                 SessionTypes.StartRequest start = new SessionTypes.StartRequest(UUID.randomUUID(), packId,
                         options.locale() == null ? pack.manifest().defaultLocale() : options.locale(),
@@ -365,10 +368,26 @@ public final class ConsoleApp {
         } catch (SessionException failure) {
             err.println(failure.code().name());
             return 3;
+        } catch (StoreException failure) {
+            err.println(failure.code().name());
+            err.println(storeHint(failure.code()));
+            return 3;
         } catch (RuntimeException failure) {
             err.println("SESSION_UNAVAILABLE");
             return 3;
+        } finally {
+            if (local != null) local.close();
         }
+    }
+
+    private String storeHint(StoreException.Code code) {
+        return switch (code) {
+            case STORE_LOCKED -> "This store is open in another console. Close it or use another --store-dir.";
+            case STORE_CORRUPT -> "The store file is damaged and was left untouched.";
+            case STORE_VERSION_UNSUPPORTED -> "The store was written by a newer version.";
+            case STORE_LEGACY_LAYOUT -> "Old run files found. Use a new --store-dir.";
+            default -> "Could not read or write the store; nothing was changed.";
+        };
     }
 
     private SessionTypes.RunSummary awaitActive(RunSessionService sessions, SessionTypes.OwnerRef owner,

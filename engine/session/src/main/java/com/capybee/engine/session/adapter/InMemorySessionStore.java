@@ -25,9 +25,7 @@ import static com.capybee.engine.session.SessionPorts.CreateOutcome;
 import static com.capybee.engine.session.SessionPorts.InsertKind;
 import static com.capybee.engine.session.SessionTypes.*;
 
-public final class InMemorySessionStore implements SessionPorts.RunRepository, SessionPorts.CommandLog,
-        SessionPorts.GenerationLedger, SessionPorts.EventOutbox, SessionPorts.PrefetchStore,
-        SessionPorts.Transaction {
+public final class InMemorySessionStore implements SessionPorts.SessionStore {
     private final Clock clock;
     private final Map<UUID, StoredRun> runs = new HashMap<>();
     private final Map<String, LoggedCommand> commands = new HashMap<>();
@@ -69,7 +67,7 @@ public final class InMemorySessionStore implements SessionPorts.RunRepository, S
     @Override
     public synchronized Optional<StoredRun> find(UUID runId, OwnerRef owner) {
         StoredRun run = runs.get(runId);
-        return run != null && run.owner().equals(owner) ? Optional.of(run) : Optional.empty();
+        return run != null && run.owner().equals(owner) ? Optional.of(withGenerationCalls(run)) : Optional.empty();
     }
 
     @Override
@@ -77,7 +75,7 @@ public final class InMemorySessionStore implements SessionPorts.RunRepository, S
         return runs.values().stream()
                 .filter(run -> run.owner().equals(owner))
                 .filter(run -> run.status() == RunStatus.PREPARING || run.status() == RunStatus.ACTIVE)
-                .max(Comparator.comparing(StoredRun::updatedAt));
+                .max(Comparator.comparing(StoredRun::updatedAt)).map(this::withGenerationCalls);
     }
 
     @Override
@@ -85,6 +83,7 @@ public final class InMemorySessionStore implements SessionPorts.RunRepository, S
         StoredRun run = runs.get(runId);
         Instant now = clock.instant();
         if (run == null || !run.owner().equals(owner)
+                || (run.status() != RunStatus.PREPARING && run.status() != RunStatus.ACTIVE)
                 || (run.lease() != null && run.lease().until().isAfter(now))) {
             return Optional.empty();
         }
@@ -234,6 +233,7 @@ public final class InMemorySessionStore implements SessionPorts.RunRepository, S
     public synchronized boolean insertIfAbsent(UUID runId, String sceneId, long basedOnRevision,
                                                GenerationArtifact artifact) {
         if (artifact.outcome() == GenerationArtifact.Outcome.FALLBACK) return false;
+        if (!runs.containsKey(runId)) return false;
         return prefetch.computeIfAbsent(runId, ignored -> new HashMap<>())
                 .putIfAbsent(sceneId, new PrefetchedArtifact(sceneId, basedOnRevision, artifact)) == null;
     }
@@ -259,6 +259,12 @@ public final class InMemorySessionStore implements SessionPorts.RunRepository, S
                            Instant updatedAt) {
         return new StoredRun(old.id(), old.owner(), old.packId(), old.locale(), status, revision,
                 snapshot, pendingStart, lease, failureCode, generationCalls, old.createdAt(), updatedAt);
+    }
+
+    private StoredRun withGenerationCalls(StoredRun run) {
+        return new StoredRun(run.id(), run.owner(), run.packId(), run.locale(), run.status(), run.revision(),
+                run.snapshot(), run.pendingStart(), run.lease(), run.failureCode(),
+                runReservations.getOrDefault(run.id().toString(), 0), run.createdAt(), run.updatedAt());
     }
 
     private void addUsage(String key, TextGenerationResult.TokenUsage value,
