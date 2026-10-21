@@ -388,6 +388,21 @@ public final class SnapshotCodec {
             ArrayNode dialogue = MAPPER.createArrayNode(); value.dialogue().forEach(line -> { ObjectNode item=MAPPER.createObjectNode(); item.put("actorSlot",line.actorSlot()); item.put("text",line.text()); dialogue.add(item); }); payload.set("dialogue", dialogue);
             ArrayNode choices = MAPPER.createArrayNode(); value.choices().forEach(choice -> { ObjectNode item=MAPPER.createObjectNode(); item.put("id",choice.id()); item.put("label",choice.label()); choices.add(item); }); payload.set("choices", choices);
             payload.set("continuityFacts", stringArray(value.continuityFacts()));
+            if (value.ending() != null) {
+                ObjectNode ending = MAPPER.createObjectNode();
+                ending.put("headline", value.ending().headline());
+                ending.put("summary", value.ending().summary());
+                ending.put("reflection", value.ending().reflection());
+                ArrayNode notes = MAPPER.createArrayNode();
+                value.ending().objectiveNotes().forEach(note -> {
+                    ObjectNode item = MAPPER.createObjectNode();
+                    item.put("objectiveId", note.objectiveId());
+                    item.put("text", note.text());
+                    notes.add(item);
+                });
+                ending.set("objectiveNotes", notes);
+                payload.set("ending", ending);
+            }
         }
         node.set("payload", payload);
         return node;
@@ -489,7 +504,9 @@ public final class SnapshotCodec {
                 }
                 case SCENE -> {
                     boolean planned = schemaVersion == 2;
-                    if (!(planned ? exactFields(node, "sceneId", "title", "narration", "dialogue", "choices", "continuityFacts") : exactFields(node, "sceneId", "title", "narration", "dialogue", "choices"))
+                    if (!(planned ? (exactFields(node, "sceneId", "title", "narration", "dialogue", "choices", "continuityFacts")
+                            || exactFields(node, "sceneId", "title", "narration", "dialogue", "choices", "continuityFacts", "ending"))
+                            : exactFields(node, "sceneId", "title", "narration", "dialogue", "choices"))
                             || !node.get("dialogue").isArray() || !node.get("choices").isArray()) yield null;
                     List<GenerationArtifact.ChoiceLabel> choices = new ArrayList<>();
                     for (JsonNode choice : node.get("choices")) {
@@ -502,7 +519,20 @@ public final class SnapshotCodec {
                             if (!exactFields(line, "actorSlot", "text")) yield null;
                             dialogue.add(new GenerationArtifact.PlannedDialogue(requiredText(line, "actorSlot"), requiredText(line, "text")));
                         }
-                        yield new GenerationArtifact.PlannedScenePayload(requiredText(node, "sceneId"), requiredText(node, "title"), requiredText(node, "narration"), dialogue, choices, textArray(node.get("continuityFacts")));
+                        GenerationArtifact.EndingNarrative ending = null;
+                        if (node.has("ending")) {
+                            JsonNode endingNode = node.get("ending");
+                            if (!exactFields(endingNode, "headline", "summary", "objectiveNotes", "reflection")
+                                    || !endingNode.get("objectiveNotes").isArray()) yield null;
+                            List<GenerationArtifact.ObjectiveNote> notes = new ArrayList<>();
+                            for (JsonNode note : endingNode.get("objectiveNotes")) {
+                                if (!exactFields(note, "objectiveId", "text")) yield null;
+                                notes.add(new GenerationArtifact.ObjectiveNote(requiredText(note, "objectiveId"), requiredText(note, "text")));
+                            }
+                            ending = new GenerationArtifact.EndingNarrative(requiredText(endingNode, "headline"),
+                                    requiredText(endingNode, "summary"), notes, requiredText(endingNode, "reflection"));
+                        }
+                        yield new GenerationArtifact.PlannedScenePayload(requiredText(node, "sceneId"), requiredText(node, "title"), requiredText(node, "narration"), dialogue, choices, textArray(node.get("continuityFacts")), ending);
                     }
                     List<GenerationArtifact.Dialogue> dialogue = new ArrayList<>();
                     for (JsonNode line : node.get("dialogue")) {

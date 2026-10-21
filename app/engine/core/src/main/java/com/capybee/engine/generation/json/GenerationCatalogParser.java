@@ -282,7 +282,7 @@ public final class GenerationCatalogParser {
             }
             fields(item, CATALOG_FILE, "GENERATION_CATALOG_INVALID", context,
                     "slotId", "sceneId", "templateId", "fallbackResource", "choiceIds",
-                    "phaseId", "storyRole", "actorSlots", "objectiveIds", "toneTags");
+                    "phaseId", "storyRole", "actorSlots", "objectiveIds", "toneTags", "generationTiming");
             String slotId = text(item.get("slotId"));
             String sceneId = text(item.get("sceneId"));
             String templateId = text(item.get("templateId"));
@@ -293,10 +293,15 @@ public final class GenerationCatalogParser {
             List<String> actorSlots = optionalStrings(item.get("actorSlots"), pointer + "/actorSlots", context, 8);
             List<String> objectiveIds = optionalStrings(item.get("objectiveIds"), pointer + "/objectiveIds", context, 8);
             List<String> toneTags = optionalStrings(item.get("toneTags"), pointer + "/toneTags", context, 8);
+            GenerationCatalog.GenerationTiming timing = item.has("generationTiming")
+                    ? enumValue(GenerationCatalog.GenerationTiming.class, text(item.get("generationTiming")))
+                    : GenerationCatalog.GenerationTiming.PREFETCHABLE;
+            if (timing == null) error(context, "PACK_RESULT_PREFETCH_INVALID", CATALOG_FILE,
+                    pointer + "/generationTiming", "Invalid generation timing");
             if (!validId(slotId) || !ids.add(slotId) || !validId(sceneId) || !validId(templateId)
                     || !validResource(fallback, pack) || templates.get(templateId) == null
                     || templates.get(templateId).stage() != GenerationCatalog.Stage.SCENE
-                    || new HashSet<>(choices).size() != choices.size()) {
+                    || new HashSet<>(choices).size() != choices.size() || timing == null) {
                 error(context, "GENERATION_CATALOG_INVALID", CATALOG_FILE, pointer, "Scene slot or its template/fallback is invalid");
                 continue;
             }
@@ -305,7 +310,7 @@ public final class GenerationCatalogParser {
                         "Scene slot must match a trusted scene and its declared choice ids");
             }
             slots.add(new GenerationCatalog.SceneSlot(slotId, sceneId, templateId, fallback, choices,
-                    phaseId, storyRole, actorSlots, objectiveIds, toneTags));
+                    phaseId, storyRole, actorSlots, objectiveIds, toneTags, timing));
         }
         return slots;
     }

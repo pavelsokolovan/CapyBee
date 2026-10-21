@@ -244,7 +244,8 @@ public final class GenerationPipeline {
                 }
                 String requestData = attempt == 0 ? contextJson : repairContext(stage, slot, failureCode);
                 String instructions = taskInstructions();
-                String outputSchema = schema(stage);
+                String outputSchema = outputParser.schema(stage, fullGame(),
+                        slot != null && "ending".equals(slot.storyRole()));
                 if (requestData.length() + instructions.length() + outputSchema.length()
                         > catalog.limits().maxInputCharacters()) {
                     failureCode = "GENERATION_CONTEXT_REQUIRED_TOO_LARGE";

@@ -1,7 +1,7 @@
 {
   "schemaVersion":1,
   "scenes":[
-    {"id":"opening","start":true,"blocks":[{"kind":"NARRATION","text":"Opening."}],"options":[{"id":"left","label":"Left","next":"development-a"},{"id":"right","label":"Right","next":"development-b"}]},
+    {"id":"opening","start":true,"blocks":[{"kind":"NARRATION","text":"Opening."}],"options":[{"id":"left","label":"Left","next":"development-a","effects":[{"type":"FLAG_SET","flag":"took-left","value":true}]},{"id":"right","label":"Right","next":"development-b"}]},
     {"id":"development-a","blocks":[{"kind":"NARRATION","text":"Development A."}],"next":"challenge"},
     {"id":"development-b","blocks":[{"kind":"NARRATION","text":"Development B."}],"next":"challenge"},
     {"id":"challenge","blocks":[{"kind":"NARRATION","text":"Challenge."}],"next":"resolution"},

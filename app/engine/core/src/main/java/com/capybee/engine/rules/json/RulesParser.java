@@ -11,6 +11,8 @@ import com.capybee.engine.rules.Effect;
 import com.capybee.engine.rules.FlagDef;
 import com.capybee.engine.rules.ObjectiveDef;
 import com.capybee.engine.rules.OutcomeDef;
+import com.capybee.engine.rules.ResultClass;
+import com.capybee.engine.rules.ResultFactDef;
 import com.capybee.engine.rules.Rules;
 import com.capybee.engine.rules.SetDef;
 import tools.jackson.databind.JsonNode;
@@ -67,10 +69,11 @@ public final class RulesParser {
             error("RULES_FIELD_INVALID", RULES_FILE, "", "Expected rules object");
             return Rules.empty();
         }
-        unknown(root, RULES_FILE, "", "schemaVersion", "counters", "flags", "sets", "objectives", "outcomes", "limits");
+        unknown(root, RULES_FILE, "", "schemaVersion", "counters", "flags", "sets", "objectives", "outcomes", "resultFacts", "limits");
         JsonNode schema = root.get("schemaVersion");
-        if (schema == null || !schema.isIntegralNumber() || !schema.canConvertToInt() || schema.intValue() != 1) {
-            error("RULES_FIELD_INVALID", RULES_FILE, "/schemaVersion", "Expected schema version 1");
+        int schemaVersion = schema != null && schema.isIntegralNumber() && schema.canConvertToInt() ? schema.intValue() : -1;
+        if (schemaVersion < 1 || schemaVersion > 2) {
+            error("RULES_FIELD_INVALID", RULES_FILE, "/schemaVersion", "Expected schema version 1 or 2");
         }
         JsonNode limits = root.get("limits");
         if (limits != null && (!limits.isObject() || !limits.isEmpty())) {
@@ -81,8 +84,9 @@ public final class RulesParser {
         List<FlagDef> flags = parseFlags(root.get("flags"));
         List<SetDef> sets = parseSets(root.get("sets"));
         List<ObjectiveDef> objectives = parseObjectives(root.get("objectives"));
-        List<OutcomeDef> outcomes = parseOutcomes(root.get("outcomes"));
-        return new Rules(counters, flags, sets, objectives, outcomes);
+        List<OutcomeDef> outcomes = parseOutcomes(root.get("outcomes"), schemaVersion);
+        List<ResultFactDef> resultFacts = schemaVersion == 2 ? parseResultFacts(root.get("resultFacts")) : List.of();
+        return new Rules(counters, flags, sets, objectives, outcomes, resultFacts);
     }
 
     private List<CounterDef> parseCounters(JsonNode node) {
@@ -184,21 +188,49 @@ public final class RulesParser {
         return result;
     }
 
-    private List<OutcomeDef> parseOutcomes(JsonNode node) {
+    private List<OutcomeDef> parseOutcomes(JsonNode node, int schemaVersion) {
         List<OutcomeDef> result = new ArrayList<>();
         if (!array(node, "outcomes", 16, true)) return result;
         for (int index = 0; index < node.size(); index++) {
             String pointer = "/outcomes/" + index;
             JsonNode item = node.get(index);
             if (!object(item, pointer)) continue;
-            unknown(item, RULES_FILE, pointer, "id");
+            unknown(item, RULES_FILE, pointer, "id", "resultClass", "labelKey");
             String id = id(item.get("id"), pointer + "/id");
+            ResultClass resultClass = null;
+            String labelKey = null;
+            if (schemaVersion == 2) {
+                String rawClass = string(item.get("resultClass"));
+                try { resultClass = rawClass == null ? null : ResultClass.valueOf(rawClass); }
+                catch (IllegalArgumentException exception) { invalid(pointer + "/resultClass", "Invalid result class"); }
+                if (resultClass == null) invalid(pointer + "/resultClass", "Result class is required");
+                labelKey = label(item.get("labelKey"), pointer + "/labelKey");
+            }
             if (id != null) {
                 define("outcome", id, pointer + "/id");
-                result.add(new OutcomeDef(id));
+                if (schemaVersion == 1) result.add(new OutcomeDef(id));
+                else if (resultClass != null && labelKey != null) result.add(new OutcomeDef(id, resultClass, labelKey));
             }
         }
         return result;
+    }
+
+    private List<ResultFactDef> parseResultFacts(JsonNode node) {
+        List<ResultFactDef> result = new ArrayList<>();
+        if (!array(node, "resultFacts", 16, true)) return result;
+        for (int index = 0; index < node.size(); index++) {
+            String pointer = "/resultFacts/" + index;
+            JsonNode item = node.get(index);
+            if (!object(item, pointer)) continue;
+            unknown(item, RULES_FILE, pointer, "id", "labelKey", "when");
+            String id = id(item.get("id"), pointer + "/id");
+            String labelKey = label(item.get("labelKey"), pointer + "/labelKey");
+            Condition when = condition(item.get("when"), RULES_FILE, pointer + "/when", 1, new int[1]);
+            if (id != null) define("resultFact", id, pointer + "/id");
+            if (id != null && labelKey != null && when != null) result.add(new ResultFactDef(id, labelKey, when));
+            else error("PACK_RESULT_FACT_INVALID", RULES_FILE, pointer, "Invalid result fact");
+        }
+        return List.copyOf(result);
     }
 
     private Condition condition(JsonNode node, String file, String pointer, int depth, int[] nodes) {

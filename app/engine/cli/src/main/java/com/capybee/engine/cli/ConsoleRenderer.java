@@ -43,7 +43,7 @@ public final class ConsoleRenderer {
 			}
 		}
 
-		if (!view.objectives().isEmpty()) {
+		if (view.result() == null && !view.objectives().isEmpty()) {
 			appendLine(builder);
 			builder.append("Objectives:");
 			for (int index = 0; index < view.objectives().size(); index++) {
@@ -59,9 +59,29 @@ public final class ConsoleRenderer {
 			}
 		}
 
-		if (view.outcome() != null) {
+		if (view.result() == null && view.outcome() != null) {
 			appendLine(builder);
 			builder.append("Outcome: ").append(view.outcome());
+		}
+
+		if (view.result() != null) {
+			var result = view.result();
+			appendLine(builder);
+			builder.append("Result: ").append(result.label()).append(" — ").append(result.headline());
+			builder.append(System.lineSeparator()).append(System.lineSeparator()).append(result.summary());
+			if (!result.objectives().isEmpty()) {
+				builder.append(System.lineSeparator()).append(System.lineSeparator()).append("Objectives:");
+				for (var item : result.objectives()) builder.append(System.lineSeparator()).append("  [")
+						.append(item.state().name().toLowerCase()).append("] ").append(item.label())
+						.append(" — ").append(item.note());
+			}
+			if (!result.facts().isEmpty()) {
+				builder.append(System.lineSeparator()).append(System.lineSeparator()).append("What changed:");
+				for (var fact : result.facts()) builder.append(System.lineSeparator()).append("  - ").append(fact.label());
+			}
+			if (result.reflection() != null && !result.reflection().isBlank()) {
+				builder.append(System.lineSeparator()).append(System.lineSeparator()).append(result.reflection());
+			}
 		}
 
 		if (view.places() != null) {

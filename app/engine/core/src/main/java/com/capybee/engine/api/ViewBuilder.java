@@ -27,9 +27,15 @@ final class ViewBuilder {
     static View build(Scene scene, boolean ended, EndReason endReason, List<Option> options,
                       List<StatusItem> status, List<ObjectiveItem> objectives, String outcome, PlacesView places,
                       StoryInfo story, List<CharacterItem> characters) {
+        return build(scene, ended, endReason, options, status, objectives, outcome, places, story, characters, null);
+    }
+
+    static View build(Scene scene, boolean ended, EndReason endReason, List<Option> options,
+                      List<StatusItem> status, List<ObjectiveItem> objectives, String outcome, PlacesView places,
+                      StoryInfo story, List<CharacterItem> characters, RunResult result) {
         if (scene == null) {
             return new View(List.of(), List.of(), new InputSpec(InputMode.NONE, 0), List.of(), true,
-                    endReason, objectives, outcome, places, story, characters);
+                    endReason, objectives, outcome, places, story, characters, result);
         }
 
         InputMode mode = ended ? InputMode.NONE : scene.inputMode() != null ? InputMode.valueOf(scene.inputMode().name())
@@ -37,12 +43,12 @@ final class ViewBuilder {
 
         if (ended && endReason == EndReason.ABANDONED) {
             return new View(List.of(), List.of(), new InputSpec(InputMode.NONE, 0), List.of(), true,
-                    endReason, objectives, outcome, places, story, characters);
+                    endReason, objectives, outcome, places, story, characters, result);
         }
 
         return new View(List.copyOf(scene.blocks()), ended ? List.of() : options,
             new InputSpec(mode, ended ? 0 : scene.maxChars()), status, ended, endReason, objectives, outcome, places,
-            story, characters);
+            story, characters, result);
     }
 
     private static Option toOption(SceneOption option) {

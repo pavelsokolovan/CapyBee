@@ -209,6 +209,9 @@ final class RunImpl implements Run {
 
     private void addPrefetchCandidate(Set<String> candidates, String targetId) {
         if (targetId != null && generationPipeline.hasSceneSlot(targetId)
+                && generationPipeline.catalog().sceneSlots().stream()
+                    .filter(slot -> slot.sceneId().equals(targetId))
+                    .noneMatch(slot -> slot.generationTiming() == com.capybee.engine.generation.GenerationCatalog.GenerationTiming.ON_ENTRY)
                 && !generationPipeline.hasCachedScene(targetId)) {
             candidates.add(targetId);
         }
@@ -577,7 +580,32 @@ final class RunImpl implements Run {
             }
         }
         return ViewBuilder.build(scene, ended, endReason, options, status, objectiveItems, outcome,
-                buildPlacesView(ended), storyInfo(), discoveredCharacters());
+                buildPlacesView(ended), storyInfo(), discoveredCharacters(), buildRunResult(objectiveItems));
+    }
+
+    private RunResult buildRunResult(List<ObjectiveItem> objectiveItems) {
+        if (!ended || endReason != EndReason.COMPLETED || outcome == null || generationPipeline == null) return null;
+        com.capybee.engine.rules.OutcomeDef definition = rules.outcomes().stream()
+                .filter(item -> item.id().equals(outcome) && item.labelKey() != null).findFirst().orElse(null);
+        if (definition == null) return null;
+        GenerationArtifact.EndingNarrative ending = generationPipeline.resolvedScenes().stream()
+                .filter(item -> item.slot().sceneId().equals(sceneId))
+                .map(GenerationPipeline.SceneResolution::artifact)
+                .map(GenerationArtifact::payload)
+                .filter(GenerationArtifact.PlannedScenePayload.class::isInstance)
+                .map(GenerationArtifact.PlannedScenePayload.class::cast)
+                .map(GenerationArtifact.PlannedScenePayload::ending)
+                .filter(java.util.Objects::nonNull).findFirst().orElse(null);
+        if (ending == null) return null;
+        Map<String, String> notes = new LinkedHashMap<>();
+        ending.objectiveNotes().forEach(note -> notes.put(note.objectiveId(), note.text()));
+        List<ObjectiveResultItem> resultObjectives = objectiveItems.stream()
+                .map(item -> new ObjectiveResultItem(item.id(), item.label(), item.description(), item.state(),
+                        notes.getOrDefault(item.id(), ""))).toList();
+        List<ResultFactItem> facts = rules.resultFacts().stream().filter(item -> evaluate(item.when()))
+                .map(item -> new ResultFactItem(item.id(), resolve(item.labelKey()))).toList();
+        return new RunResult(outcome, resolve(definition.labelKey()), definition.resultClass(), ending.headline(),
+                ending.summary(), resultObjectives, facts, ending.reflection());
     }
 
     private StoryInfo storyInfo() {

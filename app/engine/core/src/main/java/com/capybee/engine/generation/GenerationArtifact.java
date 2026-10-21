@@ -86,12 +86,24 @@ public record GenerationArtifact(
     }
 
     public record PlannedScenePayload(String sceneId, String title, String narration, List<PlannedDialogue> dialogue,
-                                      List<ChoiceLabel> choices, List<String> continuityFacts) implements Payload {
+                                      List<ChoiceLabel> choices, List<String> continuityFacts,
+                                      EndingNarrative ending) implements Payload {
+        public PlannedScenePayload(String sceneId, String title, String narration, List<PlannedDialogue> dialogue,
+                                   List<ChoiceLabel> choices, List<String> continuityFacts) {
+            this(sceneId, title, narration, dialogue, choices, continuityFacts, null);
+        }
         public PlannedScenePayload {
             dialogue = List.copyOf(dialogue); choices = List.copyOf(choices);
             continuityFacts = List.copyOf(continuityFacts);
         }
     }
+
+    public record EndingNarrative(String headline, String summary, List<ObjectiveNote> objectiveNotes,
+                                  String reflection) {
+        public EndingNarrative { objectiveNotes = List.copyOf(objectiveNotes); }
+    }
+
+    public record ObjectiveNote(String objectiveId, String text) {}
 
     public record Dialogue(String actorId, String text) {}
 

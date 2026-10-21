@@ -7,6 +7,9 @@ import com.capybee.engine.pack.LocaleTag;
 import com.capybee.engine.pack.Pack;
 import com.capybee.engine.pack.PackValidationContext;
 import com.capybee.engine.rules.Effect;
+import com.capybee.engine.rules.ResultClass;
+import com.capybee.engine.rules.Rules;
+import com.capybee.engine.rules.json.RulesParser;
 
 import java.util.*;
 
@@ -20,6 +23,7 @@ public final class FullGeneratedGameValidator {
         if (contract == null) return GeneratedGameProfile.contentOnly();
         if (contract.kind() != RunContractKind.FULL_GAME || contract.contractVersion() != 1) return null;
         Map<LocaleTag, SceneSet> sets = SceneSets.load(pack);
+        Rules rules = RulesParser.parse(pack);
         SceneSet base = sets.get(new LocaleTag(catalog.defaultLocale()));
         if (base == null) { error(context, "PACK_RUN_SCENE_UNKNOWN", "No default-locale scene set"); return null; }
 
@@ -70,6 +74,8 @@ public final class FullGeneratedGameValidator {
                 error(context, "PACK_RUN_ENDING_INVALID", "Non-ending story scene ends the run: " + entry.getKey());
         }
 
+        validateResults(rules, endings, base, catalog, context);
+
         validateSlots(base, catalog, phaseOf.keySet(), utility, context);
         validatePlanning(catalog, phaseOf, context);
         validateLocaleParity(sets, catalog, context);
@@ -116,6 +122,33 @@ public final class FullGeneratedGameValidator {
         return new GeneratedGameProfile(GeneratedGameProfile.Kind.FULL_GAME, contract.contractVersion(),
                 contract.phases().stream().map(p -> new PhaseProfile(p.id(), p.kind(), p.sceneIds().size())).toList(),
                 reachable.size(), endings.size(), bounds.min, bounds.max, calls);
+    }
+
+    private static void validateResults(Rules rules, Map<String, EndingContract> endings, SceneSet scenes,
+                                        GenerationCatalog catalog, PackValidationContext context) {
+        Set<String> used = endings.values().stream().map(EndingContract::outcomeId)
+                .collect(java.util.stream.Collectors.toSet());
+        boolean hasSuccess = rules.outcomes().stream().anyMatch(o -> o.resultClass() == ResultClass.SUCCESS);
+        boolean hasOther = rules.outcomes().stream().anyMatch(o -> o.resultClass() != ResultClass.SUCCESS);
+        Set<String> labels = new HashSet<>();
+        if (rules.outcomes().size() < 2 || rules.outcomes().size() > 8 || !hasSuccess || !hasOther
+                || rules.outcomes().stream().anyMatch(o -> o.labelKey() == null || !used.contains(o.id())
+                    || !labels.add(o.labelKey()))) {
+            error(context, "PACK_RESULT_OUTCOME_INVALID", "Full-game outcomes need unique labels, complete ending coverage, and distinct result classes");
+        }
+        boolean endRun = scenes.scenes().values().stream().anyMatch(scene ->
+                scene.onEnter().stream().anyMatch(Effect.EndRun.class::isInstance)
+                || scene.options().stream().flatMap(option -> option.effects().stream()).anyMatch(Effect.EndRun.class::isInstance));
+        if (endRun || rules.objectives().stream().flatMap(objective -> objective.onComplete().stream())
+                .anyMatch(Effect.EndRun.class::isInstance)) {
+            error(context, "PACK_RESULT_END_RUN_FORBIDDEN", "Full-game contract v1 cannot use END_RUN");
+        }
+        Set<String> endingScenes = endings.keySet();
+        for (GenerationCatalog.SceneSlot slot : catalog.sceneSlots()) {
+            if (endingScenes.contains(slot.sceneId()) && slot.generationTiming() != GenerationCatalog.GenerationTiming.ON_ENTRY) {
+                error(context, "PACK_RESULT_PREFETCH_INVALID", "Ending scenes must use ON_ENTRY generation: " + slot.sceneId());
+            }
+        }
     }
 
     private static void validatePlanning(GenerationCatalog catalog, Map<String, Integer> phaseOf,

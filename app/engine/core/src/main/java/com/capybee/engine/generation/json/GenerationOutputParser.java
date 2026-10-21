@@ -45,6 +45,10 @@ public final class GenerationOutputParser {
     }
 
     public String schema(GenerationCatalog.Stage stage, boolean fullGame) {
+        return schema(stage, fullGame, false);
+    }
+
+    public String schema(GenerationCatalog.Stage stage, boolean fullGame, boolean endingSlot) {
         Map<String, Object> text = Map.of("type", "string");
         Map<String, Object> document = switch (stage) {
             case THEME -> objectSchema(Map.of("title", text, "premise", text,
@@ -61,7 +65,13 @@ public final class GenerationOutputParser {
                         : Map.of("name", text, "description", text)))));
             case QUEST -> objectSchema(Map.of("objectives", arraySchema(objectSchema(
                 Map.of("objectiveId", text, "title", text, "description", text)))));
-            case SCENE -> objectSchema(fullGame ? Map.of("title", text, "narration", text,
+            case SCENE -> objectSchema(fullGame && endingSlot ? Map.of("title", text, "narration", text,
+                "dialogue", arraySchema(objectSchema(Map.of("actorSlot", text, "text", text))),
+                "choices", arraySchema(objectSchema(Map.of("id", text, "label", text))),
+                "continuityFacts", arraySchema(text),
+                "ending", objectSchema(Map.of("headline", text, "summary", text,
+                    "objectiveNotes", arraySchema(objectSchema(Map.of("objectiveId", text, "text", text))),
+                    "reflection", text))) : fullGame ? Map.of("title", text, "narration", text,
                 "dialogue", arraySchema(objectSchema(Map.of("actorSlot", text, "text", text))),
                 "choices", arraySchema(objectSchema(Map.of("id", text, "label", text))),
                 "continuityFacts", arraySchema(text)) : Map.of("title", text, "narration", text,
@@ -243,7 +253,9 @@ public final class GenerationOutputParser {
     }
 
     private Result plannedScene(JsonNode root, GenerationCatalog.SceneSlot slot) {
-        exactFields(root, "title", "narration", "dialogue", "choices", "continuityFacts");
+        boolean endingSlot = "ending".equals(slot.storyRole());
+        if (endingSlot) exactFields(root, "title", "narration", "dialogue", "choices", "continuityFacts", "ending");
+        else exactFields(root, "title", "narration", "dialogue", "choices", "continuityFacts");
         String title = safeText(root, "title", 80), narration = safeText(root, "narration", 500);
         List<GenerationArtifact.PlannedDialogue> dialogue = new ArrayList<>();
         for (JsonNode line : array(root, "dialogue", 8)) {
@@ -256,8 +268,32 @@ public final class GenerationOutputParser {
         List<String> facts = uniqueStrings(root, "continuityFacts", 4, 140, "GENERATION_SCENE_FACT_INVALID");
         if (facts.stream().mapToInt(s -> s.codePointCount(0, s.length())).sum() > 400
                 || facts.stream().anyMatch(f -> CONTROL.matcher(f).find())) throw invalid("GENERATION_SCENE_FACT_INVALID");
+        GenerationArtifact.EndingNarrative ending = endingSlot ? parseEnding(root.get("ending"), slot) : null;
         return Result.valid(new GenerationArtifact.PlannedScenePayload(slot.sceneId(), title, narration,
-                dialogue, choices, facts));
+                dialogue, choices, facts, ending));
+    }
+
+    private GenerationArtifact.EndingNarrative parseEnding(JsonNode node, GenerationCatalog.SceneSlot slot) {
+        if (node == null || !node.isObject()) throw invalid("GENERATION_ENDING_INVALID");
+        exactFields(node, "headline", "summary", "objectiveNotes", "reflection");
+        String headline = safeText(node, "headline", 100);
+        String summary = safeText(node, "summary", 700);
+        String reflection = node.has("reflection") && node.get("reflection").isString()
+                ? node.get("reflection").asString() : "";
+        if (reflection.codePointCount(0, reflection.length()) > 280) throw invalid("GENERATION_ENDING_INVALID");
+        JsonNode notesNode = array(node, "objectiveNotes", 8);
+        List<GenerationArtifact.ObjectiveNote> notes = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (JsonNode note : notesNode) {
+            exactFields(note, "objectiveId", "text");
+            String objectiveId = requiredText(note, "objectiveId");
+            if (!slot.objectiveIds().contains(objectiveId) || !seen.add(objectiveId)) {
+                throw invalid("GENERATION_ENDING_OBJECTIVE_MISMATCH");
+            }
+            notes.add(new GenerationArtifact.ObjectiveNote(objectiveId, safeText(note, "text", 240)));
+        }
+        if (!seen.equals(new HashSet<>(slot.objectiveIds()))) throw invalid("GENERATION_ENDING_OBJECTIVE_MISMATCH");
+        return new GenerationArtifact.EndingNarrative(headline, summary, notes, reflection);
     }
 
     private List<GenerationArtifact.ChoiceLabel> parseChoices(JsonNode root, GenerationCatalog.SceneSlot slot) {

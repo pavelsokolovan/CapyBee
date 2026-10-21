@@ -70,11 +70,18 @@ public record GenerationCatalog(
             String storyRole,
             List<String> actorSlots,
             List<String> objectiveIds,
-            List<String> toneTags) {
+            List<String> toneTags,
+            GenerationTiming generationTiming) {
+        public SceneSlot(String slotId, String sceneId, String templateId, String fallbackResource,
+                         List<String> choiceIds, String phaseId, String storyRole,
+                         List<String> actorSlots, List<String> objectiveIds, List<String> toneTags) {
+            this(slotId, sceneId, templateId, fallbackResource, choiceIds, phaseId, storyRole,
+                    actorSlots, objectiveIds, toneTags, GenerationTiming.PREFETCHABLE);
+        }
         public SceneSlot(String slotId, String sceneId, String templateId, String fallbackResource,
                          List<String> choiceIds) {
             this(slotId, sceneId, templateId, fallbackResource, choiceIds, null, null,
-                    List.of(), List.of(), List.of());
+                    List.of(), List.of(), List.of(), GenerationTiming.PREFETCHABLE);
         }
         public SceneSlot {
             Objects.requireNonNull(slotId, "slotId");
@@ -85,6 +92,7 @@ public record GenerationCatalog(
             actorSlots = List.copyOf(actorSlots);
             objectiveIds = List.copyOf(objectiveIds);
             toneTags = List.copyOf(toneTags);
+            generationTiming = generationTiming == null ? GenerationTiming.PREFETCHABLE : generationTiming;
         }
     }
 
@@ -110,4 +118,5 @@ public record GenerationCatalog(
     }
 
     public enum Stage { THEME, SCENARIO, CAST, QUEST, SCENE }
+    public enum GenerationTiming { PREFETCHABLE, ON_ENTRY }
 }

@@ -30,6 +30,16 @@ export interface GameViewV2 {
   places?: unknown | null;
   story?: { title: string; premise: string; setting: string } | null;
   characters: Array<{ id: string; slotId: string; name: string; description: string; inCurrentScene: boolean }>;
+  result?: {
+    outcomeId: string;
+    label: string;
+    resultClass: 'SUCCESS' | 'PARTIAL_SUCCESS' | 'FAILURE';
+    headline: string;
+    summary: string;
+    objectives: Array<{ id: string; label: string; description?: string | null; state: 'ACTIVE' | 'DONE'; note: string }>;
+    facts: Array<{ id: string; label: string }>;
+    reflection?: string | null;
+  } | null;
 }
 
 export type GameView = GameViewV1 | GameViewV2;
