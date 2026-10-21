@@ -3,6 +3,7 @@ package com.capybee.server.game;
 import com.capybee.engine.api.Command;
 import com.capybee.engine.api.EndReason;
 import com.capybee.engine.api.Event;
+import com.capybee.engine.api.View;
 import com.capybee.engine.session.RunSessionService;
 import com.capybee.engine.session.SessionException;
 import com.capybee.engine.session.SessionTypes;
@@ -183,13 +184,13 @@ public class GameRunController {
         return new RunSummaryDto(summary.runId().toString(), summary.status().name(), summary.revision(),
                 summary.packId().value(), summary.packVersion(), summary.locale().value(),
                 summary.endReason() == null ? null : EndReason.valueOf(summary.endReason()),
-                summary.failureCode(), 1, summary.view(), summary.updatedAt());
+                summary.failureCode(), View.CURRENT_VIEW_SCHEMA, summary.view(), summary.updatedAt());
     }
 
     private static CommandOutcomeDto commandOutcome(CommandOutcome outcome) {
         return new CommandOutcomeDto(outcome.commandId(), outcome.outcome().name(), outcome.accepted(),
                 outcome.appliedRevision(), outcome.revision(), outcome.status().name(), outcome.view(),
-                1, outcome.events(), outcome.issues());
+                View.CURRENT_VIEW_SCHEMA, outcome.events(), outcome.issues());
     }
 
     public record StartBody(UUID id, String packId, String locale, Boolean generated,

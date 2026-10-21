@@ -18,6 +18,22 @@ export interface GameViewV1 {
   places?: unknown | null;
 }
 
+export interface GameViewV2 {
+  blocks: Array<{ kind: string; speaker?: string | null; text: string; refs: string[] }>;
+  options: Array<{ id: string; label: string; enabled: boolean; hint?: string | null }>;
+  input?: { mode: string; maxChars: number; prompt?: string | null } | null;
+  status: Array<{ id: string; label: string; value: string }>;
+  ended: boolean;
+  endReason?: 'COMPLETED' | 'ABANDONED' | null;
+  objectives: Array<{ id: string; label: string; description?: string | null; state: string }>;
+  outcome?: string | null;
+  places?: unknown | null;
+  story?: { title: string; premise: string; setting: string } | null;
+  characters: Array<{ id: string; slotId: string; name: string; description: string; inCurrentScene: boolean }>;
+}
+
+export type GameView = GameViewV1 | GameViewV2;
+
 export interface GameRunSummaryDto {
   runId: string;
   status: GameRunStatus;
@@ -27,8 +43,8 @@ export interface GameRunSummaryDto {
   locale: string;
   endReason?: 'COMPLETED' | 'ABANDONED' | null;
   failureCode?: string | null;
-  viewSchema: 1;
-  view: GameViewV1 | null;
+  viewSchema: 1 | 2;
+  view: GameView | null;
   updatedAt: string;
 }
 
@@ -61,8 +77,8 @@ export interface GameCommandOutcomeDto {
   appliedRevision: number;
   revision: number;
   status: GameRunStatus;
-  view: GameViewV1;
-  viewSchema: 1;
+  view: GameView;
+  viewSchema: 1 | 2;
   events: Array<{ id: string; payload: Record<string, string> }>;
   issues: GameIssueDto[];
 }

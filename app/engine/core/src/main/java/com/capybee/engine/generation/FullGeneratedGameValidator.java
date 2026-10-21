@@ -126,6 +126,11 @@ public final class FullGeneratedGameValidator {
                 .filter(t -> t.stage() == GenerationCatalog.Stage.CAST).findFirst().orElse(null);
         GenerationCatalog.TemplateDefinition quest = catalog.templates().stream()
                 .filter(t -> t.stage() == GenerationCatalog.Stage.QUEST).findFirst().orElse(null);
+        if (cast == null || cast.actorSlots().isEmpty() || cast.actorSlots().size() > 12 || !unique(cast.actorSlots()))
+            error(context, "PACK_GENERATION_CAST_INVALID", "Full games require 1-12 unique actor slots");
+        if (quest == null || quest.objectiveIds().isEmpty() || quest.objectiveIds().size() > 12
+                || !unique(quest.objectiveIds()))
+            error(context, "PACK_GENERATION_QUEST_INVALID", "Full games require 1-12 unique generated objectives");
         for (GenerationCatalog.SceneSlot slot : catalog.sceneSlots()) {
             GenerationCatalog.TemplateDefinition scene = catalog.templates().stream()
                     .filter(t -> t.id().equals(slot.templateId())).findFirst().orElse(null);

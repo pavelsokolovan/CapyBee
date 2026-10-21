@@ -30,10 +30,12 @@ class SessionJsonTest {
         assertThat(summary.locale()).isEqualTo("en");
         assertThat(summary.endReason()).isNull();
         assertThat(summary.failureCode()).isNull();
-        assertThat(summary.viewSchema()).isEqualTo(1);
+        assertThat(summary.viewSchema()).isEqualTo(2);
         assertThat(summary.view().blocks()).isEmpty();
         assertThat(summary.updatedAt()).isEqualTo(Instant.parse("2026-10-16T20:11:03Z"));
         assertThat(SessionJson.decode(SessionJson.encode(summary), RunSummaryDto.class)).isEqualTo(summary);
+        assertThat(SessionJson.decode(golden.replace("\"viewSchema\": 2", "\"viewSchema\": 1"),
+                RunSummaryDto.class).viewSchema()).isEqualTo(1);
     }
 
     @Test
@@ -42,7 +44,7 @@ class SessionJsonTest {
         var command = new CommandRequestDto(commandId, 3L,
                 new CommandRequestDto.CommandDto("CHOOSE", "explore", null, null));
         var outcome = new CommandOutcomeDto(commandId, "APPLIED", true, 4, 4,
-                "ACTIVE", null, 1, List.of(), List.of());
+                "ACTIVE", null, com.capybee.engine.api.View.CURRENT_VIEW_SCHEMA, List.of(), List.of());
         var pack = new PackInfoDto("fixture-minimal", "1.0.0", List.of("en"), "en", List.of(), false);
         var error = new ErrorDto(new ErrorDto.Error("RUN_NOT_FOUND", "Run not found", Map.of()));
 
@@ -58,7 +60,7 @@ class SessionJsonTest {
         assertThat(outcome.appliedRevision()).isEqualTo(4);
         assertThat(outcome.revision()).isEqualTo(4);
         assertThat(outcome.status()).isEqualTo("ACTIVE");
-        assertThat(outcome.viewSchema()).isEqualTo(1);
+        assertThat(outcome.viewSchema()).isEqualTo(2);
         assertThat(outcome.events()).isEmpty();
         assertThat(outcome.issues()).isEmpty();
         assertThat(pack.id()).isEqualTo("fixture-minimal");

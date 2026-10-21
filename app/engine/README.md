@@ -134,5 +134,10 @@ trusted graph, generated slot and fallback coverage, ending outcomes, route
 length, and minimum provider-call budget before play. Hosts read the resulting
 typed `GeneratedGameProfile`; they do not infer capability from pack names or
 reparse the graph. Schema-v1 packs such as `fixture-generated` remain supported
-and report `CONTENT_ONLY`. Full generated games use a typed narrative plan for the trusted five-phase graph; generated continuity facts guide later prose but never routes, mechanics, legal actions, or outcomes. Artifact v1 remains the content-only format and full games use artifact v2. Spec 27.6 owns
-runtime cast/quest use, and 27.7 owns richer result and ending behavior.
+and report `CONTENT_ONLY`. Full generated games use a typed narrative plan for
+the trusted five-phase graph; generated continuity facts guide later prose but
+never routes, mechanics, legal actions, or outcomes. Artifact v1 remains the
+content-only format and full games use artifact v2. Full-game cast and quest
+artifacts now provide display names, discovered-character metadata, and quest
+presentation while trusted rules remain the sole owner of objective state.
+Spec 27.7 owns richer result and ending behavior.

@@ -7,7 +7,7 @@
   "locale": "en",
   "endReason": null,
   "failureCode": null,
-  "viewSchema": 1,
+  "viewSchema": 2,
   "view": {
     "blocks": [],
     "options": [],
@@ -17,7 +17,9 @@
     "endReason": null,
     "objectives": [],
     "outcome": null,
-    "places": null
+    "places": null,
+    "story": null,
+    "characters": []
   },
   "updatedAt": "2026-10-16T20:11:03Z"
 }

@@ -76,6 +76,8 @@ final class SessionConsole {
         View view = summary.view();
         out.println("Run " + summary.runId());
         out.println("Running " + summary.packId().value() + " in locale " + summary.locale().value());
+        String header = ConsoleRenderer.renderHeader(view);
+        if (!header.isEmpty()) out.println(header);
         out.println(ConsoleRenderer.render(view));
         printDebug(options.debug(), sessions, owner, summary);
         while (!view.ended()) {

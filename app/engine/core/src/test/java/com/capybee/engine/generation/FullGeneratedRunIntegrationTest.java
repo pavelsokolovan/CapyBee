@@ -4,6 +4,7 @@ import com.capybee.engine.adapter.Randoms;
 import com.capybee.engine.adapter.SequentialIdSource;
 import com.capybee.engine.api.Command;
 import com.capybee.engine.api.EndReason;
+import com.capybee.engine.api.ObjectiveState;
 import com.capybee.engine.api.Engine;
 import com.capybee.engine.api.RunRequest;
 import com.capybee.engine.pack.DirectoryPackSource;
@@ -35,9 +36,19 @@ class FullGeneratedRunIntegrationTest {
         assertThat(start.ok()).isTrue();
         var run = start.run();
         assertThat(run.view().blocks().getFirst().text()).startsWith("The Fork\n");
+        assertThat(run.view().story().title()).isEqualTo("A Small Journey");
+        assertThat(run.view().characters()).extracting(character -> character.name())
+                .containsExactly("Ari", "Mara");
+        assertThat(run.view().blocks()).anySatisfy(block -> assertThat(block.speaker()).isEqualTo("Mara"));
+        assertThat(run.view().objectives()).extracting(item -> item.label())
+                .containsExactly("Find the Safe Path", "Return to the Keeper");
+        assertThat(run.view().objectives()).allSatisfy(item -> assertThat(item.description()).isNotBlank());
 
         assertThat(run.apply(new Command.Choose("left")).accepted()).isTrue();
         assertThat(run.apply(new Command.Advance()).accepted()).isTrue();
+        assertThat(run.view().characters()).extracting(character -> character.name())
+                .containsExactly("Ari", "Mara", "Tomas");
+        assertThat(run.view().objectives().getFirst().state()).isEqualTo(ObjectiveState.DONE);
         assertThat(run.apply(new Command.Advance()).accepted()).isTrue();
         var ending = run.apply(new Command.Choose("succeed"));
 
@@ -50,5 +61,8 @@ class FullGeneratedRunIntegrationTest {
                 .filteredOn(artifact -> artifact.stage() == GenerationCatalog.Stage.SCENE)
                 .hasSize(5)
                 .allMatch(artifact -> artifact.outcome() == GenerationArtifact.Outcome.FALLBACK);
+        var restored = engine.resume(run.snapshot());
+        assertThat(restored.ok()).isTrue();
+        assertThat(restored.run().view()).isEqualTo(run.view());
     }
 }

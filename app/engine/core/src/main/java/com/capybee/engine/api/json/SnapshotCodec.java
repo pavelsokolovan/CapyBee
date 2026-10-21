@@ -385,7 +385,7 @@ public final class SnapshotCodec {
             payload.set("choices", choices);
         } else if (artifact.payload() instanceof GenerationArtifact.PlannedScenePayload value) {
             payload.put("sceneId", value.sceneId()); payload.put("title", value.title()); payload.put("narration", value.narration());
-            ArrayNode dialogue = MAPPER.createArrayNode(); value.dialogue().forEach(line -> { ObjectNode item=MAPPER.createObjectNode(); item.put("actorId",line.actorId()); item.put("text",line.text()); dialogue.add(item); }); payload.set("dialogue", dialogue);
+            ArrayNode dialogue = MAPPER.createArrayNode(); value.dialogue().forEach(line -> { ObjectNode item=MAPPER.createObjectNode(); item.put("actorSlot",line.actorSlot()); item.put("text",line.text()); dialogue.add(item); }); payload.set("dialogue", dialogue);
             ArrayNode choices = MAPPER.createArrayNode(); value.choices().forEach(choice -> { ObjectNode item=MAPPER.createObjectNode(); item.put("id",choice.id()); item.put("label",choice.label()); choices.add(item); }); payload.set("choices", choices);
             payload.set("continuityFacts", stringArray(value.continuityFacts()));
         }
@@ -491,18 +491,25 @@ public final class SnapshotCodec {
                     boolean planned = schemaVersion == 2;
                     if (!(planned ? exactFields(node, "sceneId", "title", "narration", "dialogue", "choices", "continuityFacts") : exactFields(node, "sceneId", "title", "narration", "dialogue", "choices"))
                             || !node.get("dialogue").isArray() || !node.get("choices").isArray()) yield null;
-                    List<GenerationArtifact.Dialogue> dialogue = new ArrayList<>();
-                    for (JsonNode line : node.get("dialogue")) {
-                        if (!exactFields(line, "actorId", "text")) yield null;
-                        dialogue.add(new GenerationArtifact.Dialogue(requiredText(line, "actorId"), requiredText(line, "text")));
-                    }
                     List<GenerationArtifact.ChoiceLabel> choices = new ArrayList<>();
                     for (JsonNode choice : node.get("choices")) {
                         if (!exactFields(choice, "id", "label")) yield null;
                         choices.add(new GenerationArtifact.ChoiceLabel(requiredText(choice, "id"), requiredText(choice, "label")));
                     }
-                    yield planned ? new GenerationArtifact.PlannedScenePayload(requiredText(node, "sceneId"), requiredText(node, "title"), requiredText(node, "narration"), dialogue, choices, textArray(node.get("continuityFacts")))
-                            : new GenerationArtifact.ScenePayload(requiredText(node, "sceneId"), requiredText(node, "title"), requiredText(node, "narration"), dialogue, choices);
+                    if (planned) {
+                        List<GenerationArtifact.PlannedDialogue> dialogue = new ArrayList<>();
+                        for (JsonNode line : node.get("dialogue")) {
+                            if (!exactFields(line, "actorSlot", "text")) yield null;
+                            dialogue.add(new GenerationArtifact.PlannedDialogue(requiredText(line, "actorSlot"), requiredText(line, "text")));
+                        }
+                        yield new GenerationArtifact.PlannedScenePayload(requiredText(node, "sceneId"), requiredText(node, "title"), requiredText(node, "narration"), dialogue, choices, textArray(node.get("continuityFacts")));
+                    }
+                    List<GenerationArtifact.Dialogue> dialogue = new ArrayList<>();
+                    for (JsonNode line : node.get("dialogue")) {
+                        if (!exactFields(line, "actorId", "text")) yield null;
+                        dialogue.add(new GenerationArtifact.Dialogue(requiredText(line, "actorId"), requiredText(line, "text")));
+                    }
+                    yield new GenerationArtifact.ScenePayload(requiredText(node, "sceneId"), requiredText(node, "title"), requiredText(node, "narration"), dialogue, choices);
                 }
             };
         } catch (RuntimeException exception) {

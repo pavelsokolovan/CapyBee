@@ -1,1 +1,1 @@
-{"schemaVersion":1,"counters":[],"flags":[],"sets":[],"objectives":[],"outcomes":[{"id":"success"},{"id":"partial"}]}
+{"schemaVersion":1,"counters":[],"flags":[],"sets":[],"objectives":[{"id":"find-path","labelKey":"objective.find-path","completeWhen":{"type":"VISITED_SCENE","scene":"challenge"}},{"id":"return-home","labelKey":"objective.return-home","completeWhen":{"type":"VISITED_SCENE","scene":"ending-success"}}],"outcomes":[{"id":"success"},{"id":"partial"}]}

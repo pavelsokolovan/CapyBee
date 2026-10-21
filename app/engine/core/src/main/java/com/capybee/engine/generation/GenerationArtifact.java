@@ -85,7 +85,7 @@ public record GenerationArtifact(
         }
     }
 
-    public record PlannedScenePayload(String sceneId, String title, String narration, List<Dialogue> dialogue,
+    public record PlannedScenePayload(String sceneId, String title, String narration, List<PlannedDialogue> dialogue,
                                       List<ChoiceLabel> choices, List<String> continuityFacts) implements Payload {
         public PlannedScenePayload {
             dialogue = List.copyOf(dialogue); choices = List.copyOf(choices);
@@ -94,6 +94,8 @@ public record GenerationArtifact(
     }
 
     public record Dialogue(String actorId, String text) {}
+
+    public record PlannedDialogue(String actorSlot, String text) {}
 
     public record ChoiceLabel(String id, String label) {}
 

@@ -107,6 +107,8 @@ final class ClassicConsole {
 
         out.println("Running " + packId.value() + " in locale " + run.snapshot().locale().value());
         View view = run.view();
+        String header = ConsoleRenderer.renderHeader(view);
+        if (!header.isEmpty()) out.println(header);
         out.println(ConsoleRenderer.render(view));
         printGenerationSummary(run);
 

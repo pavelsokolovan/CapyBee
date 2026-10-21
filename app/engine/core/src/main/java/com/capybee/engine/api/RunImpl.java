@@ -500,7 +500,8 @@ final class RunImpl implements Run {
         List<Block> blocks = new ArrayList<>(current.blocks());
         blocks.add(new Block(BlockKind.NARRATION, null, safeReply, List.of()));
         View replyView = new View(blocks, current.options(), current.input(), current.status(), current.ended(),
-                current.endReason(), current.objectives(), current.outcome(), current.places());
+                current.endReason(), current.objectives(), current.outcome(), current.places(), current.story(),
+                current.characters());
         List<Issue> issues = processedReply.changed()
                 ? List.of(new Issue(Issue.Severity.WARNING, "INPUT_REDACTED", "Personal details were removed from the reply"))
                 : List.of();
@@ -558,8 +559,12 @@ final class RunImpl implements Run {
                     counters.getOrDefault(def.id(), def.initial()) + " / " + def.max()));
         }
         List<ObjectiveItem> objectiveItems = new ArrayList<>();
+        Map<String, GenerationArtifact.Quest> quests = new LinkedHashMap<>();
+        if (generationPipeline != null) generationPipeline.quests().forEach(quest -> quests.put(quest.objectiveId(), quest));
         for (ObjectiveDef def : rules.objectives()) {
-            objectiveItems.add(new ObjectiveItem(def.id(), resolve(def.labelKey()),
+            GenerationArtifact.Quest quest = quests.get(def.id());
+            objectiveItems.add(new ObjectiveItem(def.id(), quest == null ? resolve(def.labelKey()) : quest.title(),
+                    quest == null ? null : quest.description(),
                     objectives.getOrDefault(def.id(), ObjectiveState.ACTIVE)));
         }
         List<Option> options = new ArrayList<>();
@@ -572,7 +577,37 @@ final class RunImpl implements Run {
             }
         }
         return ViewBuilder.build(scene, ended, endReason, options, status, objectiveItems, outcome,
-                buildPlacesView(ended));
+                buildPlacesView(ended), storyInfo(), discoveredCharacters());
+    }
+
+    private StoryInfo storyInfo() {
+        if (generationPipeline == null) return null;
+        GenerationArtifact.StoryPlanPayload plan = generationPipeline.storyPlan();
+        return plan == null ? null : new StoryInfo(plan.title(), plan.premise(), plan.setting());
+    }
+
+    private List<CharacterItem> discoveredCharacters() {
+        if (generationPipeline == null || generationPipeline.storyPlan() == null) return List.of();
+        Map<String, GenerationArtifact.CastMember> cast = new LinkedHashMap<>();
+        generationPipeline.cast().forEach(member -> cast.put(member.slotId(), member));
+        LinkedHashSet<String> discovered = new LinkedHashSet<>();
+        List<String> scenes = new ArrayList<>(visited);
+        if (sceneId != null && !scenes.contains(sceneId)) scenes.add(sceneId);
+        for (String visitedScene : scenes) {
+            generationPipeline.catalog().sceneSlots().stream()
+                    .filter(slot -> slot.sceneId().equals(visitedScene)).findFirst()
+                    .ifPresent(slot -> discovered.addAll(slot.actorSlots()));
+        }
+        Set<String> current = generationPipeline.catalog().sceneSlots().stream()
+                .filter(slot -> slot.sceneId().equals(sceneId)).findFirst()
+                .map(slot -> Set.copyOf(slot.actorSlots())).orElse(Set.of());
+        List<CharacterItem> result = new ArrayList<>();
+        for (String slotId : discovered) {
+            GenerationArtifact.CastMember member = cast.get(slotId);
+            if (member != null) result.add(new CharacterItem(member.actorId(), member.slotId(), member.name(),
+                    member.description(), current.contains(slotId)));
+        }
+        return List.copyOf(result);
     }
 
     private StepResult move(String placeId) {

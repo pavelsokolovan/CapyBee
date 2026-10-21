@@ -45,11 +45,17 @@ public final class ConsoleRenderer {
 
 		if (!view.objectives().isEmpty()) {
 			appendLine(builder);
-			builder.append("Objectives: ");
+			builder.append("Objectives:");
 			for (int index = 0; index < view.objectives().size(); index++) {
 				ObjectiveItem item = view.objectives().get(index);
-				if (index > 0) builder.append(", ");
-				builder.append(item.label()).append(" (").append(item.state().name().toLowerCase()).append(")");
+				if (item.description() == null) {
+					if (index == 0) builder.append(" "); else builder.append(", ");
+					builder.append(item.label()).append(" (").append(item.state().name().toLowerCase()).append(")");
+				} else {
+					builder.append(System.lineSeparator()).append("  [")
+							.append(item.state().name().toLowerCase()).append("] ").append(item.label())
+							.append(" — ").append(item.description());
+				}
 			}
 		}
 
@@ -117,6 +123,10 @@ public final class ConsoleRenderer {
 		}
 
 		return builder.toString();
+	}
+
+	public static String renderHeader(View view) {
+		return view == null || view.story() == null ? "" : view.story().title();
 	}
 
 	private static void appendLine(StringBuilder builder) {

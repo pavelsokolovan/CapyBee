@@ -31,9 +31,9 @@ public final class GenerationOutputParser {
             return switch (stage) {
                 case THEME -> theme(root, template);
                 case SCENARIO -> fullGame(catalog) ? storyPlan(root, catalog) : scenario(root, catalog);
-                case CAST -> cast(root, template);
-                case QUEST -> quest(root, template, objectiveIds);
-                case SCENE -> fullGame(catalog) ? plannedScene(root, slot, actorIds) : scene(root, slot, actorIds);
+                case CAST -> cast(root, template, fullGame(catalog));
+                case QUEST -> quest(root, template, objectiveIds, fullGame(catalog));
+                case SCENE -> fullGame(catalog) ? plannedScene(root, slot) : scene(root, slot, actorIds);
             };
         } catch (ValidationException exception) {
             return Result.invalid(exception.code);
@@ -57,11 +57,12 @@ public final class GenerationOutputParser {
                         "storyRoles", arraySchema(text))))))
                 : objectSchema(Map.of("title", text, "premise", text, "setting", text, "beats", arraySchema(text)));
             case CAST -> objectSchema(Map.of("characters", arraySchema(objectSchema(
-                Map.of("name", text, "description", text)))));
+                fullGame ? Map.of("slotId", text, "name", text, "description", text)
+                        : Map.of("name", text, "description", text)))));
             case QUEST -> objectSchema(Map.of("objectives", arraySchema(objectSchema(
                 Map.of("objectiveId", text, "title", text, "description", text)))));
             case SCENE -> objectSchema(fullGame ? Map.of("title", text, "narration", text,
-                "dialogue", arraySchema(objectSchema(Map.of("actorId", text, "text", text))),
+                "dialogue", arraySchema(objectSchema(Map.of("actorSlot", text, "text", text))),
                 "choices", arraySchema(objectSchema(Map.of("id", text, "label", text))),
                 "continuityFacts", arraySchema(text)) : Map.of("title", text, "narration", text,
                 "dialogue", arraySchema(objectSchema(Map.of("actorId", text, "text", text))),
@@ -157,40 +158,59 @@ public final class GenerationOutputParser {
         return Result.valid(new GenerationArtifact.ScenarioPayload(title, premise, setting, beats));
     }
 
-    private Result cast(JsonNode root, GenerationCatalog.TemplateDefinition template) {
+    private Result cast(JsonNode root, GenerationCatalog.TemplateDefinition template, boolean fullGame) {
         exactFields(root, "characters");
         JsonNode characters = array(root, "characters", template.actorSlots().size());
         List<GenerationArtifact.CastMember> values = new ArrayList<>();
         Set<String> names = new HashSet<>();
+        Map<String, GenerationArtifact.CastMember> bySlot = new java.util.LinkedHashMap<>();
         for (int index = 0; index < characters.size(); index++) {
             JsonNode character = characters.get(index);
-            exactFields(character, "name", "description");
+            boolean explicitSlots = character.has("slotId");
+            if (fullGame && !explicitSlots) throw invalid("GENERATION_CAST_COVERAGE_INVALID");
+            if (explicitSlots) exactFields(character, "slotId", "name", "description");
+            else exactFields(character, "name", "description");
+            String slotId = explicitSlots ? requiredText(character, "slotId") : template.actorSlots().get(index);
+            if (!template.actorSlots().contains(slotId) || bySlot.containsKey(slotId)) {
+                throw invalid("GENERATION_CAST_COVERAGE_INVALID");
+            }
             String name = safeText(character, "name", 60);
             String description = safeText(character, "description", 300);
-            if (!names.add(name.toLowerCase(java.util.Locale.ROOT))) throw invalid("OUTPUT_DUPLICATE_ENTRY");
-            values.add(new GenerationArtifact.CastMember(template.actorSlots().get(index), null, name, description));
+            String normalizedName = java.text.Normalizer.normalize(name, java.text.Normalizer.Form.NFKC)
+                    .toLowerCase(java.util.Locale.ROOT);
+            if (!names.add(normalizedName) || identifierLike(name)) throw invalid("GENERATION_CAST_NAME_INVALID");
+            bySlot.put(slotId, new GenerationArtifact.CastMember(slotId, null, name, description));
         }
+        if (fullGame && bySlot.size() != template.actorSlots().size()) throw invalid("GENERATION_CAST_COVERAGE_INVALID");
+        if (fullGame) template.actorSlots().forEach(slotId -> values.add(bySlot.get(slotId)));
+        else values.addAll(bySlot.values());
         return Result.valid(new GenerationArtifact.CastPayload(values));
     }
 
-    private Result quest(JsonNode root, GenerationCatalog.TemplateDefinition template, Set<String> objectiveIds) {
+    private Result quest(JsonNode root, GenerationCatalog.TemplateDefinition template, Set<String> objectiveIds,
+                         boolean fullGame) {
         exactFields(root, "objectives");
         JsonNode objectives = array(root, "objectives", 12);
         Set<String> allowedObjectives = new HashSet<>(template.objectiveIds());
-        allowedObjectives.addAll(objectiveIds);
+        if (!fullGame) allowedObjectives.addAll(objectiveIds);
         List<GenerationArtifact.Quest> values = new ArrayList<>();
         Set<String> seen = new HashSet<>();
+        Set<String> titles = new HashSet<>();
         for (JsonNode objective : objectives) {
             exactFields(objective, "objectiveId", "title", "description");
             String id = requiredText(objective, "objectiveId");
             String title = safeText(objective, "title", 80);
             String description = safeText(objective, "description", 500);
             if (id.isBlank() || (!allowedObjectives.isEmpty() && !allowedObjectives.contains(id))) {
-                throw invalid("OUTPUT_REFERENCE_INVALID");
+                throw invalid("GENERATION_QUEST_COVERAGE_INVALID");
             }
-            if (!seen.add(id)) throw invalid("OUTPUT_DUPLICATE_ENTRY");
+            if (!seen.add(id)) throw invalid("GENERATION_QUEST_COVERAGE_INVALID");
+            String normalizedTitle = java.text.Normalizer.normalize(title, java.text.Normalizer.Form.NFKC)
+                    .toLowerCase(java.util.Locale.ROOT);
+            if (!titles.add(normalizedTitle)) throw invalid("GENERATION_QUEST_PRESENTATION_INVALID");
             values.add(new GenerationArtifact.Quest(id, title, description));
         }
+        if (fullGame && !seen.equals(allowedObjectives)) throw invalid("GENERATION_QUEST_COVERAGE_INVALID");
         return Result.valid(new GenerationArtifact.QuestPayload(values));
     }
 
@@ -222,15 +242,39 @@ public final class GenerationOutputParser {
         return Result.valid(new GenerationArtifact.ScenePayload(slot.sceneId(), title, narration, lines, labels));
     }
 
-    private Result plannedScene(JsonNode root, GenerationCatalog.SceneSlot slot, Set<String> actorIds) {
+    private Result plannedScene(JsonNode root, GenerationCatalog.SceneSlot slot) {
         exactFields(root, "title", "narration", "dialogue", "choices", "continuityFacts");
-        Result base = sceneFields(root, slot, actorIds);
-        GenerationArtifact.ScenePayload scene = (GenerationArtifact.ScenePayload) base.payload();
+        String title = safeText(root, "title", 80), narration = safeText(root, "narration", 500);
+        List<GenerationArtifact.PlannedDialogue> dialogue = new ArrayList<>();
+        for (JsonNode line : array(root, "dialogue", 8)) {
+            exactFields(line, "actorSlot", "text");
+            String actorSlot = requiredText(line, "actorSlot");
+            if (!slot.actorSlots().contains(actorSlot)) throw invalid("GENERATION_DIALOGUE_ACTOR_INVALID");
+            dialogue.add(new GenerationArtifact.PlannedDialogue(actorSlot, safeText(line, "text", 300)));
+        }
+        List<GenerationArtifact.ChoiceLabel> choices = parseChoices(root, slot);
         List<String> facts = uniqueStrings(root, "continuityFacts", 4, 140, "GENERATION_SCENE_FACT_INVALID");
         if (facts.stream().mapToInt(s -> s.codePointCount(0, s.length())).sum() > 400
                 || facts.stream().anyMatch(f -> CONTROL.matcher(f).find())) throw invalid("GENERATION_SCENE_FACT_INVALID");
-        return Result.valid(new GenerationArtifact.PlannedScenePayload(scene.sceneId(), scene.title(), scene.narration(),
-                scene.dialogue(), scene.choices(), facts));
+        return Result.valid(new GenerationArtifact.PlannedScenePayload(slot.sceneId(), title, narration,
+                dialogue, choices, facts));
+    }
+
+    private List<GenerationArtifact.ChoiceLabel> parseChoices(JsonNode root, GenerationCatalog.SceneSlot slot) {
+        List<GenerationArtifact.ChoiceLabel> labels = new ArrayList<>(); Set<String> ids = new HashSet<>();
+        for (JsonNode choice : array(root, "choices", 8)) {
+            exactFields(choice, "id", "label"); String id = requiredText(choice, "id");
+            if (!slot.choiceIds().contains(id) || !ids.add(id)) throw invalid("OUTPUT_REFERENCE_INVALID");
+            labels.add(new GenerationArtifact.ChoiceLabel(id, safeText(choice, "label", 80)));
+        }
+        if (!ids.equals(new HashSet<>(slot.choiceIds()))) throw invalid("OUTPUT_REFERENCE_INVALID");
+        return labels;
+    }
+
+    private boolean identifierLike(String value) {
+        return value.matches("(?i)[0-9a-f]{8}-[0-9a-f-]{27,}")
+                || value.matches("(?i)(actor|slot|id|cmd|system)[_-].*")
+                || value.startsWith("/") || value.matches("[A-Z0-9_]{3,}");
     }
 
     private Result sceneFields(JsonNode root, GenerationCatalog.SceneSlot slot, Set<String> actorIds) {
