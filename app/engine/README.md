@@ -108,9 +108,11 @@ file. Sources never enumerate classpath directories and can read packs
 inside JARs. File reads are bounded; directory sources reject traversal
 and symlink escapes. JSON rejects duplicate keys and trailing documents.
 
-Four test packs exercise different locales, inputs and optional features:
+Five test packs exercise different locales, inputs and optional features:
 `fixture-minimal`, `fixture-text-dungeon`, `fixture-space-courier`, and
-`fixture-generated`.
+`fixture-generated`. `fixture-generated-full-minimal` is the technical schema-v2
+full-game contract fixture; `fixture-generated` intentionally remains the
+schema-v1 `CONTENT_ONLY` compatibility fixture.
 The source boundary scanner has self-tests for every enforced rule.
 Section validators run in registration order and share a reference index
 for cross-file links.
@@ -125,3 +127,12 @@ earlier spec 29 plan to spec 27. The expanded local console host is included
 in spec 27 rather than being a separate numbered spec. Spec 28 owns the client
 rendering contract, and spec 29 owns the CapyBee Polish pack. The framework-
 neutral session module does not depend on Spring or the web application.
+
+Generation catalog schema v2 can declare a versioned `FULL_GAME` run contract.
+Pack loading validates its five ordered story phases, acyclic and finishable
+trusted graph, generated slot and fallback coverage, ending outcomes, route
+length, and minimum provider-call budget before play. Hosts read the resulting
+typed `GeneratedGameProfile`; they do not infer capability from pack names or
+reparse the graph. Schema-v1 packs such as `fixture-generated` remain supported
+and report `CONTENT_ONLY`. Spec 27.5 owns generated story planning, 27.6 owns
+runtime cast/quest use, and 27.7 owns richer result and ending behavior.

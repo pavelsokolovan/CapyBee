@@ -1,0 +1,23 @@
+{
+  "schemaVersion":2,"supportedLocales":["en"],"defaultLocale":"en",
+  "stages":[
+    {"stage":"SCENARIO","templateId":"scenario-basic","dependencies":[],"fallbackResource":"generation/fallbacks/scenario.json"},
+    {"stage":"CAST","templateId":"cast-basic","dependencies":["SCENARIO"],"fallbackResource":"generation/fallbacks/cast.json"},
+    {"stage":"QUEST","templateId":"quest-basic","dependencies":["SCENARIO"],"fallbackResource":"generation/fallbacks/quest.json"},
+    {"stage":"SCENE","templateId":"scene-basic","dependencies":["SCENARIO","CAST","QUEST"],"fallbackResource":"generation/fallbacks/opening.json"}
+  ],
+  "sceneSlots":[
+    {"slotId":"opening-slot","sceneId":"opening","templateId":"scene-basic","fallbackResource":"generation/fallbacks/opening.json","choiceIds":["left","right"]},
+    {"slotId":"development-a-slot","sceneId":"development-a","templateId":"scene-basic","fallbackResource":"generation/fallbacks/development-a.json","choiceIds":[]},
+    {"slotId":"development-b-slot","sceneId":"development-b","templateId":"scene-basic","fallbackResource":"generation/fallbacks/development-b.json","choiceIds":[]},
+    {"slotId":"challenge-slot","sceneId":"challenge","templateId":"scene-basic","fallbackResource":"generation/fallbacks/challenge.json","choiceIds":[]},
+    {"slotId":"resolution-slot","sceneId":"resolution","templateId":"scene-basic","fallbackResource":"generation/fallbacks/resolution.json","choiceIds":["succeed","accept"]},
+    {"slotId":"ending-success-slot","sceneId":"ending-success","templateId":"scene-basic","fallbackResource":"generation/fallbacks/ending-success.json","choiceIds":[]},
+    {"slotId":"ending-partial-slot","sceneId":"ending-partial","templateId":"scene-basic","fallbackResource":"generation/fallbacks/ending-partial.json","choiceIds":[]}
+  ],
+  "limits":{"totalCallsPerRun":8,"callsPerStage":1,"maxOutputTokens":800,"maxInputCharacters":12000,"repairAttempts":0},
+  "runContract":{"kind":"FULL_GAME","contractVersion":1,
+    "phases":[{"id":"opening","kind":"OPENING","sceneIds":["opening"]},{"id":"development","kind":"DEVELOPMENT","sceneIds":["development-a","development-b"]},{"id":"challenge","kind":"CHALLENGE","sceneIds":["challenge"]},{"id":"resolution","kind":"RESOLUTION","sceneIds":["resolution"]},{"id":"ending","kind":"ENDING","sceneIds":["ending-success","ending-partial"]}],
+    "utilitySceneIds":[],"length":{"minimumStoryTransitions":4,"maximumStoryTransitions":4},
+    "completion":{"endings":[{"sceneId":"ending-success","outcomeId":"success"},{"sceneId":"ending-partial","outcomeId":"partial"}]}}
+}

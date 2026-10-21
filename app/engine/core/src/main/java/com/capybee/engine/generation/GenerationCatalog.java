@@ -10,9 +10,16 @@ public record GenerationCatalog(
         List<StageDefinition> stages,
         List<TemplateDefinition> templates,
         List<SceneSlot> sceneSlots,
-        GenerationLimits limits) {
+        GenerationLimits limits,
+        RunContract runContract) {
 
-    public static final int SUPPORTED_SCHEMA_VERSION = 1;
+    public static final int SUPPORTED_SCHEMA_VERSION = 2;
+
+    public GenerationCatalog(int schemaVersion, List<String> supportedLocales, String defaultLocale,
+                             List<StageDefinition> stages, List<TemplateDefinition> templates,
+                             List<SceneSlot> sceneSlots, GenerationLimits limits) {
+        this(schemaVersion, supportedLocales, defaultLocale, stages, templates, sceneSlots, limits, null);
+    }
 
     public GenerationCatalog {
         supportedLocales = List.copyOf(supportedLocales);

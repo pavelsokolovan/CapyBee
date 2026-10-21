@@ -25,6 +25,9 @@ class GenerationCatalogParserTest {
         assertThat(GenerationCatalogParser.parse(result.pack().orElseThrow()).sceneSlots())
                 .extracting(slot -> slot.sceneId())
                 .containsExactly("opening", "meeting");
+        assertThat(result.pack().orElseThrow().generatedGameProfile())
+                .hasValueSatisfying(profile -> assertThat(profile.kind())
+                        .isEqualTo(com.capybee.engine.generation.GeneratedGameProfile.Kind.CONTENT_ONLY));
     }
 
     @Test

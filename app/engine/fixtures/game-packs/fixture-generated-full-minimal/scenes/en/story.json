@@ -1,0 +1,12 @@
+{
+  "schemaVersion":1,
+  "scenes":[
+    {"id":"opening","start":true,"blocks":[{"kind":"NARRATION","text":"Opening."}],"options":[{"id":"left","label":"Left","next":"development-a"},{"id":"right","label":"Right","next":"development-b"}]},
+    {"id":"development-a","blocks":[{"kind":"NARRATION","text":"Development A."}],"next":"challenge"},
+    {"id":"development-b","blocks":[{"kind":"NARRATION","text":"Development B."}],"next":"challenge"},
+    {"id":"challenge","blocks":[{"kind":"NARRATION","text":"Challenge."}],"next":"resolution"},
+    {"id":"resolution","blocks":[{"kind":"NARRATION","text":"Resolution."}],"options":[{"id":"succeed","label":"Succeed","next":"ending-success"},{"id":"accept","label":"Accept","next":"ending-partial"}]},
+    {"id":"ending-success","blocks":[{"kind":"NARRATION","text":"Success."}],"end":true,"outcome":"success"},
+    {"id":"ending-partial","blocks":[{"kind":"NARRATION","text":"Partial."}],"end":true,"outcome":"partial"}
+  ]
+}

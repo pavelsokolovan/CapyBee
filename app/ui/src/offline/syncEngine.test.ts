@@ -195,6 +195,54 @@ describe('offline sync engine', () => {
     expect(queueStore.removeAction).toHaveBeenCalledWith('next');
   });
 
+  it('honors Retry-After for a busy game and skips deferred actions', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    const busy = createAction({ clientId: 'busy', type: 'gameCommand' });
+    const deferred = createAction({ clientId: 'deferred', notBefore: 20_000 });
+    queueStore.listQueuedActions.mockResolvedValueOnce([busy, deferred]).mockResolvedValueOnce([]);
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ code: 'RUN_BUSY' }), {
+      status: 409,
+      headers: { 'Content-Type': 'application/json', 'Retry-After': '5' }
+    }));
+
+    await flushQueue();
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(queueStore.updateAction).toHaveBeenLastCalledWith(expect.objectContaining({
+      clientId: 'busy', attempts: 1, status: 'pending', notBefore: 15_000
+    }));
+    expect(queueStore.removeAction).not.toHaveBeenCalled();
+  });
+
+  it('marks a failed request at its attempt limit and skips exhausted actions', async () => {
+    const exhausted = createAction({ clientId: 'exhausted', status: 'failed', attempts: 8 });
+    const lastAttempt = createAction({ clientId: 'last', attempts: 7 });
+    queueStore.listQueuedActions.mockResolvedValueOnce([exhausted, lastAttempt]).mockResolvedValueOnce([]);
+    vi.mocked(fetch).mockRejectedValue(new Error('offline'));
+
+    await flushQueue();
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(queueStore.updateAction).toHaveBeenLastCalledWith(expect.objectContaining({
+      clientId: 'last', attempts: 8, status: 'failed', notBefore: expect.any(Number)
+    }));
+  });
+
+  it('removes non-game terminal failures and continues to the next action', async () => {
+    const invalid = createAction({ clientId: 'invalid' });
+    const next = createAction({ clientId: 'next' });
+    queueStore.listQueuedActions.mockResolvedValueOnce([invalid, next]).mockResolvedValueOnce([]);
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 400 }))
+      .mockResolvedValueOnce(new Response(null, { status: 201 }));
+
+    await flushQueue();
+
+    expect(queueStore.removeAction).toHaveBeenNthCalledWith(1, 'invalid');
+    expect(queueStore.removeAction).toHaveBeenNthCalledWith(2, 'next');
+  });
+
   it('notifies subscribers with the remaining synchronizable count', async () => {
     const listener = vi.fn();
     const unsubscribe = onSyncStatusChange(listener);

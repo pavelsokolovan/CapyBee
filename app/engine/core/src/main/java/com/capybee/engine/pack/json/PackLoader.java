@@ -1,6 +1,9 @@
 package com.capybee.engine.pack.json;
 
 import com.capybee.engine.generation.GenerationPipeline;
+import com.capybee.engine.generation.FullGeneratedGameValidator;
+import com.capybee.engine.generation.GeneratedGameProfile;
+import com.capybee.engine.generation.GenerationCatalog;
 import com.capybee.engine.generation.json.GenerationCatalogParser;
 import com.capybee.engine.pack.*;
 import tools.jackson.databind.JsonNode;
@@ -71,8 +74,9 @@ public final class PackLoader {
         Pack pack = null;
         if (!context.hasErrors()) {
             pack = new Pack(manifest.manifest(), files);
+            GenerationCatalog generationCatalog = null;
             if (manifest.features().contains(PackFeature.GENERATION)) {
-                GenerationCatalogParser.validate(pack, documents.get("generation/catalog.json"),
+                generationCatalog = GenerationCatalogParser.validate(pack, documents.get("generation/catalog.json"),
                         documents.get("generation/templates.json"), context);
             }
             for (SectionValidator validator : sectionValidators) validator.validate(pack, context);
@@ -89,6 +93,12 @@ public final class PackLoader {
                                         : "A configured generation fallback is invalid");
                         break;
                     }
+                }
+            }
+            if (generationCatalog != null) {
+                GeneratedGameProfile profile = FullGeneratedGameValidator.validate(pack, generationCatalog, context);
+                if (!context.hasErrors() && profile != null) {
+                    pack = new Pack(pack.manifest(), pack.files(), Optional.of(profile));
                 }
             }
         }
