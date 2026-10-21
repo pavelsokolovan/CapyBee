@@ -36,6 +36,23 @@ public final class SessionPorts {
         void delete(UUID runId, OwnerRef owner);
     }
 
+    public interface RunLibrary {
+        RunPage list(OwnerRef owner, RunQuery query, PageToken token, int limit);
+        LifecycleOutcome suspend(OwnerRef owner, UUID runId);
+        LifecycleOutcome activate(OwnerRef owner, UUID runId);
+        LifecycleOutcome archive(OwnerRef owner, UUID runId);
+        LifecycleOutcome unarchive(OwnerRef owner, UUID runId);
+        LifecycleOutcome trash(OwnerRef owner, UUID runId);
+        LifecycleOutcome restore(OwnerRef owner, UUID runId);
+        LifecycleOutcome purge(OwnerRef owner, UUID runId, PurgeConfirmation confirmation);
+    }
+
+    public interface RecoveryStore {
+        StoreRecoveryReport recoveryReport();
+        List<RecoverableRun> scanRecoverable();
+        boolean recoverInterrupted(UUID runId, Instant now);
+    }
+
     public interface CommandLog {
         Optional<LoggedCommand> find(UUID runId, UUID commandId);
         InsertKind begin(UUID runId, UUID commandId, byte[] payloadMac, long revisionBefore);
@@ -79,8 +96,8 @@ public final class SessionPorts {
     }
 
     /** A complete, internally consistent store for one local session domain. */
-    public interface SessionStore extends RunRepository, CommandLog, GenerationLedger,
-            EventOutbox, PrefetchStore, Transaction {}
+    public interface SessionStore extends RunRepository, RunLibrary, RecoveryStore, CommandLog,
+            GenerationLedger, EventOutbox, PrefetchStore, Transaction {}
 
     @FunctionalInterface
     public interface EngineFactory {

@@ -5,7 +5,10 @@ import java.util.Map;
 /** A stable, non-sensitive failure when opening or updating a local session store. */
 public final class StoreException extends RuntimeException {
     public enum Code { STORE_LOCKED, STORE_CORRUPT, STORE_VERSION_UNSUPPORTED, STORE_LEGACY_LAYOUT,
-        STORE_WRITE_FAILED, STORE_READ_FAILED, STORE_TOO_LARGE, STORE_CLOSED }
+        STORE_WRITE_FAILED, STORE_READ_FAILED, STORE_TOO_LARGE, STORE_CLOSED,
+        STORE_KEY_MISSING, STORE_KEY_INVALID, STORE_CHECKSUM_MISMATCH, STORE_SPLIT_BRAIN,
+        STORE_RECOVERY_REQUIRED, STORE_LIMIT_REACHED, STORE_QUARANTINE_FAILED,
+        STORE_MIGRATION_FAILED, STORE_EXPORT_FAILED, STORE_IMPORT_FAILED }
 
     private final Code code;
     private final Map<String, Object> details;

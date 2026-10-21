@@ -12,6 +12,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -36,6 +37,9 @@ public final class InMemorySessionStore implements SessionPorts.SessionStore {
     private final Map<String, Integer> runReservations = new HashMap<>();
     private final Map<String, Integer> runPrefetchCalls = new HashMap<>();
     private final Map<String, long[]> usage = new HashMap<>();
+    private int transactionDepth;
+    private Snapshot transactionSnapshot;
+    private final UUID storeId = UUID.randomUUID();
 
     public InMemorySessionStore() {
         this(Clock.systemUTC());
@@ -62,7 +66,8 @@ public final class InMemorySessionStore implements SessionPorts.SessionStore {
         StartRequest pending = new StartRequest(newRun.id(), newRun.packId(), newRun.locale(),
                 newRun.startInputs(), newRun.seed(), newRun.generated());
         runs.put(newRun.id(), new StoredRun(newRun.id(), newRun.owner(), newRun.packId(), newRun.locale(),
-                RunStatus.PREPARING, 0, null, pending, null, null, 0, newRun.createdAt(), newRun.createdAt()));
+                RunStatus.PREPARING, 0, null, pending, null, null, 0, newRun.createdAt(), newRun.createdAt(),
+                newRun.packVersion(), newRun.createdAt(), null, null));
         return new CreateOutcome(CreateKind.CREATED, newRun.id());
     }
 
@@ -89,7 +94,9 @@ public final class InMemorySessionStore implements SessionPorts.SessionStore {
                 || (run.lease() != null && run.lease().until().isAfter(now))) {
             return Optional.empty();
         }
-        Lease lease = new Lease(UUID.randomUUID(), now.plus(ttl));
+        UUID token = UUID.randomUUID();
+        Lease lease = new Lease(token, now.plus(ttl), token, now,
+                run.status() == RunStatus.PREPARING ? LeaseKind.START : LeaseKind.COMMAND);
         runs.put(runId, copy(run, run.status(), run.revision(), run.snapshot(), run.pendingStart(),
                 lease, run.failureCode(), run.generationCalls(), now));
         return Optional.of(lease);
@@ -136,6 +143,89 @@ public final class InMemorySessionStore implements SessionPorts.SessionStore {
             runReservations.remove(runId.toString());
             runPrefetchCalls.remove(runId.toString());
         }
+    }
+
+    @Override
+    public synchronized RunPage list(OwnerRef owner, RunQuery query, PageToken token, int limit) {
+        if (limit < 1 || limit > 100) throw new IllegalArgumentException("limit must be 1..100");
+        RunQuery effective = query == null ? RunQuery.visible() : query;
+        int offset = decodeToken(token, owner, effective);
+        List<StoredRun> matching = runs.values().stream().filter(run -> run.owner().equals(owner))
+                .filter(run -> effective.includeArchived() || run.archivedAt() == null)
+                .filter(run -> effective.includeTrashed() || run.trashedAt() == null)
+                .sorted(Comparator.comparing((StoredRun run) -> isCurrent(run) ? 0 : 1)
+                        .thenComparing(StoredRun::lastPlayedAt, Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(run -> run.id().toString())).toList();
+        int end = Math.min(matching.size(), offset + limit);
+        List<RunDescriptor> page = matching.subList(Math.min(offset, matching.size()), end).stream()
+                .map(this::descriptor).toList();
+        PageToken next = end < matching.size() ? encodeToken(end, owner, effective) : null;
+        return new RunPage(page, next);
+    }
+
+    @Override public synchronized LifecycleOutcome suspend(OwnerRef owner, UUID id) {
+        StoredRun run = owned(owner, id); requireVisible(run);
+        if (run.status() != RunStatus.ACTIVE || liveLease(run)) return unchanged(run);
+        return updateLifecycle(run, RunStatus.SUSPENDED, run.archivedAt(), run.trashedAt());
+    }
+    @Override public synchronized LifecycleOutcome activate(OwnerRef owner, UUID id) {
+        StoredRun selected = owned(owner, id); requireVisible(selected);
+        if (selected.status() != RunStatus.SUSPENDED) return unchanged(selected);
+        runs.values().stream().filter(run -> run.owner().equals(owner) && run.status() == RunStatus.ACTIVE)
+                .findFirst().ifPresent(run -> runs.put(run.id(), lifecycle(run, RunStatus.SUSPENDED,
+                        run.archivedAt(), run.trashedAt(), clock.instant())));
+        return updateLifecycle(selected, RunStatus.ACTIVE, selected.archivedAt(), selected.trashedAt());
+    }
+    @Override public synchronized LifecycleOutcome archive(OwnerRef owner, UUID id) {
+        StoredRun run = owned(owner, id); requireNotPreparing(run);
+        RunStatus status = run.status() == RunStatus.ACTIVE ? RunStatus.SUSPENDED : run.status();
+        return updateLifecycle(run, status, clock.instant(), run.trashedAt());
+    }
+    @Override public synchronized LifecycleOutcome unarchive(OwnerRef owner, UUID id) {
+        StoredRun run = owned(owner, id); return updateLifecycle(run, run.status(), null, run.trashedAt());
+    }
+    @Override public synchronized LifecycleOutcome trash(OwnerRef owner, UUID id) {
+        StoredRun run = owned(owner, id); requireNotPreparing(run);
+        RunStatus status = run.status() == RunStatus.ACTIVE ? RunStatus.SUSPENDED : run.status();
+        return updateLifecycle(run, status, run.archivedAt(), clock.instant());
+    }
+    @Override public synchronized LifecycleOutcome restore(OwnerRef owner, UUID id) {
+        StoredRun run = owned(owner, id); return updateLifecycle(run, run.status(), run.archivedAt(), null);
+    }
+    @Override public synchronized LifecycleOutcome purge(OwnerRef owner, UUID id, PurgeConfirmation confirmation) {
+        StoredRun run = owned(owner, id);
+        if (confirmation == null || !confirmation.confirmed()) throw new IllegalStateException("PURGE_CONFIRMATION_REQUIRED");
+        Duration grace = confirmation.gracePeriod() == null ? Duration.ofDays(30) : confirmation.gracePeriod();
+        if (run.trashedAt() == null || (!confirmation.force() && run.trashedAt().plus(grace).isAfter(clock.instant())))
+            throw new IllegalStateException("PURGE_CONFIRMATION_REQUIRED");
+        delete(id, owner); return new LifecycleOutcome(id, run.status(), true);
+    }
+
+    @Override public synchronized StoreRecoveryReport recoveryReport() {
+        return new StoreRecoveryReport(storeId, 0, RecoverySource.EMPTY, List.of(), List.of(), false);
+    }
+    @Override public synchronized List<RecoverableRun> scanRecoverable() {
+        Instant now = clock.instant();
+        return runs.values().stream().map(run -> new RecoverableRun(run.id(), run.revision(),
+                liveLease(run) ? RecoveryState.WAITING_FOR_LEASE
+                        : hasInterrupted(run, now) ? RecoveryState.INTERRUPTED_COMMAND : RecoveryState.NO_ACTION,
+                hasInterrupted(run, now) ? "COMMAND_INTERRUPTED" : null)).toList();
+    }
+    @Override public synchronized boolean recoverInterrupted(UUID runId, Instant now) {
+        StoredRun run = runs.get(runId); if (run == null || liveLease(run)) return false;
+        boolean changed = false; String prefix = runId + ":";
+        for (var entry : new ArrayList<>(commands.entrySet())) if (entry.getKey().startsWith(prefix)) {
+            LoggedCommand command = entry.getValue();
+            if (command.state() == CommandState.IN_PROGRESS && command.revisionBefore() == run.revision()) {
+                commands.put(entry.getKey(), new LoggedCommand(command.payloadMac(), CommandState.FAILED, false,
+                        command.revisionBefore(), null, List.of(), "COMMAND_INTERRUPTED")); changed = true;
+            }
+        }
+        if (run.lease() != null && !run.lease().until().isAfter(now)) {
+            runs.put(run.id(), copy(run, run.status(), run.revision(), run.snapshot(), run.pendingStart(),
+                    null, run.failureCode(), run.generationCalls(), now)); changed = true;
+        }
+        return changed;
     }
 
     @Override
@@ -281,7 +371,11 @@ public final class InMemorySessionStore implements SessionPorts.SessionStore {
 
     @Override
     public synchronized void execute(Runnable work) {
-        work.run();
+        boolean outer = transactionDepth++ == 0;
+        if (outer) transactionSnapshot = snapshot();
+        try { work.run(); }
+        catch (Throwable failure) { if (outer) restore(transactionSnapshot); throw failure; }
+        finally { transactionDepth--; if (outer) transactionSnapshot = null; }
     }
 
     private boolean hasLease(StoredRun run, Lease lease) {
@@ -293,14 +387,35 @@ public final class InMemorySessionStore implements SessionPorts.SessionStore {
                            StartRequest pendingStart, Lease lease, String failureCode, int generationCalls,
                            Instant updatedAt) {
         return new StoredRun(old.id(), old.owner(), old.packId(), old.locale(), status, revision,
-                snapshot, pendingStart, lease, failureCode, generationCalls, old.createdAt(), updatedAt);
+                snapshot, pendingStart, lease, failureCode, generationCalls, old.createdAt(), updatedAt,
+                old.packVersion(), updatedAt, old.archivedAt(), old.trashedAt());
     }
 
     private StoredRun withGenerationCalls(StoredRun run) {
         return new StoredRun(run.id(), run.owner(), run.packId(), run.locale(), run.status(), run.revision(),
                 run.snapshot(), run.pendingStart(), run.lease(), run.failureCode(),
-                runReservations.getOrDefault(run.id().toString(), 0), run.createdAt(), run.updatedAt());
+                runReservations.getOrDefault(run.id().toString(), 0), run.createdAt(), run.updatedAt(),
+                run.packVersion(), run.lastPlayedAt(), run.archivedAt(), run.trashedAt());
     }
+
+    private StoredRun owned(OwnerRef owner, UUID id) { StoredRun run = runs.get(id); if (run == null || !run.owner().equals(owner)) throw new IllegalStateException("RUN_NOT_FOUND"); return run; }
+    private void requireVisible(StoredRun run) { if (run.archivedAt() != null) throw new IllegalStateException("RUN_ARCHIVED"); if (run.trashedAt() != null) throw new IllegalStateException("RUN_TRASHED"); }
+    private void requireNotPreparing(StoredRun run) { if (run.status() == RunStatus.PREPARING || liveLease(run)) throw new IllegalStateException("RUN_SWITCH_BUSY"); }
+    private boolean liveLease(StoredRun run) { return run.lease() != null && run.lease().until().isAfter(clock.instant()); }
+    private boolean hasInterrupted(StoredRun run, Instant now) { return !liveLease(run) && commands.entrySet().stream().anyMatch(e -> e.getKey().startsWith(run.id()+":") && e.getValue().state()==CommandState.IN_PROGRESS && e.getValue().revisionBefore()==run.revision()); }
+    private static boolean isCurrent(StoredRun run) { return run.status()==RunStatus.ACTIVE || run.status()==RunStatus.PREPARING; }
+    private LifecycleOutcome unchanged(StoredRun run) { return new LifecycleOutcome(run.id(), run.status(), false); }
+    private LifecycleOutcome updateLifecycle(StoredRun run, RunStatus status, Instant archived, Instant trashed) { StoredRun changed=lifecycle(run,status,archived,trashed,clock.instant()); runs.put(run.id(),changed); return new LifecycleOutcome(run.id(),status,true); }
+    private StoredRun lifecycle(StoredRun run, RunStatus status, Instant archived, Instant trashed, Instant now) { return new StoredRun(run.id(),run.owner(),run.packId(),run.locale(),status,run.revision(),run.snapshot(),run.pendingStart(),null,run.failureCode(),run.generationCalls(),run.createdAt(),now,run.packVersion(),now,archived,trashed); }
+    private RunDescriptor descriptor(StoredRun run) { return new RunDescriptor(run.id(),run.packId(),run.packVersion(),run.locale(),run.status(),run.revision(),null,run.createdAt(),run.lastPlayedAt(),run.status()==RunStatus.ENDED?run.updatedAt():null,run.archivedAt(),run.trashedAt(),run.status()==RunStatus.ACTIVE||run.status()==RunStatus.SUSPENDED,run.failureCode(),0); }
+    private static PageToken encodeToken(int offset, OwnerRef owner, RunQuery query) { return new PageToken(Base64.getUrlEncoder().withoutPadding().encodeToString((owner.value()+"|"+query.includeArchived()+"|"+query.includeTrashed()+"|"+offset).getBytes(java.nio.charset.StandardCharsets.UTF_8))); }
+    private static int decodeToken(PageToken token, OwnerRef owner, RunQuery query) { if(token==null)return 0; try { String[] p=new String(Base64.getUrlDecoder().decode(token.value()),java.nio.charset.StandardCharsets.UTF_8).split("\\|",-1); if(p.length!=4||!p[0].equals(owner.value())||Boolean.parseBoolean(p[1])!=query.includeArchived()||Boolean.parseBoolean(p[2])!=query.includeTrashed())throw new IllegalArgumentException("invalid page token"); return Integer.parseInt(p[3]); } catch(RuntimeException e){throw new IllegalArgumentException("invalid page token");} }
+    private Snapshot snapshot(){return new Snapshot(new HashMap<>(runs),new LinkedHashMap<>(commands),copyEvents(),copyPrefetch(),new HashMap<>(reservations),new HashMap<>(runReservations),new HashMap<>(runPrefetchCalls),copyUsage());}
+    private Map<UUID,List<OutboxEvent>> copyEvents(){Map<UUID,List<OutboxEvent>> copy=new HashMap<>();events.forEach((k,v)->copy.put(k,new ArrayList<>(v)));return copy;}
+    private Map<UUID,Map<String,PrefetchedArtifact>> copyPrefetch(){Map<UUID,Map<String,PrefetchedArtifact>> copy=new HashMap<>();prefetch.forEach((k,v)->copy.put(k,new HashMap<>(v)));return copy;}
+    private Map<String,long[]> copyUsage(){Map<String,long[]> copy=new HashMap<>();usage.forEach((k,v)->copy.put(k,v.clone()));return copy;}
+    private void restore(Snapshot s){runs.clear();runs.putAll(s.runs);commands.clear();commands.putAll(s.commands);events.clear();events.putAll(s.events);prefetch.clear();prefetch.putAll(s.prefetch);reservations.clear();reservations.putAll(s.reservations);runReservations.clear();runReservations.putAll(s.runReservations);runPrefetchCalls.clear();runPrefetchCalls.putAll(s.runPrefetchCalls);usage.clear();usage.putAll(s.usage);}
+    private record Snapshot(Map<UUID,StoredRun> runs,Map<String,LoggedCommand> commands,Map<UUID,List<OutboxEvent>> events,Map<UUID,Map<String,PrefetchedArtifact>> prefetch,Map<String,Integer> reservations,Map<String,Integer> runReservations,Map<String,Integer> runPrefetchCalls,Map<String,long[]> usage){}
 
     private void addUsage(String key, TextGenerationResult.TokenUsage value) {
         long[] totals = usage.computeIfAbsent(key, ignored -> new long[3]);

@@ -30,6 +30,29 @@ class LocalSessionStoreTest {
     @TempDir Path directory;
 
     @Test
+    void recoversNewestValidBackupAndQuarantinesCorruptPrimary() throws Exception {
+        Clock clock = Clock.fixed(Instant.parse("2026-10-19T10:00:00Z"), ZoneOffset.UTC);
+        OwnerRef owner = new OwnerRef("local-owner");
+        UUID first = UUID.randomUUID();
+        try (LocalSessionStore store = LocalSessionStore.open(directory, clock)) {
+            store.createPreparing(new NewRun(first, owner, new PackId("test"), "1.0.0",
+                    new LocaleTag("en"), Map.of(), null, false, clock.instant()));
+            store.begin(first, UUID.randomUUID(), new byte[32], 0);
+        }
+        java.nio.file.Files.writeString(directory.resolve("session-store.json"), "{broken");
+
+        try (LocalSessionStore recovered = LocalSessionStore.open(directory, clock)) {
+            assertThat(recovered.find(first, owner)).isPresent();
+            assertThat(recovered.recoveryReport().source()).isEqualTo(RecoverySource.BACKUP);
+            assertThat(recovered.recoveryReport().notices()).extracting(RecoveryNotice::code)
+                    .contains("RECOVERED_FROM_BACKUP");
+        }
+        try (var files = java.nio.file.Files.list(directory.resolve("quarantine"))) {
+            assertThat(files).hasSize(1);
+        }
+    }
+
+    @Test
     void persistsSnapshotAndLeaseStateAcrossInstances() {
         Clock clock = Clock.fixed(Instant.parse("2026-10-19T10:00:00Z"), ZoneOffset.UTC);
         OwnerRef owner = new OwnerRef("local-owner"); UUID id = UUID.randomUUID();
@@ -136,7 +159,7 @@ class LocalSessionStoreTest {
     }
 
     @Test
-    void migratesV1InMemoryAndWritesV2OnlyOnFirstChange() throws Exception {
+    void migratesV1InMemoryAndWritesV3OnlyOnFirstChange() throws Exception {
         Clock clock = Clock.fixed(Instant.parse("2026-10-19T10:00:00Z"), ZoneOffset.UTC);
         Path storeFile = directory.resolve("session-store.json");
         try (var golden = getClass().getResourceAsStream("/session-store-v1.json")) {
@@ -159,7 +182,9 @@ class LocalSessionStoreTest {
         }
 
         ObjectMapper mapper = new ObjectMapper();
-        ObjectNode legacy = (ObjectNode) mapper.readTree(java.nio.file.Files.readAllBytes(storeFile));
+        ObjectNode envelope = (ObjectNode) mapper.readTree(java.nio.file.Files.readAllBytes(storeFile));
+        ObjectNode legacy = (ObjectNode) envelope.get("data");
+        legacy.put("format", "capybee-session-store");
         legacy.put("version", 1);
         legacy.remove("runPrefetchCalls");
         ArrayNode runs = (ArrayNode) legacy.get("runs");
@@ -167,6 +192,7 @@ class LocalSessionStoreTest {
         command.remove("latencyMillis");
         command.remove("sceneSource");
         java.nio.file.Files.write(storeFile, mapper.writeValueAsBytes(legacy));
+        java.nio.file.Files.deleteIfExists(directory.resolve("session-store.json.bak"));
         byte[] legacyBytes = java.nio.file.Files.readAllBytes(storeFile);
 
         try (LocalSessionStore reopened = LocalSessionStore.open(directory, clock)) {
@@ -179,7 +205,10 @@ class LocalSessionStoreTest {
                     clock.instant()));
         }
 
-        assertThat(java.nio.file.Files.readString(storeFile)).contains("\"version\":2");
+        assertThat(java.nio.file.Files.readString(storeFile)).contains("\"version\":3")
+                .contains("\"storeRevision\":").contains("\"checksum\":");
+        assertThat(java.nio.file.Files.readAllBytes(directory.resolve("session-store.json.bak")))
+                .isEqualTo(legacyBytes);
     }
 
     @Test
@@ -188,16 +217,16 @@ class LocalSessionStoreTest {
         Path storeFile = directory.resolve("session-store.json");
         String document = "\"format\":\"capybee-session-store\",\"runs\":[],"
                 + "\"reservations\":{},\"runReservations\":{},\"usage\":{}";
-        java.nio.file.Files.writeString(storeFile, "{" + document + ",\"version\":3}");
+        java.nio.file.Files.writeString(storeFile, "{" + document + ",\"version\":4}");
         assertThatThrownBy(() -> LocalSessionStore.open(directory, clock))
                 .isInstanceOfSatisfying(com.capybee.engine.session.StoreException.class, failure -> {
                     assertThat(failure.code()).isEqualTo(com.capybee.engine.session.StoreException.Code.STORE_VERSION_UNSUPPORTED);
-                    assertThat(failure.details()).containsEntry("found", 3).containsEntry("supported", 2);
+                    assertThat(failure.details()).containsEntry("found", 4).containsEntry("supported", 3);
                 });
 
         java.nio.file.Files.writeString(storeFile, "{" + document + ",\"version\":0}");
         assertThatThrownBy(() -> LocalSessionStore.open(directory, clock))
                 .isInstanceOfSatisfying(com.capybee.engine.session.StoreException.class, failure ->
-                        assertThat(failure.code()).isEqualTo(com.capybee.engine.session.StoreException.Code.STORE_CORRUPT));
+                        assertThat(failure.code()).isEqualTo(com.capybee.engine.session.StoreException.Code.STORE_RECOVERY_REQUIRED));
     }
 }

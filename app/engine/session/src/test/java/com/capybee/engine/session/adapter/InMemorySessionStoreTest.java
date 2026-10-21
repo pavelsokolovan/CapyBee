@@ -17,10 +17,29 @@ import java.util.UUID;
 import static com.capybee.engine.session.SessionPorts.CreateKind;
 import static com.capybee.engine.session.SessionTypes.*;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class InMemorySessionStoreTest {
     private final Clock clock = Clock.fixed(Instant.parse("2026-10-19T10:00:00Z"), ZoneOffset.UTC);
     private final InMemorySessionStore store = new InMemorySessionStore(clock);
+
+    @Test
+    void transactionRollsBackAllParticipatingPorts() {
+        OwnerRef owner = new OwnerRef("profile");
+        UUID runId = UUID.randomUUID();
+        UUID commandId = UUID.randomUUID();
+        store.createPreparing(new NewRun(runId, owner, new com.capybee.engine.pack.PackId("test"), "1.0.0",
+                new com.capybee.engine.pack.LocaleTag("en"), Map.of(), null, false, clock.instant()));
+
+        assertThatThrownBy(() -> store.execute(() -> {
+            store.begin(runId, commandId, new byte[32], 0);
+            store.append(runId, commandId, 0, List.of(new Event("temporary", Map.of())));
+            throw new IllegalStateException("rollback");
+        })).isInstanceOf(IllegalStateException.class);
+
+        assertThat(store.find(runId, commandId)).isEmpty();
+        assertThat(store.readAfter(runId, 0, 10)).isEmpty();
+    }
 
     @Test
     void enforcesOneOpenRunAndOwnerIsolation() {
