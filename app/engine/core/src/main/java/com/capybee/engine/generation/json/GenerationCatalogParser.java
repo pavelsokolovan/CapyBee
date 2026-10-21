@@ -5,6 +5,7 @@ import com.capybee.engine.pack.LocaleTag;
 import com.capybee.engine.pack.Pack;
 import com.capybee.engine.pack.PackLayout;
 import com.capybee.engine.pack.PackValidationContext;
+import com.capybee.engine.pack.StartInputDef;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -71,9 +72,10 @@ public final class GenerationCatalogParser {
         List<GenerationCatalog.SceneSlot> slots = parseSlots(catalog, templateDefinitions, pack, context);
         GenerationCatalog.GenerationLimits limits = parseLimits(catalog.get("limits"), context);
         RunContract runContract = parseRunContract(catalog.get("runContract"), schemaVersion, context);
+        GenerationSetup setup = parseSetup(pack, runContract, stages, context);
         if (context.hasErrors()) return null;
         return new GenerationCatalog(schemaVersion, locales, defaultLocale, stages,
-                new ArrayList<>(templateDefinitions.values()), slots, limits, runContract);
+                new ArrayList<>(templateDefinitions.values()), slots, limits, runContract, setup);
     }
 
     private static RunContract parseRunContract(JsonNode node, int schemaVersion, PackValidationContext context) {
@@ -84,7 +86,7 @@ public final class GenerationCatalogParser {
             return null;
         }
         fields(node, CATALOG_FILE, "PACK_RUN_CONTRACT_INVALID", context,
-                "kind", "contractVersion", "phases", "utilitySceneIds", "length", "completion");
+                "kind", "contractVersion", "phases", "utilitySceneIds", "length", "completion", "setupResource");
         RunContractKind kind = enumValue(RunContractKind.class, text(node.get("kind")));
         int version = integer(node.get("contractVersion"));
         if (version != 1) error(context, "PACK_RUN_CONTRACT_VERSION_UNSUPPORTED", CATALOG_FILE,
@@ -142,7 +144,128 @@ public final class GenerationCatalogParser {
                 else endings.add(new EndingContract(sceneId, outcomeId));
             }
         }
-        return kind == null ? null : new RunContract(kind, version, phases, utility, length, new CompletionContract(endings));
+        String setupResource = text(node.get("setupResource"));
+        if (setupResource != null && !"generation/setup.json".equals(setupResource)) {
+            error(context, "PACK_SETUP_REQUIRED", CATALOG_FILE, "/runContract/setupResource", "Setup resource path is invalid");
+        }
+        return kind == null ? null : new RunContract(kind, version, phases, utility, length,
+                new CompletionContract(endings), setupResource);
+    }
+
+    private static GenerationSetup parseSetup(Pack pack, RunContract contract,
+                                               List<GenerationCatalog.StageDefinition> stages,
+                                               PackValidationContext context) {
+        boolean full = contract != null && contract.kind() == RunContractKind.FULL_GAME;
+        if (!full && (contract == null || contract.setupResource() == null)) return null;
+        if (contract == null || contract.setupResource() == null) {
+            error(context, "PACK_SETUP_REQUIRED", CATALOG_FILE, "/runContract/setupResource",
+                    "A full game requires generation/setup.json");
+            return null;
+        }
+        String file = contract.setupResource();
+        if (!pack.manifest().files().contains(file) || pack.file(file).isEmpty()) {
+            error(context, "PACK_SETUP_REQUIRED", file, "", "Setup resource is missing");
+            return null;
+        }
+        JsonNode root = read(pack.file(file).orElse(null), file, context);
+        if (!object(root, file, "PACK_SETUP_QUESTION_MISMATCH", context)) return null;
+        fields(root, file, "PACK_SETUP_QUESTION_MISMATCH", context, "schemaVersion", "questions");
+        int version = integer(root.get("schemaVersion"));
+        if (version != GenerationSetup.SUPPORTED_SCHEMA_VERSION) {
+            error(context, "PACK_SETUP_VERSION_UNSUPPORTED", file, "/schemaVersion", "Unsupported setup schema version");
+        }
+        JsonNode nodes = root.get("questions");
+        if (nodes == null || !nodes.isArray() || nodes.size() > 12) {
+            error(context, "PACK_SETUP_QUESTION_MISMATCH", file, "/questions", "Expected 0 to 12 setup questions");
+            return null;
+        }
+        List<StartInputDef> inputs = pack.manifest().startInputs();
+        if (nodes.size() != inputs.size()) {
+            error(context, "PACK_SETUP_QUESTION_MISMATCH", file, "/questions", "Questions must exactly cover start inputs");
+        }
+        Set<GenerationCatalog.Stage> configured = new HashSet<>();
+        stages.forEach(stage -> configured.add(stage.stage()));
+        List<GenerationSetup.SetupQuestion> questions = new ArrayList<>();
+        int freeTextCount = 0;
+        for (int i = 0; i < nodes.size(); i++) {
+            JsonNode node = nodes.get(i); String pointer = "/questions/" + i;
+            if (!object(node, file, "PACK_SETUP_QUESTION_MISMATCH", context)) continue;
+            fields(node, file, "PACK_SETUP_QUESTION_MISMATCH", context,
+                    "inputId", "helpKey", "stages", "defaultValues", "options", "freeTextNoticeKey");
+            String inputId = text(node.get("inputId"));
+            StartInputDef input = i < inputs.size() ? inputs.get(i) : null;
+            if (input == null || !input.id().equals(inputId)) {
+                error(context, "PACK_SETUP_QUESTION_MISMATCH", file, pointer + "/inputId",
+                        "Question order must match manifest start inputs");
+                continue;
+            }
+            String help = text(node.get("helpKey"));
+            List<String> stageNames = strings(node.get("stages"), file, pointer + "/stages", context, 2);
+            List<GenerationCatalog.Stage> routed = new ArrayList<>();
+            for (String name : stageNames) {
+                GenerationCatalog.Stage stage = stageName(name);
+                if ((stage != GenerationCatalog.Stage.THEME && stage != GenerationCatalog.Stage.SCENARIO)
+                        || !configured.contains(stage) || routed.contains(stage)) {
+                    error(context, "PACK_SETUP_STAGE_INVALID", file, pointer + "/stages", "Setup stage is absent, duplicate, or forbidden");
+                } else routed.add(stage);
+            }
+            if (routed.isEmpty()) error(context, "PACK_SETUP_STAGE_INVALID", file, pointer + "/stages", "At least one stage is required");
+            List<String> defaults = node.get("defaultValues") == null ? List.of()
+                    : strings(node.get("defaultValues"), file, pointer + "/defaultValues", context, 8);
+            List<GenerationSetup.SetupOption> options = new ArrayList<>();
+            JsonNode optionNodes = node.get("options");
+            if (optionNodes != null) {
+                int minimumOptions = input instanceof StartInputDef.FreeTextInput ? 0 : 1;
+                if (!optionNodes.isArray() || optionNodes.size() < minimumOptions || optionNodes.size() > 32) {
+                    error(context, "PACK_SETUP_OPTION_INVALID", file, pointer + "/options", "Expected a bounded option list");
+                } else for (int j = 0; j < optionNodes.size(); j++) {
+                    JsonNode option = optionNodes.get(j); String op = pointer + "/options/" + j;
+                    if (!object(option, file, "PACK_SETUP_OPTION_INVALID", context)) continue;
+                    fields(option, file, "PACK_SETUP_OPTION_INVALID", context, "value", "labelKey");
+                    String value = text(option.get("value")); String label = text(option.get("labelKey"));
+                    if (value == null || label == null) error(context, "PACK_SETUP_OPTION_INVALID", file, op, "Option is invalid");
+                    else options.add(new GenerationSetup.SetupOption(value, label));
+                }
+            }
+            String notice = text(node.get("freeTextNoticeKey"));
+            if (input instanceof StartInputDef.FreeTextInput freeText) {
+                freeTextCount++;
+                if (freeText.required() || freeText.maxChars() < 1 || freeText.maxChars() > 300
+                        || notice == null || !defaults.isEmpty() || !options.isEmpty()) {
+                    error(context, "PACK_SETUP_FREE_TEXT_INVALID", file, pointer, "Full-game free text must be optional, bounded, and have a notice");
+                }
+            } else {
+                if (notice != null) error(context, "PACK_SETUP_FREE_TEXT_INVALID", file, pointer + "/freeTextNoticeKey", "Notice is only valid for free text");
+                List<String> declared = input instanceof StartInputDef.EnumInput e ? e.values()
+                        : ((StartInputDef.EnumSetInput) input).values();
+                if (!options.stream().map(GenerationSetup.SetupOption::value).toList().equals(declared)) {
+                    error(context, "PACK_SETUP_OPTION_INVALID", file, pointer + "/options", "Options must match declared values in order");
+                }
+                boolean defaultsValid = new HashSet<>(defaults).size() == defaults.size() && declared.containsAll(defaults);
+                if (input instanceof StartInputDef.EnumInput && (defaults.size() > 1 || input.required() && defaults.size() != 1)) defaultsValid = false;
+                if (input instanceof StartInputDef.EnumSetInput set && (defaults.size() > set.maxItems() || input.required() && defaults.isEmpty())) defaultsValid = false;
+                if (!defaultsValid) error(context, "PACK_SETUP_DEFAULT_INVALID", file, pointer + "/defaultValues", "Defaults do not match the input declaration");
+            }
+            validateSetupString(pack, help, 240, file, pointer + "/helpKey", context);
+            validateSetupString(pack, input.labelKey(), 120, file, pointer + "/inputId", context);
+            if (notice != null) validateSetupString(pack, notice, 240, file, pointer + "/freeTextNoticeKey", context);
+            options.forEach(option -> validateSetupString(pack, option.labelKey(), 120, file, pointer + "/options", context));
+            if (help != null) questions.add(new GenerationSetup.SetupQuestion(inputId, help, routed, defaults, options, notice));
+        }
+        if (freeTextCount > 1) error(context, "PACK_SETUP_FREE_TEXT_INVALID", file, "/questions", "At most one free-text question is supported");
+        return new GenerationSetup(version, questions);
+    }
+
+    private static void validateSetupString(Pack pack, String key, int max, String file, String pointer,
+                                            PackValidationContext context) {
+        if (key == null) { error(context, "PACK_SETUP_STRING_MISSING", file, pointer, "String key is missing"); return; }
+        for (LocaleTag locale : pack.manifest().locales()) {
+            JsonNode strings = read(pack.file("strings/" + locale.value() + ".json").orElse(null), file, null);
+            String value = strings == null ? null : text(strings.get(key));
+            if (value == null || value.isBlank() || value.codePointCount(0, value.length()) > max) {
+                error(context, "PACK_SETUP_STRING_MISSING", file, pointer, "Localized setup string is missing or too long");
+            }
+        }
     }
 
     private static boolean contractId(String id) {

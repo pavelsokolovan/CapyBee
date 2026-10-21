@@ -11,6 +11,7 @@ import com.capybee.engine.generation.json.GenerationCatalogParser;
 import com.capybee.engine.generation.json.GenerationJson;
 import com.capybee.engine.generation.json.GenerationOutputParser;
 import com.capybee.engine.input.PiiScrubber;
+import com.capybee.engine.input.PreparedStartInputs;
 import com.capybee.engine.pack.LocaleTag;
 import com.capybee.engine.pack.Pack;
 import com.capybee.engine.pack.PackFeature;
@@ -57,6 +58,7 @@ public final class GenerationPipeline {
     private final Map<String, Scene> trustedScenes;
     private int totalCalls;
     private boolean initialized;
+    private PreparedStartInputs initializingInputs;
     private List<String> visitedSceneIds = List.of();
 
     public GenerationPipeline(Pack pack, LocaleTag explicitLocale, TextGenerator generator, IdSource ids, Clock clock) {
@@ -132,11 +134,21 @@ public final class GenerationPipeline {
     }
 
     public InitialContent initialize() {
+        return initialize(new PreparedStartInputs(Map.of(), Map.of(), List.of()));
+    }
+
+    public InitialContent initialize(PreparedStartInputs preparedInputs) {
         if (initialized) return initialContent();
-        for (GenerationCatalog.StageDefinition definition : catalog.stages()) {
-            if (definition.stage() != GenerationCatalog.Stage.SCENE) {
-                execute(definition.stage(), null);
+        if (preparedInputs == null || !preparedInputs.ok()) throw new IllegalArgumentException("START_INPUT_INVALID");
+        initializingInputs = preparedInputs;
+        try {
+            for (GenerationCatalog.StageDefinition definition : catalog.stages()) {
+                if (definition.stage() != GenerationCatalog.Stage.SCENE) {
+                    execute(definition.stage(), null);
+                }
             }
+        } finally {
+            initializingInputs = null;
         }
         Scene start = trustedScenes.values().stream().filter(Scene::start).findFirst()
                 .orElseThrow(() -> new IllegalStateException("GENERATION_START_SCENE_MISSING"));
@@ -531,6 +543,7 @@ public final class GenerationPipeline {
         context.put("stage", stage.name());
         context.put("locale", locale.value());
         context.put("templateId", slot == null ? definitions.get(stage).templateId() : slot.templateId());
+        addSetupContext(context, stage);
         if (slot != null) context.put("trustedChoices", slot.choiceIds());
         if (stage == GenerationCatalog.Stage.SCENARIO && !fullGame()) context.put("sceneSlots", slots.keySet());
         if (stage == GenerationCatalog.Stage.CAST) context.put("actorSlots", templateFor(stage, slot).actorSlots());
@@ -568,6 +581,25 @@ public final class GenerationPipeline {
         }
         String json = encode(context);
         return json;
+    }
+
+    private void addSetupContext(Map<String, Object> context, GenerationCatalog.Stage stage) {
+        if (initializingInputs == null || catalog.setup() == null
+                || (stage != GenerationCatalog.Stage.THEME && stage != GenerationCatalog.Stage.SCENARIO)) return;
+        List<Map<String, Object>> presets = new ArrayList<>();
+        List<Map<String, Object>> freeText = new ArrayList<>();
+        for (GenerationSetup.SetupQuestion question : catalog.setup().questions()) {
+            if (!question.stages().contains(stage)) continue;
+            String preset = initializingInputs.persistentValues().get(question.inputId());
+            if (preset != null) presets.add(Map.of("id", question.inputId(), "values", List.of(preset.split(","))));
+            var safe = initializingInputs.transientTextValues().get(question.inputId());
+            if (safe != null) freeText.add(Map.of("id", question.inputId(), "value", safe.text()));
+        }
+        if (!presets.isEmpty() || !freeText.isEmpty()) {
+            Map<String, Object> setup = new LinkedHashMap<>();
+            setup.put("preset", presets); setup.put("freeText", freeText);
+            context.put("setup", setup);
+        }
     }
 
     private String repairContext(GenerationCatalog.Stage stage, GenerationCatalog.SceneSlot slot, String errorCode) {

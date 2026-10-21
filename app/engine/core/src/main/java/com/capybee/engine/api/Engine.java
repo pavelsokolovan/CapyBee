@@ -3,6 +3,7 @@ package com.capybee.engine.api;
 import com.capybee.engine.content.json.SceneSectionValidator;
 import com.capybee.engine.pack.PackRegistry;
 import com.capybee.engine.pack.SectionValidator;
+import com.capybee.engine.input.PreparedStartInputs;
 import com.capybee.engine.places.json.PlacesSectionValidator;
 import com.capybee.engine.rules.json.RulesSectionValidator;
 import com.capybee.engine.rules.json.RuleReferenceValidator;
@@ -20,6 +21,10 @@ public interface Engine {
     }
 
     StartResult start(RunRequest request);
+
+    default StartResult start(RunRequest request, PreparedStartInputs preparedInputs) {
+        return start(request);
+    }
 
     ResumeResult resume(RunSnapshot snapshot);
 }

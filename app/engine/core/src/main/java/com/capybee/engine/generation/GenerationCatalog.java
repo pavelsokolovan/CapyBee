@@ -11,14 +11,21 @@ public record GenerationCatalog(
         List<TemplateDefinition> templates,
         List<SceneSlot> sceneSlots,
         GenerationLimits limits,
-        RunContract runContract) {
+        RunContract runContract,
+        GenerationSetup setup) {
 
     public static final int SUPPORTED_SCHEMA_VERSION = 2;
 
     public GenerationCatalog(int schemaVersion, List<String> supportedLocales, String defaultLocale,
                              List<StageDefinition> stages, List<TemplateDefinition> templates,
                              List<SceneSlot> sceneSlots, GenerationLimits limits) {
-        this(schemaVersion, supportedLocales, defaultLocale, stages, templates, sceneSlots, limits, null);
+        this(schemaVersion, supportedLocales, defaultLocale, stages, templates, sceneSlots, limits, null, null);
+    }
+
+    public GenerationCatalog(int schemaVersion, List<String> supportedLocales, String defaultLocale,
+                             List<StageDefinition> stages, List<TemplateDefinition> templates,
+                             List<SceneSlot> sceneSlots, GenerationLimits limits, RunContract runContract) {
+        this(schemaVersion, supportedLocales, defaultLocale, stages, templates, sceneSlots, limits, runContract, null);
     }
 
     public GenerationCatalog {

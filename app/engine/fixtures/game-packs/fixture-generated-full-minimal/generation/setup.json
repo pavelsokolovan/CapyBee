@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "questions": [
+    {"inputId":"mood","helpKey":"setup.mood.help","stages":["SCENARIO"],"defaultValues":["calm"],"options":[{"value":"calm","labelKey":"setup.mood.calm"},{"value":"curious","labelKey":"setup.mood.curious"}]},
+    {"inputId":"interests","helpKey":"setup.interests.help","stages":["SCENARIO"],"defaultValues":[],"options":[{"value":"animals","labelKey":"setup.interests.animals"},{"value":"mystery","labelKey":"setup.interests.mystery"}]},
+    {"inputId":"story-wish","helpKey":"setup.storyWish.help","stages":["SCENARIO"],"defaultValues":[],"options":[],"freeTextNoticeKey":"setup.storyWish.notice"}
+  ]
+}

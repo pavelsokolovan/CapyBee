@@ -16,7 +16,7 @@
     {"slotId":"ending-partial-slot","sceneId":"ending-partial","templateId":"scene-basic","fallbackResource":"generation/fallbacks/ending-partial.json","choiceIds":[],"phaseId":"ending","storyRole":"ending","actorSlots":["hero","keeper"],"objectiveIds":["return-home"],"toneTags":["hopeful"],"generationTiming":"ON_ENTRY"}
   ],
   "limits":{"totalCallsPerRun":8,"callsPerStage":1,"maxOutputTokens":800,"maxInputCharacters":12000,"repairAttempts":0},
-  "runContract":{"kind":"FULL_GAME","contractVersion":1,
+  "runContract":{"kind":"FULL_GAME","contractVersion":1,"setupResource":"generation/setup.json",
     "phases":[{"id":"opening","kind":"OPENING","sceneIds":["opening"]},{"id":"development","kind":"DEVELOPMENT","sceneIds":["development-a","development-b"]},{"id":"challenge","kind":"CHALLENGE","sceneIds":["challenge"]},{"id":"resolution","kind":"RESOLUTION","sceneIds":["resolution"]},{"id":"ending","kind":"ENDING","sceneIds":["ending-success","ending-partial"]}],
     "utilitySceneIds":[],"length":{"minimumStoryTransitions":4,"maximumStoryTransitions":4},
     "completion":{"endings":[{"sceneId":"ending-success","outcomeId":"success"},{"sceneId":"ending-partial","outcomeId":"partial"}]}}

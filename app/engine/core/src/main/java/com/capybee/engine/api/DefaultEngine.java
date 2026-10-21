@@ -15,6 +15,8 @@ import com.capybee.engine.input.InputSafetyAction;
 import com.capybee.engine.input.InputSafetyDecision;
 import com.capybee.engine.input.PiiScrubber;
 import com.capybee.engine.input.ProcessedInput;
+import com.capybee.engine.input.PreparedStartInputs;
+import com.capybee.engine.input.StartInputProcessor;
 import com.capybee.engine.pack.StartInputDef;
 import com.capybee.engine.rules.*;
 import com.capybee.engine.rules.json.RulesParser;
@@ -56,7 +58,21 @@ final class DefaultEngine implements Engine {
 
     @Override
     public StartResult start(RunRequest request) {
+        if (request == null) return new StartResult(null, validateStartRequest(null));
+        Pack pack = packs.find(request.packId()).orElse(null);
+        if (pack == null) return new StartResult(null, validateStartRequest(request));
+        LocaleTag locale = request.locale() == null ? pack.manifest().defaultLocale() : request.locale();
+        PreparedStartInputs prepared = new StartInputProcessor(piiScrubber)
+                .prepare(pack, locale, request.startInputs(), inputGuard);
+        return start(request, prepared);
+    }
+
+    @Override
+    public StartResult start(RunRequest request, PreparedStartInputs preparedInputs) {
         List<Issue> issues = validateStartRequest(request);
+        if (preparedInputs == null) {
+            issues.add(new Issue(Issue.Severity.ERROR, "START_INPUT_INVALID", "Prepared start inputs are missing"));
+        } else issues.addAll(preparedInputs.issues());
         if (issues.stream().anyMatch(issue -> issue.severity() == Issue.Severity.ERROR)) {
             return new StartResult(null, issues);
         }
@@ -79,14 +95,14 @@ final class DefaultEngine implements Engine {
         if (request.generated()) {
             try {
                 generationPipeline = new GenerationPipeline(pack, locale, textGenerator, ids, clock);
-                generationPipeline.initialize();
+                generationPipeline.initialize(preparedInputs);
             } catch (RuntimeException exception) {
                 return new StartResult(null, List.of(new Issue(Issue.Severity.ERROR,
                         "GENERATION_START_FAILED", "Generated content could not be prepared")));
             }
         }
 
-        Map<String, String> normalizedInputs = persistentInputs(normalizeInputs(request.startInputs(), pack), pack);
+        Map<String, String> normalizedInputs = preparedInputs.persistentValues();
         long seed = request.seed() != null ? request.seed() : random.nextLong();
         String runId = ids.nextId();
         Instant now = clock.instant();
@@ -391,71 +407,6 @@ final class DefaultEngine implements Engine {
         if (!unsupported.isEmpty()) {
             issues.add(new Issue(Issue.Severity.ERROR, "FEATURE_NOT_AVAILABLE",
                     "Pack feature not supported by this engine version: " + unsupported.iterator().next()));
-        }
-
-        Map<String, StartInputDef> declared = new LinkedHashMap<>();
-        for (StartInputDef input : pack.manifest().startInputs()) {
-            declared.put(input.id(), input);
-        }
-
-        Map<String, String> normalized = normalizeInputs(request.startInputs(), pack);
-        for (String key : normalized.keySet()) {
-            if (!declared.containsKey(key)) {
-                issues.add(new Issue(Issue.Severity.ERROR, "START_INPUT_UNKNOWN",
-                        "Unknown start input: " + key));
-            }
-        }
-
-        for (StartInputDef input : pack.manifest().startInputs()) {
-            String value = normalized.get(input.id());
-            if (value == null || value.isBlank()) {
-                if (input.required()) {
-                    issues.add(new Issue(Issue.Severity.ERROR, "START_INPUT_MISSING",
-                            "Required start input is missing: " + input.id()));
-                }
-                continue;
-            }
-            if (input instanceof StartInputDef.FreeTextInput) {
-                try {
-                    String normalizedText = piiScrubber.normalize(value);
-                    int maxChars = Math.min(freeTextLimit(input), PiiScrubber.MAX_INPUT_CODE_POINTS);
-                    if (normalizedText.codePointCount(0, normalizedText.length()) > maxChars) {
-                        issues.add(new Issue(Issue.Severity.ERROR, "INPUT_TOO_LONG", "Text input exceeds the allowed length"));
-                        continue;
-                    }
-                } catch (PiiScrubber.InputTextException exception) {
-                    issues.add(new Issue(Issue.Severity.ERROR, exception.code(), "Text input is invalid"));
-                    continue;
-                }
-            } else if (!inputValueValid(input, value)) {
-                issues.add(new Issue(Issue.Severity.ERROR, "START_INPUT_INVALID",
-                        "Start input value is invalid for " + input.id()));
-                continue;
-            }
-            if (input instanceof StartInputDef.FreeTextInput) {
-                if (pack.manifest().contentPolicy() == null || !pack.manifest().contentPolicy().freeTextAllowed()) {
-                    issues.add(new Issue(Issue.Severity.ERROR, "FREE_TEXT_DISABLED", "Free-text input is disabled by pack policy"));
-                    continue;
-                }
-                if (inputGuard == null) {
-                    issues.add(new Issue(Issue.Severity.ERROR, "INPUT_GUARD_UNAVAILABLE", "Text safety checks are unavailable"));
-                    continue;
-                }
-                try {
-                    ProcessedInput processed = piiScrubber.process(value);
-                    InputSafetyDecision decision = inputGuard.inspect(processed.input(), policy(pack,
-                            Math.min(freeTextLimit(input), PiiScrubber.MAX_INPUT_CODE_POINTS)));
-                    if (decision == null || decision.action() == null || decision.action() == InputSafetyAction.UNAVAILABLE) {
-                        issues.add(new Issue(Issue.Severity.ERROR, "INPUT_GUARD_UNAVAILABLE", "Text safety checks are unavailable"));
-                    } else if (decision.action() == InputSafetyAction.BLOCK) {
-                        issues.add(new Issue(Issue.Severity.ERROR, "INPUT_BLOCKED", "Text input was not accepted"));
-                    } else if (decision.action() == InputSafetyAction.NEEDS_CLARIFICATION) {
-                        issues.add(new Issue(Issue.Severity.ERROR, "INPUT_NEEDS_CLARIFICATION", "Text input needs clarification"));
-                    }
-                } catch (RuntimeException exception) {
-                    issues.add(new Issue(Issue.Severity.ERROR, "INPUT_GUARD_UNAVAILABLE", "Text safety checks are unavailable"));
-                }
-            }
         }
 
         return issues;

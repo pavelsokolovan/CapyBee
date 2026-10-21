@@ -13,6 +13,7 @@ import com.capybee.engine.generation.GenerationArtifact;
 import com.capybee.engine.generation.GenerationCatalog;
 import com.capybee.engine.generation.GenerationExecutionSummary;
 import com.capybee.engine.pack.Pack;
+import com.capybee.engine.pack.StartInputDef;
 import com.capybee.engine.pack.PackFeature;
 import com.capybee.engine.pack.PackId;
 import com.capybee.engine.session.SessionPorts.CommandLog;
@@ -38,6 +39,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -140,9 +142,15 @@ public final class RunSessionService {
         Instant now = clock.now();
         Pack selectedPack = packs.find(request.packId().value()).orElseThrow(() ->
                 new SessionException(ErrorCode.REQUEST_INVALID));
+        Map<String, String> persistentInputs = new LinkedHashMap<>(request.startInputs());
+        selectedPack.manifest().startInputs().stream()
+                .filter(StartInputDef.FreeTextInput.class::isInstance)
+                .map(StartInputDef::id).forEach(persistentInputs::remove);
+        StartRequest persistentRequest = new StartRequest(request.id(), request.packId(), request.locale(),
+                persistentInputs, request.seed(), request.generated());
         var created = runs.createPreparing(new SessionTypes.NewRun(request.id(), owner, request.packId(),
                 selectedPack.manifest().version().toString(), request.locale(),
-                request.startInputs(), request.seed(), request.generated(), now));
+                persistentInputs, request.seed(), request.generated(), now));
         if (created.kind() == CreateKind.EXISTS_OTHER_OWNER) {
             throw new SessionException(ErrorCode.RUN_NOT_FOUND);
         }
@@ -154,7 +162,7 @@ public final class RunSessionService {
                 new SessionException(ErrorCode.RUN_NOT_FOUND));
         CompletableFuture<Void> startJob = null;
         if (created.kind() == CreateKind.CREATED) {
-            startJob = scheduleStart(owner, request);
+            startJob = scheduleStart(owner, persistentRequest);
         }
         if (startJob != null) waitForStart(startJob, syncWait);
         stored = runs.find(request.id(), owner).orElse(stored);

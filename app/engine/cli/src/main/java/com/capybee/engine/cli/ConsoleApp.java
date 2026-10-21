@@ -5,6 +5,7 @@ import com.capybee.engine.api.Engine;
 import com.capybee.engine.pack.DirectoryPackSource;
 import com.capybee.engine.pack.LoadResult;
 import com.capybee.engine.pack.PackId;
+import com.capybee.engine.pack.StartInputDef;
 import com.capybee.engine.pack.json.PackLoader;
 import com.capybee.engine.port.IdSource;
 import com.capybee.engine.port.TextGenerator;
@@ -86,6 +87,17 @@ public final class ConsoleApp {
         }
 
         var pack = load.pack().orElseThrow();
+        if (options.generated() && pack.generatedGameProfile()
+                .filter(profile -> profile.kind() == com.capybee.engine.generation.GeneratedGameProfile.Kind.FULL_GAME)
+                .isPresent()) {
+            boolean commandLineText = pack.manifest().startInputs().stream()
+                    .filter(StartInputDef.FreeTextInput.class::isInstance)
+                    .anyMatch(input -> options.inputs().containsKey(input.id()));
+            if (commandLineText) {
+                err.println("FREE_TEXT_COMMAND_LINE_FORBIDDEN: enter optional story text only in interactive setup.");
+                return 2;
+            }
+        }
         if (options.session()) return runSessionMode(options, packId, pack);
         return new ClassicConsole(in, out, err, clock, ids, random, textGenerator).run(options, packId, pack);
     }
@@ -96,6 +108,7 @@ public final class ConsoleApp {
                 + "       Session options: --store-dir <dir>, --run <id>, --new, --debug, --prefetch on|off.\n"
                 + "                        --calls-per-day <0..100000>, --run-calls <1..1000>.\n"
                 + "       Add --live-smoke --script <file> to call the configured provider (may incur cost).\n"
+                + "       Full-game free text is accepted only by interactive setup, never by --input or scripts.\n"
                 + "       Provider configuration: GENERATION_MODEL_ID and ANTHROPIC_API_KEY environment variables.";
     }
 
