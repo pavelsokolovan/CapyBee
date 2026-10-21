@@ -94,10 +94,6 @@ jobs:
 
       - name: Run backend tests
         run: mvn -B -f app/pom.xml -pl server -am verify
-        env:
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/capybee
-          SPRING_DATASOURCE_USERNAME: capybee
-          SPRING_DATASOURCE_PASSWORD: capybee
 
       - name: Build backend JAR
         run: mvn -B -f app/pom.xml -DskipTests -pl server -am package
