@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.capybee.engine.session.SessionTypes.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -206,6 +207,40 @@ class RunSessionServiceTest {
         jobs.removeFirst().run();
         assertThat(pendingService.get(owner, runId).status()).isEqualTo(RunStatus.ACTIVE);
     }
+
+        @Test
+        void diagnosticsUsesStoredCountsAndNeverResumesTheSnapshot() {
+                AtomicInteger resumes = new AtomicInteger();
+                Pack pack = pack();
+                InMemorySessionStore diagnosticsStore = new InMemorySessionStore(CLOCK);
+                SessionLimits limits = new SessionLimits(Duration.ofSeconds(30), Duration.ofMinutes(10),
+                                24, 1500, 2, 40, false);
+                Engine noResumeEngine = new Engine() {
+                        private final TestEngine engine = new TestEngine(UUID.randomUUID(), pack);
+                        @Override public StartResult start(com.capybee.engine.api.RunRequest request) {
+                                return engine.start(request);
+                        }
+                        @Override public ResumeResult resume(RunSnapshot snapshot) {
+                                resumes.incrementAndGet();
+                                throw new AssertionError("diagnostics must not resume snapshots");
+                        }
+                };
+                RunSessionService diagnosticsService = new RunSessionService(new TestPackCatalog(pack), diagnosticsStore,
+                                diagnosticsStore, diagnosticsStore, diagnosticsStore,
+                                (ignoredOwner, runId, priority) -> noResumeEngine, CLOCK::instant, limits,
+                                diagnosticsStore, DIRECT, new byte[32], diagnosticsStore,
+                                ignored -> new LedgerScope("profile:profile-1", limits.profileCallsPerDay()));
+                UUID runId = UUID.randomUUID();
+                diagnosticsService.start(owner, new StartRequest(runId, PACK_ID, LOCALE, Map.of(), null, false),
+                                Duration.ofSeconds(1));
+
+                Diagnostics diagnostics = diagnosticsService.diagnostics(owner, runId);
+
+                assertThat(resumes).hasValue(0);
+                assertThat(diagnostics.generationCalls()).isZero();
+                assertThat(diagnostics.stages()).isEmpty();
+                assertThat(diagnostics.budget()).isEqualTo(new BudgetDiagnostics(40, 1500));
+        }
 
     private static Pack pack() {
         var manifest = new PackManifest(1, PACK_ID, PACK_VERSION, "Test", "Test pack",

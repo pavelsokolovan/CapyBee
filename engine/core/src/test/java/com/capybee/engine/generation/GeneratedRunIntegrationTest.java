@@ -10,6 +10,7 @@ import com.capybee.engine.pack.DirectoryPackSource;
 import com.capybee.engine.pack.LocaleTag;
 import com.capybee.engine.pack.PackId;
 import com.capybee.engine.pack.PackRegistry;
+import com.capybee.engine.pack.Pack;
 import com.capybee.engine.pack.json.PackLoader;
 import com.capybee.engine.port.StructuredGenerationRequest;
 import com.capybee.engine.port.TextGenerationResult;
@@ -23,6 +24,11 @@ import java.time.ZoneOffset;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -112,12 +118,60 @@ class GeneratedRunIntegrationTest {
         assertThat(run.snapshot().step()).isEqualTo(before.step());
         assertThat(run.snapshot().state().sceneId()).isEqualTo(before.state().sceneId());
         assertThat(run.snapshot().state().counters()).isEqualTo(before.state().counters());
+        assertThat(run.snapshot().state().flags()).isEqualTo(before.state().flags());
+        assertThat(run.snapshot().state().sets()).isEqualTo(before.state().sets());
+        assertThat(run.snapshot().state().objectives()).isEqualTo(before.state().objectives());
         assertThat(run.snapshot().updatedAt()).isEqualTo(before.updatedAt());
         assertThat(run.view()).isEqualTo(viewBefore);
         assertThat(generator.requests).hasSize(5);
 
         assertThat(run.apply(new Command.Choose("explore")).accepted()).isTrue();
         assertThat(generator.requests).hasSize(5);
+    }
+
+    @Test
+    void prefetchCandidatesAreEmptyForAuthoredAndEndedRunsAndDeduplicateConvergingTargets() throws Exception {
+        Pack authoredPack = new PackLoader(Engine.sectionValidators()).load(new PackId("fixture-text-dungeon"),
+                new DirectoryPackSource(Path.of("..", "fixtures", "game-packs", "fixture-text-dungeon")
+                        .toAbsolutePath().normalize()));
+        Engine authoredEngine = Engine.builder(new PackRegistry(List.of(authoredPack)))
+                .clock(Clock.systemUTC()).random(Randoms.seeded(4)).ids(new SequentialIdSource("authored"))
+                .build();
+        var authoredRun = authoredEngine.start(new RunRequest(authoredPack.manifest().id(),
+                authoredPack.manifest().defaultLocale(), java.util.Map.of(), 4L, false)).run();
+        assertThat(authoredRun.prefetchCandidates()).isEmpty();
+
+        Pack original = new PackLoader(Engine.sectionValidators()).load(new PackId("fixture-generated"),
+                new DirectoryPackSource(PACK_PATH));
+        Map<String, String> files = new LinkedHashMap<>(original.files());
+        ObjectMapper mapper = new ObjectMapper();
+        ObjectNode story = (ObjectNode) mapper.readTree(files.get("scenes/en/story.json"));
+        ArrayNode scenes = (ArrayNode) story.get("scenes");
+        ObjectNode opening = (ObjectNode) scenes.get(0);
+        ((ObjectNode) opening.get("options").get(1)).put("next", "meeting");
+        files.put("scenes/en/story.json", mapper.writeValueAsString(story));
+        Pack convergingPack = new Pack(original.manifest(), files);
+        ScriptedGenerator provider = generatedProvider();
+        Engine generatedEngine = Engine.builder(new PackRegistry(List.of(convergingPack)))
+                .clock(Clock.fixed(Instant.parse("2026-10-14T12:00:00Z"), ZoneOffset.UTC))
+                .random(Randoms.seeded(17)).ids(new SequentialIdSource("converging"))
+                .textGenerator(provider).build();
+        var generatedRun = generatedEngine.start(new RunRequest(new PackId("fixture-generated"),
+                new LocaleTag("en"), java.util.Map.of(), 17L, true)).run();
+
+        assertThat(generatedRun.prefetchCandidates()).containsExactly("meeting");
+        assertThat(generatedRun.prefetch("meeting")).isPresent();
+        assertThat(generatedRun.prefetchCandidates()).isEmpty();
+        generatedRun.apply(new Command.Abandon());
+        assertThat(generatedRun.prefetchCandidates()).isEmpty();
+    }
+
+    private static ScriptedGenerator generatedProvider() {
+        return new ScriptedGenerator(
+                "{\"title\":\"An Evening\",\"premise\":\"A lantern waits.\",\"setting\":\"Observatory\",\"beats\":[\"opening-slot\",\"meeting-slot\"]}",
+                "{\"characters\":[]}", "{\"objectives\":[]}",
+                scene("opening", "A Quiet Start", "explore", "Look around", "rest", "Rest"),
+                scene("meeting", "A New Room", "continue", "Continue", "finish", "Finish"));
     }
 
     private static String scene(String ignoredSceneId, String title, String firstId, String firstLabel,

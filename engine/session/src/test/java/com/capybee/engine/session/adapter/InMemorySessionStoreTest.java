@@ -1,6 +1,8 @@
 package com.capybee.engine.session.adapter;
 
 import com.capybee.engine.api.Event;
+import com.capybee.engine.port.TextGenerationResult;
+import com.capybee.engine.session.MeteredTextGenerator;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
@@ -62,6 +64,48 @@ class InMemorySessionStoreTest {
         store.releaseCall(profile, global, day, runId);
         assertThat(reserve(profile, global, day, runId, 3)).isTrue();
     }
+
+        @Test
+        void countsPrefetchReservationsWithoutUsageAndKeepsDailyCountsOnDelete() {
+        OwnerRef owner = new OwnerRef("profile");
+        UUID runId = UUID.randomUUID();
+        store.createPreparing(new NewRun(runId, owner, new com.capybee.engine.pack.PackId("test"), "1.0.0",
+            new com.capybee.engine.pack.LocaleTag("en"), Map.of(), null, false, clock.instant()));
+        var profile = new LedgerScope("profile:meter", 1);
+        var global = new LedgerScope("global", 10);
+        LocalDate day = LocalDate.of(2026, 10, 19);
+
+        assertThat(store.tryReserveCall(profile, global, day, runId, 10,
+            MeteredTextGenerator.Priority.PREFETCH, 0, 0, 0)).isTrue();
+        assertThat(store.tryReserveCall(profile, global, day, runId, 10,
+            MeteredTextGenerator.Priority.PREFETCH, 0, 0, 0)).isFalse();
+        assertThat(store.runPrefetchCalls(runId)).isEqualTo(1);
+        assertThat(store.dayUsage(profile, day).prefetchCalls()).isEqualTo(1);
+
+            store.recordUsage(profile, global, day, runId,
+                new TextGenerationResult.TokenUsage(7, 3, 0, 0),
+            MeteredTextGenerator.Priority.PREFETCH);
+        assertThat(store.dayUsage(profile, day)).isEqualTo(new DayUsage(1, 7, 3, 1));
+        store.delete(runId, owner);
+        assertThat(store.runPrefetchCalls(runId)).isZero();
+        assertThat(store.dayUsage(profile, day).prefetchCalls()).isEqualTo(1);
+        }
+
+        @Test
+        void listsCommandsInBeginOrderWithOptionalCompletionDiagnostics() {
+        UUID runId = UUID.randomUUID();
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        store.begin(runId, first, new byte[32], 0);
+        store.begin(runId, second, new byte[32], 0);
+        store.complete(runId, first, true, 1, List.of(), 12L, SceneSource.INLINE_GENERATED);
+        store.complete(runId, second, false, 0, List.of());
+
+        assertThat(store.list(runId)).extracting(CommandSummary::commandId).containsExactly(first, second);
+        assertThat(store.find(runId, first).orElseThrow().latencyMillis()).isEqualTo(12L);
+        assertThat(store.find(runId, first).orElseThrow().sceneSource()).isEqualTo(SceneSource.INLINE_GENERATED);
+        assertThat(store.find(runId, second).orElseThrow().latencyMillis()).isNull();
+        }
 
     private boolean reserve(LedgerScope profile, LedgerScope global, LocalDate day,
                             UUID runId, int runLimit) {

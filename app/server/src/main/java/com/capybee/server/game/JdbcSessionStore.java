@@ -152,15 +152,17 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
     @Override
     public Optional<LoggedCommand> find(UUID runId, UUID commandId) {
         Optional<LoggedCommand> logged = jdbc.query("""
-                SELECT payload_mac, state, accepted, revision_before, revision_after, failure_code
+                SELECT payload_mac, state, accepted, revision_before, revision_after,
+                       failure_code, latency_ms, scene_source
                 FROM game_run_commands WHERE run_id = ? AND command_id = ?
                 """, (rs, row) -> new LoggedCommand(rs.getBytes("payload_mac"),
                 CommandState.valueOf(rs.getString("state")), (Boolean) rs.getObject("accepted"),
                 rs.getLong("revision_before"), nullableLong(rs, "revision_after"), List.of(),
-                rs.getString("failure_code")), runId, commandId).stream().findFirst();
+                rs.getString("failure_code"), nullableLong(rs, "latency_ms"),
+                nullableSceneSource(rs, "scene_source")), runId, commandId).stream().findFirst();
         return logged.map(value -> new LoggedCommand(value.payloadMac(), value.state(), value.accepted(),
                 value.revisionBefore(), value.revisionAfter(), eventsForCommand(runId, commandId),
-                value.failureCode()));
+                value.failureCode(), value.latencyMillis(), value.sceneSource()));
     }
 
     @Override
@@ -179,11 +181,35 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
 
     @Override
     public void complete(UUID runId, UUID commandId, boolean accepted, long revisionAfter,
-                         List<Event> events) {
+                         List<Event> events, Long latencyMillis, SceneSource sceneSource) {
         jdbc.update("""
-                UPDATE game_run_commands SET state = 'DONE', accepted = ?, revision_after = ?
+                UPDATE game_run_commands SET state = 'DONE', accepted = ?, revision_after = ?,
+                    latency_ms = ?, scene_source = ?
                 WHERE run_id = ? AND command_id = ?
-                """, accepted, revisionAfter, runId, commandId);
+                """, accepted, revisionAfter, latencyMillis, sceneSource == null ? null : sceneSource.name(),
+                runId, commandId);
+    }
+
+    @Override
+    public void complete(UUID runId, UUID commandId, boolean accepted, long revisionAfter,
+                         List<Event> events) {
+        complete(runId, commandId, accepted, revisionAfter, events, null, null);
+    }
+
+    @Override
+    public List<CommandSummary> list(UUID runId) {
+        return jdbc.query("""
+                SELECT command_id, state, accepted, revision_before, revision_after,
+                       latency_ms, scene_source
+                FROM game_run_commands WHERE run_id = ? ORDER BY created_at ASC
+                """, (rs, row) -> new CommandSummary(
+                rs.getObject("command_id", UUID.class),
+                CommandState.valueOf(rs.getString("state")),
+                (Boolean) rs.getObject("accepted"),
+                rs.getLong("revision_before"),
+                nullableLong(rs, "revision_after"),
+                nullableLong(rs, "latency_ms"),
+                nullableSceneSource(rs, "scene_source")), runId);
     }
 
     @Override
@@ -207,8 +233,8 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
                 int effectiveRunCap = priority == MeteredTextGenerator.Priority.PREFETCH
                         ? Math.max(0, runLimit - runReserve) : runLimit;
                 if (!reserveRun(runId, effectiveRunCap)) throw new ReservationDenied();
-                if (!reserveScope(profile.value(), effectiveProfileCap, day)) throw new ReservationDenied();
-                if (!reserveScope(global.value(), effectiveGlobalCap, day)) throw new ReservationDenied();
+                if (!reserveScope(profile.value(), effectiveProfileCap, day, priority)) throw new ReservationDenied();
+                if (!reserveScope(global.value(), effectiveGlobalCap, day, priority)) throw new ReservationDenied();
                 return true;
             }));
         } catch (ReservationDenied denied) {
@@ -221,16 +247,14 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
                            TextGenerationResult.TokenUsage usage, MeteredTextGenerator.Priority priority) {
         jdbc.update("""
                 UPDATE game_generation_usage SET input_tokens = input_tokens + ?,
-                    output_tokens = output_tokens + ?, prefetch_calls = prefetch_calls + ?
+                    output_tokens = output_tokens + ?
                 WHERE scope = ? AND day = ?
-                """, usage.inputTokens(), usage.outputTokens(),
-                priority == MeteredTextGenerator.Priority.PREFETCH ? 1 : 0, profile.value(), day);
+                """, usage.inputTokens(), usage.outputTokens(), profile.value(), day);
         jdbc.update("""
                 UPDATE game_generation_usage SET input_tokens = input_tokens + ?,
-                    output_tokens = output_tokens + ?, prefetch_calls = prefetch_calls + ?
+                    output_tokens = output_tokens + ?
                 WHERE scope = ? AND day = ?
-                """, usage.inputTokens(), usage.outputTokens(),
-                priority == MeteredTextGenerator.Priority.PREFETCH ? 1 : 0, global.value(), day);
+                """, usage.inputTokens(), usage.outputTokens(), global.value(), day);
     }
 
     @Override
@@ -241,6 +265,25 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
                 global.value(), day);
         jdbc.update("UPDATE game_runs SET generation_calls = GREATEST(0, generation_calls - 1) WHERE id = ?",
                 runId);
+    }
+
+    @Override
+    public DayUsage dayUsage(LedgerScope scope, LocalDate day) {
+        return jdbc.query("""
+                SELECT calls, input_tokens, output_tokens, prefetch_calls
+                FROM game_generation_usage WHERE scope = ? AND day = ?
+                """, (rs, row) -> new DayUsage(
+                        rs.getInt("calls"), rs.getLong("input_tokens"), rs.getLong("output_tokens"),
+                        rs.getInt("prefetch_calls")), scope.value(), day).stream().findFirst()
+                .orElse(new DayUsage(0, 0, 0, 0));
+    }
+
+    @Override
+    public int runPrefetchCalls(UUID runId) {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM game_run_prefetch WHERE run_id = ?",
+                Integer.class, runId);
+        return count == null ? 0 : count;
     }
 
     @Override
@@ -316,15 +359,19 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
                 """, (rs, row) -> rs.getInt(1), runId, cap).isEmpty();
     }
 
-    private boolean reserveScope(String scope, int cap, LocalDate day) {
+    private boolean reserveScope(String scope, int cap, LocalDate day,
+                                MeteredTextGenerator.Priority priority) {
         if (cap < 1) return false;
+        int prefetchDelta = priority == MeteredTextGenerator.Priority.PREFETCH ? 1 : 0;
         return !jdbc.query("""
                 INSERT INTO game_generation_usage (scope, day, calls, prefetch_calls, input_tokens, output_tokens)
-                VALUES (?, ?, 1, 0, 0, 0)
-                ON CONFLICT (scope, day) DO UPDATE SET calls = game_generation_usage.calls + 1
+                VALUES (?, ?, 1, ?, 0, 0)
+                ON CONFLICT (scope, day) DO UPDATE SET calls = game_generation_usage.calls + 1,
+                    prefetch_calls = game_generation_usage.prefetch_calls + ?
                 WHERE game_generation_usage.calls < ?
                 RETURNING calls
-                """, (rs, row) -> rs.getInt(1), scope, day, cap).isEmpty();
+                """, (rs, row) -> rs.getInt(1), scope, day, prefetchDelta,
+                prefetchDelta, cap).isEmpty();
     }
 
     private String encodeArtifact(GenerationArtifact artifact) {
@@ -379,6 +426,11 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
     private static Long nullableLong(ResultSet rs, String column) throws SQLException {
         long value = rs.getLong(column);
         return rs.wasNull() ? null : value;
+    }
+
+    private static SceneSource nullableSceneSource(ResultSet rs, String column) throws SQLException {
+        String value = rs.getString(column);
+        return value == null ? null : SceneSource.valueOf(value);
     }
 
     private static Instant instant(ResultSet rs, String column) throws SQLException {

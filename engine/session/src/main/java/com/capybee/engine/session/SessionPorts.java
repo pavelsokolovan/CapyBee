@@ -39,9 +39,14 @@ public final class SessionPorts {
     public interface CommandLog {
         Optional<LoggedCommand> find(UUID runId, UUID commandId);
         InsertKind begin(UUID runId, UUID commandId, byte[] payloadMac, long revisionBefore);
+        default void complete(UUID runId, UUID commandId, boolean accepted, long revisionAfter,
+                              List<Event> events) {
+            complete(runId, commandId, accepted, revisionAfter, events, null, null);
+        }
         void complete(UUID runId, UUID commandId, boolean accepted, long revisionAfter,
-                      List<Event> events);
+                      List<Event> events, Long latencyMillis, SceneSource sceneSource);
         void fail(UUID runId, UUID commandId, String code);
+        List<CommandSummary> list(UUID runId);
     }
 
     public interface GenerationLedger {
@@ -52,6 +57,8 @@ public final class SessionPorts {
                          UUID runId, TextGenerationResult.TokenUsage usage,
                          MeteredTextGenerator.Priority priority);
         void releaseCall(LedgerScope profile, LedgerScope global, LocalDate day, UUID runId);
+        DayUsage dayUsage(LedgerScope scope, LocalDate day);
+        int runPrefetchCalls(UUID runId);
     }
 
     public interface EventOutbox {
@@ -88,6 +95,10 @@ public final class SessionPorts {
     @FunctionalInterface
     public interface OwnerScopes {
         LedgerScope profileScope(OwnerRef owner);
+
+        default LocalDate currentDay(Instant instant) {
+            return LocalDate.ofInstant(instant, java.time.ZoneOffset.UTC);
+        }
     }
 
     public interface PackCatalog {

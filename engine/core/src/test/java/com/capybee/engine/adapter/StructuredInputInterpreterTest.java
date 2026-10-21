@@ -47,6 +47,7 @@ class StructuredInputInterpreterTest {
 
         assertThat(resolution).isEqualTo(new InputResolution.SelectOption("continue"));
         assertThat(captured.get().taskId()).isEqualTo("INPUT_RESOLUTION");
+        assertThat(captured.get().slotKey()).isNull();
         assertThat(captured.get().maxOutputTokens()).isEqualTo(400);
         assertThat(captured.get().untrustedDataJson()).contains("scrubbed [redacted:email]", "locked", "enabled");
         assertThat(captured.get().taskInstructions()).doesNotContain("scrubbed");

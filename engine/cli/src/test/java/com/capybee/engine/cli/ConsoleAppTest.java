@@ -15,10 +15,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.Duration;
 import java.time.ZoneOffset;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -173,11 +177,85 @@ class ConsoleAppTest {
         assertThat(result.exitCode).isZero();
         assertThat(result.errors).isEmpty();
         assertThat(result.output).contains("/debug on|off", "! Unknown command. Type ? for help.",
-            "! Choose an option, or press Enter to continue.", "revision=", "calls=0/5",
-            "prefetchReady=[]", "Place: Cell", "Place: Corridor", "COMMAND_NOT_ALLOWED", "INPUT_NOT_EXPECTED");
+            "! Choose an option, or press Enter to continue.", "revision=", "source=NONE latency=0ms",
+            "calls=0/5", "prefetch=ready:0 inflight:0 calls:0", "Place: Cell", "Place: Corridor",
+            "COMMAND_NOT_ALLOWED", "INPUT_NOT_EXPECTED");
         assertThat(result.output).doesNotContain("[abandoned]", "private-marker@example.com");
         assertThat(result.output.lines().filter(line -> line.contains("revision="))).hasSize(1);
+        String diagnostics = result.output.lines().filter(line -> line.contains("revision=")).findFirst()
+            .orElseThrow();
+        if (diagnostics.startsWith("> ")) diagnostics = diagnostics.substring(2);
+        assertThat(diagnostics).matches("revision=\\d+ source=(NONE|PREFETCHED|JOINED_PREFETCH|INLINE_GENERATED|INLINE_REPAIRED|FALLBACK) "
+            + "latency=\\d+ms calls=\\d+/\\d+ prefetch=ready:\\d+ inflight:\\d+ calls:\\d+ "
+            + "hits:\\d+ misses:\\d+ wasted:\\d+ budget=\\d+/\\d+");
         }
+
+    @Test
+    void slowSessionCommandUsesInjectedPollingAndPrintsThinkingOnce() throws Exception {
+        Path script = Files.createTempFile("slow-session", ".txt");
+        CountDownLatch openingGenerated = new CountDownLatch(1);
+        CountDownLatch meetingEntered = new CountDownLatch(1);
+        CountDownLatch releaseMeeting = new CountDownLatch(1);
+        AtomicInteger meetingCalls = new AtomicInteger();
+        java.util.ArrayList<Duration> sleeps = new java.util.ArrayList<>();
+        try {
+            Files.writeString(script, "/debug on\n1\n/quit\n", StandardCharsets.UTF_8);
+            TextGenerator generator = request -> {
+                String output;
+                if (request.slotKey() == null) {
+                    output = switch (request.taskId()) {
+                        case "GEN_SCENARIO" -> "{\"title\":\"An Evening\",\"premise\":\"A lantern waits.\",\"setting\":\"Observatory\",\"beats\":[\"opening-slot\",\"meeting-slot\"]}";
+                        case "GEN_CAST" -> "{\"characters\":[]}";
+                        case "GEN_QUEST" -> "{\"objectives\":[]}";
+                        default -> "{}";
+                    };
+                } else if (request.slotKey().equals("opening-slot")) {
+                    openingGenerated.countDown();
+                    output = scene("opening", "A Quiet Start", "explore", "Look around", "rest", "Rest");
+                } else {
+                    meetingCalls.incrementAndGet();
+                    meetingEntered.countDown();
+                    awaitGate(releaseMeeting);
+                    output = scene("meeting", "A New Room", "continue", "Continue", "finish", "Finish");
+                }
+                return new TextGenerationResult(output, null, "test-provider",
+                        TextGenerationResult.FinishReason.COMPLETE);
+            };
+            Sleeper sleeper = delay -> {
+                sleeps.add(delay);
+                try {
+                    if (openingGenerated.getCount() > 0) openingGenerated.await(10, TimeUnit.SECONDS);
+                    if (meetingEntered.getCount() == 0) releaseMeeting.countDown();
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+            };
+                ConsoleTuning tuning = new ConsoleTuning(Duration.ofSeconds(8), Duration.ofMillis(10),
+                    Duration.ofMillis(30), Duration.ofSeconds(30), sleeper);
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            ByteArrayOutputStream errors = new ByteArrayOutputStream();
+            ConsoleApp app = new ConsoleApp(new ByteArrayInputStream(new byte[0]),
+                    new PrintStream(output, true, StandardCharsets.UTF_8),
+                    new PrintStream(errors, true, StandardCharsets.UTF_8),
+                    Clock.fixed(Instant.parse("2026-10-12T10:00:00Z"), ZoneOffset.UTC),
+                    new SequentialIdSource("slow-session"), Randoms.seeded(42), generator, tuning);
+
+                int exit = app.run(new String[]{"--pack-dir", GENERATED_PACK, "--generated", "--session",
+                        "--prefetch", "off", "--script", script.toString()});
+
+            String transcript = output.toString(StandardCharsets.UTF_8);
+            assertThat(exit).as("output=%s errors=%s", transcript, errors.toString(StandardCharsets.UTF_8)).isZero();
+            assertThat(transcript.lines().filter(line -> line.equals("CapyBee is thinking…"))).hasSize(1);
+                assertThat(transcript).contains("A New Room", "source=INLINE_GENERATED latency=0ms",
+                    "prefetch=ready:0 inflight:0 calls:0").doesNotContain("SESSION_UNAVAILABLE");
+            assertThat(errors.toString(StandardCharsets.UTF_8)).isEmpty();
+            assertThat(meetingCalls).hasValue(1);
+            assertThat(sleeps).isNotEmpty().allSatisfy(delay -> assertThat(delay).isEqualTo(Duration.ofMillis(30)));
+        } finally {
+            releaseMeeting.countDown();
+            Files.deleteIfExists(script);
+        }
+    }
 
         @Test
         void interactiveSessionAbandonCanBeCancelledThenConfirmed() {
@@ -213,6 +291,15 @@ class ConsoleAppTest {
         return "{\"title\":\"" + title + "\",\"narration\":\"" + narration + "\",\"dialogue\":[],\"choices\":["
                 + "{\"id\":\"" + firstId + "\",\"label\":\"" + firstLabel + "\"},"
                 + "{\"id\":\"" + secondId + "\",\"label\":\"" + secondLabel + "\"}]}";
+    }
+
+    private static void awaitGate(CountDownLatch latch) {
+        try {
+            if (!latch.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("test gate timed out");
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("test gate interrupted", interrupted);
+        }
     }
 
     private static final class ScriptedGenerator implements TextGenerator {

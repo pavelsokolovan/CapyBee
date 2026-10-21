@@ -10,7 +10,15 @@ public record StructuredGenerationRequest(
         String untrustedDataJson,
         String outputSchemaJson,
         int maxOutputTokens,
-        CostClass costClass) {
+        CostClass costClass,
+        String slotKey) {
+
+    public StructuredGenerationRequest(String requestId, String taskId, String systemPolicyVersion,
+                                       String taskInstructions, String untrustedDataJson,
+                                       String outputSchemaJson, int maxOutputTokens, CostClass costClass) {
+        this(requestId, taskId, systemPolicyVersion, taskInstructions, untrustedDataJson,
+                outputSchemaJson, maxOutputTokens, costClass, null);
+    }
 
     public StructuredGenerationRequest {
         Objects.requireNonNull(requestId, "requestId");
@@ -26,6 +34,9 @@ public record StructuredGenerationRequest(
         }
         if (maxOutputTokens < 1 || maxOutputTokens > 1_500) {
             throw new IllegalArgumentException("Output token limit is outside the supported range");
+        }
+        if (slotKey != null && (slotKey.isBlank() || slotKey.length() > 200)) {
+            throw new IllegalArgumentException("Generation slot key is invalid");
         }
     }
 

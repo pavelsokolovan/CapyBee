@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -28,11 +29,12 @@ import static com.capybee.engine.session.SessionTypes.*;
 public final class InMemorySessionStore implements SessionPorts.SessionStore {
     private final Clock clock;
     private final Map<UUID, StoredRun> runs = new HashMap<>();
-    private final Map<String, LoggedCommand> commands = new HashMap<>();
+    private final Map<String, LoggedCommand> commands = new LinkedHashMap<>();
     private final Map<UUID, List<OutboxEvent>> events = new HashMap<>();
     private final Map<UUID, Map<String, PrefetchedArtifact>> prefetch = new HashMap<>();
     private final Map<String, Integer> reservations = new HashMap<>();
     private final Map<String, Integer> runReservations = new HashMap<>();
+    private final Map<String, Integer> runPrefetchCalls = new HashMap<>();
     private final Map<String, long[]> usage = new HashMap<>();
 
     public InMemorySessionStore() {
@@ -131,6 +133,8 @@ public final class InMemorySessionStore implements SessionPorts.SessionStore {
             commands.keySet().removeIf(key -> key.startsWith(runId + ":"));
             events.remove(runId);
             prefetch.remove(runId);
+            runReservations.remove(runId.toString());
+            runPrefetchCalls.remove(runId.toString());
         }
     }
 
@@ -150,12 +154,25 @@ public final class InMemorySessionStore implements SessionPorts.SessionStore {
 
     @Override
     public synchronized void complete(UUID runId, UUID commandId, boolean accepted,
-                                      long revisionAfter, List<Event> commandEvents) {
+                                      long revisionAfter, List<Event> commandEvents,
+                                      Long latencyMillis, SceneSource sceneSource) {
         String key = commandKey(runId, commandId);
         LoggedCommand prior = commands.get(key);
         if (prior == null) throw new IllegalStateException("COMMAND_NOT_BEGUN");
         commands.put(key, new LoggedCommand(prior.payloadMac(), CommandState.DONE, accepted,
-                prior.revisionBefore(), revisionAfter, commandEvents, null));
+                prior.revisionBefore(), revisionAfter, commandEvents, null, latencyMillis, sceneSource));
+    }
+
+    @Override
+    public synchronized List<CommandSummary> list(UUID runId) {
+        String prefix = runId + ":";
+        return commands.entrySet().stream().filter(entry -> entry.getKey().startsWith(prefix))
+                .map(entry -> {
+                    LoggedCommand command = entry.getValue();
+                    return new CommandSummary(UUID.fromString(entry.getKey().substring(prefix.length())),
+                            command.state(), command.accepted(), command.revisionBefore(),
+                            command.revisionAfter(), command.latencyMillis(), command.sceneSource());
+                }).toList();
     }
 
     @Override
@@ -190,6 +207,11 @@ public final class InMemorySessionStore implements SessionPorts.SessionStore {
         reservations.put(profileKey, profileCalls + 1);
         reservations.put(globalKey, globalCalls + 1);
         runReservations.put(runKey, runCalls + 1);
+        if (priority == com.capybee.engine.session.MeteredTextGenerator.Priority.PREFETCH) {
+            usage.computeIfAbsent(profileKey, ignored -> new long[3])[2]++;
+            usage.computeIfAbsent(globalKey, ignored -> new long[3])[2]++;
+            runPrefetchCalls.merge(runKey, 1, Integer::sum);
+        }
         return true;
     }
 
@@ -197,8 +219,8 @@ public final class InMemorySessionStore implements SessionPorts.SessionStore {
     public synchronized void recordUsage(LedgerScope profile, LedgerScope global, LocalDate day,
                                          UUID runId, TextGenerationResult.TokenUsage tokenUsage,
                                          com.capybee.engine.session.MeteredTextGenerator.Priority priority) {
-        addUsage(usageKey(profile.value(), day), tokenUsage, priority);
-        addUsage(usageKey(global.value(), day), tokenUsage, priority);
+        addUsage(usageKey(profile.value(), day), tokenUsage);
+        addUsage(usageKey(global.value(), day), tokenUsage);
     }
 
     @Override
@@ -206,6 +228,19 @@ public final class InMemorySessionStore implements SessionPorts.SessionStore {
         decrement(usageKey(profile.value(), day));
         decrement(usageKey(global.value(), day));
         runReservations.computeIfPresent(runId.toString(), (ignored, count) -> Math.max(0, count - 1));
+    }
+
+    @Override
+    public synchronized DayUsage dayUsage(LedgerScope scope, LocalDate day) {
+        String key = usageKey(scope.value(), day);
+        long[] totals = usage.getOrDefault(key, new long[3]);
+        return new DayUsage(reservations.getOrDefault(key, 0), totals[0], totals[1],
+                Math.toIntExact(totals[2]));
+    }
+
+    @Override
+    public synchronized int runPrefetchCalls(UUID runId) {
+        return runPrefetchCalls.getOrDefault(runId.toString(), 0);
     }
 
     @Override
@@ -267,12 +302,10 @@ public final class InMemorySessionStore implements SessionPorts.SessionStore {
                 runReservations.getOrDefault(run.id().toString(), 0), run.createdAt(), run.updatedAt());
     }
 
-    private void addUsage(String key, TextGenerationResult.TokenUsage value,
-                          com.capybee.engine.session.MeteredTextGenerator.Priority priority) {
+    private void addUsage(String key, TextGenerationResult.TokenUsage value) {
         long[] totals = usage.computeIfAbsent(key, ignored -> new long[3]);
         totals[0] += value.inputTokens();
         totals[1] += value.outputTokens();
-        if (priority == com.capybee.engine.session.MeteredTextGenerator.Priority.PREFETCH) totals[2]++;
     }
 
     private void decrement(String key) {

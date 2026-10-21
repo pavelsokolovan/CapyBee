@@ -21,6 +21,7 @@ public final class SessionTypes {
     public enum RunStatus { PREPARING, ACTIVE, ENDED, FAILED }
     public enum CommandState { IN_PROGRESS, DONE, FAILED }
     public enum Outcome { APPLIED, REJECTED, REPLAYED, PROCESSING }
+    public enum SceneSource { NONE, PREFETCHED, JOINED_PREFETCH, INLINE_GENERATED, INLINE_REPAIRED, FALLBACK }
     public enum ErrorCode {
         REQUEST_INVALID, GAME_DISABLED, PAYLOAD_TOO_LARGE, INTERNAL_ERROR, SERVICE_UNAVAILABLE,
         RATE_LIMITED, RUN_NOT_FOUND, RUN_ALREADY_ACTIVE, RUN_BUSY, RUN_NOT_ACTIVE,
@@ -77,13 +78,23 @@ public final class SessionTypes {
 
     public record LoggedCommand(byte[] payloadMac, CommandState state, Boolean accepted,
                                 long revisionBefore, Long revisionAfter, List<Event> events,
-                                String failureCode) {
+                                String failureCode, Long latencyMillis, SceneSource sceneSource) {
+        public LoggedCommand(byte[] payloadMac, CommandState state, Boolean accepted,
+                             long revisionBefore, Long revisionAfter, List<Event> events,
+                             String failureCode) {
+            this(payloadMac, state, accepted, revisionBefore, revisionAfter, events,
+                    failureCode, null, null);
+        }
         public LoggedCommand {
             payloadMac = payloadMac.clone();
             events = List.copyOf(events);
         }
         @Override public byte[] payloadMac() { return payloadMac.clone(); }
     }
+
+    public record CommandSummary(UUID commandId, CommandState state, Boolean accepted,
+                                 long revisionBefore, Long revisionAfter, Long latencyMillis,
+                                 SceneSource sceneSource) {}
 
     public record OutboxEvent(UUID runId, long seq, UUID commandId, long revision,
                               Event event, Instant createdAt) {}
@@ -96,14 +107,31 @@ public final class SessionTypes {
         }
     }
 
-    public record Diagnostics(UUID runId, long revision, int generationCalls,
-                              int runCallCeiling, List<String> readyPrefetch,
-                              List<String> inFlightPrefetch) {
+    public record Diagnostics(UUID runId, long revision, int generationCalls, int runCallCeiling,
+                              PrefetchDiagnostics prefetch, List<CommandDiagnostics> recentCommands,
+                              List<StageDiagnostics> stages, BudgetDiagnostics budget) {
         public Diagnostics {
-            readyPrefetch = List.copyOf(readyPrefetch);
-            inFlightPrefetch = List.copyOf(inFlightPrefetch);
+            recentCommands = List.copyOf(recentCommands);
+            stages = List.copyOf(stages);
         }
     }
+
+    public record PrefetchDiagnostics(List<String> ready, List<String> inFlight, int prefetchCalls,
+                                      int hits, int misses, int wastedCalls) {
+        public PrefetchDiagnostics {
+            ready = List.copyOf(ready);
+            inFlight = List.copyOf(inFlight);
+        }
+    }
+
+    public record CommandDiagnostics(long revisionAfter, long latencyMillis, SceneSource sceneSource) {}
+
+    public record StageDiagnostics(String stage, String outcome, int providerCalls, long elapsedMillis,
+                                   String failureCode, int inputTokens, int outputTokens) {}
+
+    public record BudgetDiagnostics(int profileCallsLeftToday, int globalCallsLeftToday) {}
+
+    public record DayUsage(int reservedCalls, long inputTokens, long outputTokens, int prefetchCalls) {}
 
     public record PrefetchedArtifact(String sceneId, long basedOnRevision,
                                      GenerationArtifact artifact) {}

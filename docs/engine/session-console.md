@@ -10,6 +10,11 @@ Useful session options are `--run <uuid>`, `--new`, `--debug`, `--prefetch on|of
 for generated runs and off otherwise. `--calls-per-day` applies to both local profile
 and global limits, so `0` is useful for rehearsing fallback scenes.
 
+With `--debug`, each diagnostics line reports the most recent scene source and latency,
+run calls, prefetch ready/in-flight counts, prefetch calls/hits/misses/wasted upper bound,
+and remaining profile/global budgets. Player generation and prefetch have separate
+concurrency limits; peak provider concurrency is their sum (defaults: 2 + 1).
+
 Inside a session, use `/text <words>`, `/move <placeId>`, `/status`,
 `/events [afterSeq]`, `/debug on|off`, `/abandon`, `/quit` (or `/q`), and `?` or
 `/help`. Unknown slash commands are never submitted as player text; use `/text` for

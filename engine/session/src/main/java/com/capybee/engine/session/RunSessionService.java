@@ -10,6 +10,8 @@ import com.capybee.engine.api.RunState;
 import com.capybee.engine.api.StartResult;
 import com.capybee.engine.api.StepResult;
 import com.capybee.engine.generation.GenerationArtifact;
+import com.capybee.engine.generation.GenerationCatalog;
+import com.capybee.engine.generation.GenerationExecutionSummary;
 import com.capybee.engine.pack.Pack;
 import com.capybee.engine.pack.PackFeature;
 import com.capybee.engine.pack.PackId;
@@ -29,6 +31,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
@@ -61,15 +64,50 @@ public final class RunSessionService {
     private final Transaction transaction;
     private final Executor workers;
     private final byte[] commandMacKey;
+    private final SessionPorts.GenerationLedger ledger;
+    private final SessionPorts.OwnerScopes ownerScopes;
+    private final SingleFlightRegistry singleFlight;
     private final Semaphore generationSlots;
+    private final Semaphore prefetchSlots;
     private final Map<UUID, CompletableFuture<Void>> startJobs = new ConcurrentHashMap<>();
     private final Map<String, CompletableFuture<GenerationArtifact>> prefetchJobs = new ConcurrentHashMap<>();
     private final Map<String, CompletableFuture<CommandOutcome>> commandJobs = new ConcurrentHashMap<>();
+    private final Map<UUID, List<StageDiagnostics>> lastStages = new ConcurrentHashMap<>();
 
     public RunSessionService(PackCatalog packs, RunRepository runs, CommandLog commands,
                              EventOutbox outbox, PrefetchStore prefetch, EngineFactory engines,
                              SessionClock clock, SessionLimits limits, Transaction transaction,
                              Executor workers, byte[] commandMacKey) {
+                    this(packs, runs, commands, outbox, prefetch, engines, clock, limits, transaction, workers,
+                        commandMacKey, runs instanceof SessionPorts.GenerationLedger generationLedger
+                            ? generationLedger : null,
+                        owner -> new LedgerScope("profile:" + owner.value(), limits.profileCallsPerDay()),
+                        new SingleFlightRegistry());
+                    }
+
+                    public RunSessionService(PackCatalog packs, RunRepository runs, CommandLog commands,
+                                 EventOutbox outbox, PrefetchStore prefetch, EngineFactory engines,
+                                 SessionClock clock, SessionLimits limits, Transaction transaction,
+                                 Executor workers, byte[] commandMacKey, SessionPorts.OwnerScopes ownerScopes) {
+                        this(packs, runs, commands, outbox, prefetch, engines, clock, limits, transaction, workers,
+                            commandMacKey, runs instanceof SessionPorts.GenerationLedger generationLedger
+                                ? generationLedger : null, ownerScopes, new SingleFlightRegistry());
+                        }
+
+                        public RunSessionService(PackCatalog packs, RunRepository runs, CommandLog commands,
+                                     EventOutbox outbox, PrefetchStore prefetch, EngineFactory engines,
+                                     SessionClock clock, SessionLimits limits, Transaction transaction,
+                                     Executor workers, byte[] commandMacKey, SessionPorts.GenerationLedger ledger,
+                                     SessionPorts.OwnerScopes ownerScopes) {
+                            this(packs, runs, commands, outbox, prefetch, engines, clock, limits, transaction, workers,
+                                commandMacKey, ledger, ownerScopes, new SingleFlightRegistry());
+                            }
+
+                            public RunSessionService(PackCatalog packs, RunRepository runs, CommandLog commands,
+                                         EventOutbox outbox, PrefetchStore prefetch, EngineFactory engines,
+                                         SessionClock clock, SessionLimits limits, Transaction transaction,
+                                         Executor workers, byte[] commandMacKey, SessionPorts.GenerationLedger ledger,
+                                         SessionPorts.OwnerScopes ownerScopes, SingleFlightRegistry singleFlight) {
         this.packs = packs;
         this.runs = runs;
         this.commands = commands;
@@ -81,7 +119,11 @@ public final class RunSessionService {
         this.transaction = transaction;
         this.workers = workers;
         this.commandMacKey = commandMacKey.clone();
+        this.ledger = ledger;
+        this.ownerScopes = ownerScopes;
+        this.singleFlight = singleFlight;
         this.generationSlots = new Semaphore(limits.maxConcurrentGeneration());
+        this.prefetchSlots = new Semaphore(limits.prefetchMaxConcurrent());
     }
 
     public StartAccepted start(OwnerRef owner, StartRequest request) {
@@ -197,7 +239,7 @@ public final class RunSessionService {
         CompletableFuture<CommandOutcome> raced = commandJobs.putIfAbsent(key, job);
         if (raced != null) return waitForCommand(raced, request.id(), syncWait, stored);
         try {
-            workers.execute(() -> processCommand(owner, runId, request, job, syncWait));
+            workers.execute(() -> processCommand(owner, runId, request, job));
         } catch (RuntimeException failure) {
             commandJobs.remove(key, job);
             commands.fail(runId, request.id(), "GENERATION_BUSY");
@@ -226,6 +268,7 @@ public final class RunSessionService {
     public void delete(OwnerRef owner, UUID runId) {
         requireRun(owner, runId);
         runs.delete(runId, owner);
+        lastStages.remove(runId);
         String prefix = runId + ":";
         prefetchJobs.entrySet().removeIf(entry -> entry.getKey().startsWith(prefix));
     }
@@ -248,35 +291,38 @@ public final class RunSessionService {
                     .resume(mergePrefetched(stored.snapshot(), prefetch.load(runId)));
             if (!resumed.ok()) return;
             Run run = resumed.run();
-            for (String sceneId : run.prefetchCandidates().stream().limit(3).toList()) {
+            for (String sceneId : run.prefetchCandidates().stream().limit(limits.prefetchMaxFanout()).toList()) {
                 String key = runId + ":" + sceneId;
+                if (!prefetchSlots.tryAcquire()) break;
                 CompletableFuture<GenerationArtifact> future = new CompletableFuture<>();
-                if (prefetchJobs.putIfAbsent(key, future) != null) continue;
+                if (prefetchJobs.putIfAbsent(key, future) != null) {
+                    prefetchSlots.release();
+                    continue;
+                }
                 try {
                     workers.execute(() -> {
                         try {
-                            if (!generationSlots.tryAcquire()) {
-                                future.completeExceptionally(new IllegalStateException("GENERATION_BUSY"));
-                                return;
-                            }
-                            try {
-                                GenerationArtifact artifact = run.prefetch(sceneId).orElse(null);
-                                if (artifact != null && artifact.outcome() != GenerationArtifact.Outcome.FALLBACK) {
-                                    prefetch.insertIfAbsent(runId, sceneId, stored.revision(), artifact);
+                            GenerationArtifact artifact = run.prefetch(sceneId).orElse(null);
+                            if (artifact != null && artifact.outcome() != GenerationArtifact.Outcome.FALLBACK
+                                    && prefetch.insertIfAbsent(runId, sceneId, stored.revision(), artifact)) {
+                                StoredRun current = runs.find(runId, owner).orElse(null);
+                                if (current != null && current.snapshot() != null
+                                        && visitedGeneratedScenes(current.snapshot()).contains(sceneId)) {
+                                    prefetch.deleteForScenes(runId, List.of(sceneId));
                                 }
-                                future.complete(artifact);
-                            } finally {
-                                generationSlots.release();
                             }
+                            future.complete(artifact);
                         } catch (RuntimeException failure) {
                             future.completeExceptionally(failure);
                         } finally {
                             prefetchJobs.remove(key, future);
+                            prefetchSlots.release();
                         }
                     });
                 } catch (RuntimeException rejected) {
                     prefetchJobs.remove(key, future);
                     future.completeExceptionally(rejected);
+                    prefetchSlots.release();
                 }
             }
         } catch (RuntimeException ignored) {
@@ -291,11 +337,34 @@ public final class RunSessionService {
         List<String> inFlight = prefetchJobs.keySet().stream()
                 .filter(key -> key.startsWith(runId + ":"))
                 .map(key -> key.substring((runId + ":").length())).sorted().toList();
-        int calls = stored.snapshot() == null ? 0 : resume(owner, stored.snapshot()).run()
-                .generationSummary().map(summary -> summary.totalProviderCalls()).orElse(0);
-        return new Diagnostics(runId, stored.revision(), calls, limits.runCalls(),
-                ready.stream().sorted().toList(), inFlight);
+        List<CommandSummary> allCommands = commands.list(runId);
+        int hits = (int) allCommands.stream().filter(command -> command.sceneSource() == SceneSource.PREFETCHED
+            || command.sceneSource() == SceneSource.JOINED_PREFETCH).count();
+        int misses = (int) allCommands.stream().filter(command -> command.sceneSource() == SceneSource.INLINE_GENERATED
+            || command.sceneSource() == SceneSource.INLINE_REPAIRED
+            || command.sceneSource() == SceneSource.FALLBACK).count();
+        List<CommandDiagnostics> recent = allCommands.stream()
+            .filter(command -> command.state() == CommandState.DONE && command.revisionAfter() != null
+                && command.latencyMillis() != null)
+            .map(command -> new CommandDiagnostics(command.revisionAfter(), command.latencyMillis(),
+                command.sceneSource()))
+            .sorted(Comparator.comparingLong(CommandDiagnostics::revisionAfter).reversed())
+            .limit(10).toList();
+        LedgerScope profile = ownerScopes.profileScope(owner);
+        LedgerScope global = new LedgerScope("global", limits.globalCallsPerDay());
+        LocalDate day = ownerScopes.currentDay(clock.now());
+        int profileLeft = Math.max(0, profile.dailyCallLimit() - dayUsage(profile, day).reservedCalls());
+        int globalLeft = Math.max(0, global.dailyCallLimit() - dayUsage(global, day).reservedCalls());
+        int prefetchCalls = ledger == null ? 0 : ledger.runPrefetchCalls(runId);
+        return new Diagnostics(runId, stored.revision(), stored.generationCalls(), limits.runCalls(),
+            new PrefetchDiagnostics(ready.stream().sorted().toList(), inFlight, prefetchCalls, hits, misses,
+                Math.max(0, prefetchCalls - hits)), recent, lastStages.getOrDefault(runId, List.of()),
+            new BudgetDiagnostics(profileLeft, globalLeft));
     }
+
+        private SessionTypes.DayUsage dayUsage(LedgerScope scope, LocalDate day) {
+            return ledger == null ? new DayUsage(0, 0, 0, 0) : ledger.dayUsage(scope, day);
+        }
 
     private CompletableFuture<Void> scheduleStart(OwnerRef owner, StartRequest request) {
         if (request == null) return CompletableFuture.completedFuture(null);
@@ -374,10 +443,9 @@ public final class RunSessionService {
     }
 
     private void processCommand(OwnerRef owner, UUID runId, CommandRequest request,
-                                CompletableFuture<CommandOutcome> resultFuture, Duration syncWait) {
+                                CompletableFuture<CommandOutcome> resultFuture) {
         Lease lease = null;
         try {
-            awaitInFlightPrefetch(runId, syncWait);
             StoredRun stored = requireRun(owner, runId);
             if (stored.status() != RunStatus.ACTIVE) {
                 throw new SessionException(ErrorCode.RUN_NOT_ACTIVE, Map.of("status", stored.status().name()));
@@ -392,20 +460,31 @@ public final class RunSessionService {
             Lease claimedLease = lease;
             if (!generationSlots.tryAcquire()) throw new SessionException(ErrorCode.GENERATION_BUSY);
             try {
-                RunSnapshot merged = mergePrefetched(stored.snapshot(), prefetch.load(runId));
+                List<PrefetchedArtifact> rowsBeforeApply = prefetch.load(runId);
+                RunSnapshot merged = mergePrefetched(stored.snapshot(), rowsBeforeApply);
                 ResumeResult resumed = engines.create(owner, runId, MeteredTextGenerator.Priority.DEMAND)
                         .resume(merged);
                 if (!resumed.ok() && merged != stored.snapshot()) {
-                    prefetch.deleteForScenes(runId, prefetch.load(runId).stream()
-                            .map(PrefetchedArtifact::sceneId).toList());
+                    prefetch.deleteForScenes(runId, rowsBeforeApply.stream().map(PrefetchedArtifact::sceneId).toList());
+                    rowsBeforeApply = List.of();
                     resumed = engines.create(owner, runId, MeteredTextGenerator.Priority.DEMAND)
                             .resume(stored.snapshot());
                 }
                 if (!resumed.ok()) throw new SessionException(ErrorCode.RUN_UNRECOVERABLE);
                 Run run = resumed.run();
+                singleFlight.consumeJoined();
+                Instant startedAt = clock.now();
                 StepResult step = run.apply(request.command());
+                Instant completedAt = clock.now();
                 RunSnapshot nextSnapshot = step.accepted() ? run.snapshot() : stored.snapshot();
                 long nextRevision = stored.revision() + (step.accepted() ? 1 : 0);
+                Long latencyMillis = step.accepted()
+                    ? Math.max(0, Duration.between(startedAt, completedAt).toMillis()) : null;
+                SceneSource sceneSource = step.accepted()
+                    ? sceneSource(stored.snapshot().state().sceneId(), nextSnapshot, rowsBeforeApply,
+                        singleFlight.consumeJoined())
+                    : null;
+                lastStages.put(runId, stagesOf(run.generationSummary()));
                 transaction.execute(() -> {
                     if (step.accepted() && !runs.saveActive(runId, claimedLease, stored.revision(),
                             nextSnapshot, step.events())) {
@@ -416,7 +495,8 @@ public final class RunSessionService {
                         outbox.append(runId, request.id(), nextRevision, step.events());
                         prefetch.deleteForScenes(runId, visitedGeneratedScenes(nextSnapshot));
                     }
-                    commands.complete(runId, request.id(), step.accepted(), nextRevision, step.events());
+                        commands.complete(runId, request.id(), step.accepted(), nextRevision, step.events(),
+                            latencyMillis, sceneSource);
                 });
                 runs.releaseLease(runId, claimedLease);
                 StoredRun current = requireRun(owner, runId);
@@ -454,30 +534,6 @@ public final class RunSessionService {
             }
         } finally {
             commandJobs.remove(commandKey(runId, request.id()), resultFuture);
-        }
-    }
-
-    private void awaitInFlightPrefetch(UUID runId, Duration syncWait) {
-        if (syncWait == null || syncWait.isZero() || syncWait.isNegative()) return;
-        Duration boundedWait = syncWait.compareTo(Duration.ofSeconds(20)) > 0
-                ? Duration.ofSeconds(20) : syncWait;
-        long deadline = System.nanoTime() + boundedWait.toNanos();
-        String prefix = runId + ":";
-        for (Map.Entry<String, CompletableFuture<GenerationArtifact>> entry
-                : List.copyOf(prefetchJobs.entrySet())) {
-            if (!entry.getKey().startsWith(prefix)) continue;
-            long remaining = deadline - System.nanoTime();
-            if (remaining <= 0) return;
-            try {
-                entry.getValue().get(remaining, TimeUnit.NANOSECONDS);
-            } catch (TimeoutException timeout) {
-                return;
-            } catch (InterruptedException interrupted) {
-                Thread.currentThread().interrupt();
-                return;
-            } catch (java.util.concurrent.ExecutionException ignored) {
-                // A failed speculative request is retried on demand.
-            }
         }
     }
 
@@ -564,6 +620,33 @@ public final class RunSessionService {
                 snapshot.locale(), snapshot.seed(), snapshot.startInputs(), snapshot.createdAt(),
                 snapshot.updatedAt(), snapshot.step(), merged);
     }
+
+            static SceneSource sceneSource(String previousScene, RunSnapshot next,
+                           List<PrefetchedArtifact> rowsBeforeApply, boolean joined) {
+            if (next == null || next.state().sceneId() == null
+                || next.state().sceneId().equals(previousScene)) return SceneSource.NONE;
+            String entered = next.state().sceneId();
+            GenerationArtifact artifact = next.state().generationArtifacts().stream()
+                .filter(item -> item.stage() == GenerationCatalog.Stage.SCENE)
+                .filter(item -> item.payload() instanceof GenerationArtifact.ScenePayload payload
+                    && payload.sceneId().equals(entered))
+                .findFirst().orElse(null);
+            if (artifact == null) return SceneSource.NONE;
+            if (rowsBeforeApply.stream().anyMatch(row -> row.sceneId().equals(entered))) return SceneSource.PREFETCHED;
+            if (artifact.outcome() == GenerationArtifact.Outcome.FALLBACK) return SceneSource.FALLBACK;
+            if (artifact.outcome() == GenerationArtifact.Outcome.REPAIRED) return SceneSource.INLINE_REPAIRED;
+            return joined ? SceneSource.JOINED_PREFETCH : SceneSource.INLINE_GENERATED;
+            }
+
+            private List<StageDiagnostics> stagesOf(java.util.Optional<GenerationExecutionSummary> summary) {
+            if (summary.isEmpty()) return List.of();
+            return summary.get().stages().stream().filter(stage -> stage.providerCalls() > 0)
+                .map(stage -> new StageDiagnostics(stage.stage().name(), stage.outcome().name(),
+                    stage.providerCalls(), stage.elapsedMillis(), stage.failureCode(),
+                    stage.usage() == null ? 0 : Math.toIntExact(stage.usage().inputTokens()),
+                    stage.usage() == null ? 0 : Math.toIntExact(stage.usage().outputTokens())))
+                .toList();
+            }
 
     private List<String> visitedGeneratedScenes(RunSnapshot snapshot) {
         return snapshot.state().generationArtifacts().stream()

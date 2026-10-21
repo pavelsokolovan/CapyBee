@@ -255,7 +255,7 @@ Implementation sketch: candidates come from `scene(sceneId)` (`options[].next`, 
 |---|---|
 | `com.capybee.engine.session` | `RunSessionService`, ports (§7.1), `MeteredTextGenerator`, limits/config records |
 | `…session.wire` | `RunSummaryDto`, `CommandRequestDto`, `CommandOutcomeDto`, `PackInfoDto`, `ErrorDto`, `SessionJson` (Jackson 3 codec). The HTTP controllers return these same records. |
-| `…session.adapter` | Public in-memory implementations of every port, plus `FileRunRepository` (one JSON file per run) for console use |
+| `…session.adapter` | In-memory implementations of every port and `LocalSessionStore` (one versioned JSON document) for console use |
 
 ---
 
@@ -411,17 +411,17 @@ Scoped `@RestControllerAdvice` for `com.capybee.server.game` only; body `{ "erro
 {
   "runId": "…", "revision": 7,
   "generationCalls": 9, "runCallCeiling": 24,
-  "prefetch": { "inFlight": ["meeting"], "ready": ["finale"], "hits": 3, "misses": 1, "wastedCalls": 2 },
+  "prefetch": { "inFlight": ["meeting"], "ready": ["finale"], "prefetchCalls": 4, "hits": 3, "misses": 1, "wastedCalls": 1 },
   "recentCommands": [
-    { "revisionAfter": 7, "latencyMs": 180, "sceneSource": "PREFETCHED" },
-    { "revisionAfter": 6, "latencyMs": 9400, "sceneSource": "INLINE_GENERATED" }
+    { "revisionAfter": 7, "latencyMillis": 180, "sceneSource": "PREFETCHED" },
+    { "revisionAfter": 6, "latencyMillis": 9400, "sceneSource": "JOINED_PREFETCH" }
   ],
-  "stages": [ { "stage": "SCENE", "outcome": "GENERATED", "calls": 1, "elapsedMs": 4120, "failureCode": null, "usage": {…} } ],
+  "stages": [ { "stage": "SCENE", "outcome": "GENERATED", "providerCalls": 1, "elapsedMillis": 4120, "failureCode": null, "inputTokens": 800, "outputTokens": 100 } ],
   "budget": { "profileCallsLeftToday": 31, "globalCallsLeftToday": 1288 }
 }
 ```
 
-`sceneSource` is one of `NONE` (no scene resolution), `PREFETCHED`, `INLINE_GENERATED`, `INLINE_REPAIRED`, `FALLBACK`. It is the measurement used to decide whether prefetch is paying off.
+`sceneSource` is one of `NONE` (no scene resolution), `PREFETCHED`, `JOINED_PREFETCH`, `INLINE_GENERATED`, `INLINE_REPAIRED`, `FALLBACK`. Per-run `prefetchCalls` counts granted reservations even when the provider returns no usage or throws. `wastedCalls = max(0, prefetchCalls - hits)` is an upper bound because a repaired scene can consume two provider calls for one scene. `generationCalls` comes from the run reservation ledger, and stage details are in memory from the last command only.
 
 ---
 
@@ -499,9 +499,9 @@ RETURNING calls;
 5. If the resulting artifact has `outcome = FALLBACK`, **discard it** (a transient error must not permanently replace the story with fallback text; the demand path will try again when the player gets there). Otherwise `insertIfAbsent` into `game_run_prefetch`.
 6. Throw the throwaway `Run` away. The job never writes `game_runs`.
 
-**In-flight registry:** an in-memory map `(runId, sceneId) → future` on the host. A command that needs a scene being prefetched waits for that future (bounded by `syncWait`) instead of making a second provider call. It is per-machine; if the app is ever scaled to several machines, the worst case is one duplicate provider call, still bounded by the ledger.
+**In-flight registry:** an in-memory map `(runId, sceneId) → future` wraps the metered generator. A command that needs a scene being prefetched joins that future; the join is counted as neither a second reservation nor a second provider call. Commands for unrelated scenes never wait. It is per-process; if the app is ever scaled to several machines, the worst case is one duplicate provider call, still bounded by the ledger. A narrow race between provider return and prefetch-row insertion can also produce one extra counted call.
 
-**Budget protection:** prefetch is refused when `profileCallsLeftToday <= prefetch.profile-reserve` (default 8), when `globalCallsLeftToday <= prefetch.global-reserve` (default 100), or when the run has `<= prefetch.run-reserve` (default 4) calls left before `run-calls`. Prefetch also runs under its own concurrency limit (`prefetch.max-concurrent`, default 1 of `max-concurrent-generation` 2), so a tap can always get a permit.
+**Budget protection:** prefetch is refused when `profileCallsLeftToday <= prefetch.profile-reserve` (default 8), when `globalCallsLeftToday <= prefetch.global-reserve` (default 100), or when the run has `<= prefetch.run-reserve` (default 4) calls left before `run-calls`. Reserves larger than a cap are allowed and effectively disable prefetch at that scope. Prefetch also runs under its own concurrency limit (`prefetch.max-concurrent`, default 1), independent of player generation slots. Peak provider concurrency is `max-concurrent-generation + prefetch.max-concurrent` (default 3).
 
 **Cost model:** a run costs roughly (visited generated scenes + sibling scenes that were prefetched but never visited). Wasted calls are counted in `game_generation_usage.prefetch_calls` and reported by diagnostics, so the cost of Option B is visible from the first test session.
 
@@ -663,7 +663,7 @@ Free text: persisted only in `pending_start` during `PREPARING`; never in `snaps
 
 **Scope:** the console runs on your own computer only. It never connects to Fly or any server and needs no sign-in, database or network (except to the LLM provider when you choose real generation).
 
-**How it works:** the console calls `RunSessionService` in-process with the public in-memory adapters (or `FileRunRepository` with `--store-dir`). It therefore follows the same lifecycle rules as the web app: run ids, revisions, idempotent commands, metering, ledger caps and prefetch. Only the storage differs (memory/files instead of Postgres).
+**How it works:** the console calls `RunSessionService` in-process with the public in-memory adapters (or `LocalSessionStore` with `--store-dir`). It therefore follows the same lifecycle rules as the web app: run ids, revisions, idempotent commands, metering, ledger caps and prefetch. Only the storage differs (memory/files instead of Postgres).
 
 The existing authored/`--generated` console path (`ConsoleApp` using `Engine` directly, `--save/--load`) stays unchanged and provider-free by default (26.1 guarantee). Session mode is new and additive.
 
@@ -758,7 +758,7 @@ One scripted scenario set (start → choices → free text → move → abandon;
 1. Create `engine-session` module with ports, in-memory fakes, `RunSessionService`, `MeteredTextGenerator`; tests 1–12.
 2. Wire `engine-session` into the reactor and CI; keep `mvn -f engine/pom.xml clean verify` green.
 2a. Engine-core additions `Run.prefetchCandidates()` / `Run.prefetch()` (§7.4) with tests 21–22; then host-side prefetch (job, in-flight registry, `PrefetchStore`, reserves, `ensurePrefetch`) with tests 23–27.
-2b. `wire` DTOs + `SessionJson`, public in-memory adapters, `FileRunRepository`; console `--session` mode (flags in §14.1); tests 28–33. The console can be used for manual testing as soon as 2b is done, before any web work.
+2b. `wire` DTOs + `SessionJson`, public in-memory adapters, `LocalSessionStore`; console `--session` mode (flags in §14.1); tests 28–33. The console can be used for manual testing as soon as 2b is done, before any web work.
 3. Flyway `V12`, JDBC adapters (`RunRepository`, `CommandLog`, `GenerationLedger`, `EventOutbox`), `@RestControllerAdvice`, controllers behind `capybee.game.enabled`; tests 13–17.
 4. Dockerfile/CI changes (§14); verify the image boots with the feature flag off and on.
 5. Client: API types + `syncEngine`/`queueStore` changes (§12) and tests 18–20, **without** game screens (those are spec 28). Add a minimal dev-only debug page or Postman collection to drive the API by hand.

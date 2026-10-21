@@ -241,7 +241,8 @@ public final class GenerationPipeline {
                 try {
                     response = generator.generate(new StructuredGenerationRequest(ids.nextId(), "GEN_" + stage.name(),
                             "generation-v1", instructions, requestData, outputSchema,
-                            catalog.limits().maxOutputTokens(), StructuredGenerationRequest.CostClass.STANDARD));
+                            catalog.limits().maxOutputTokens(), StructuredGenerationRequest.CostClass.STANDARD,
+                            slot == null ? null : slot.slotId()));
                 } catch (TextGenerationException exception) {
                     failureCode = providerCode(exception.code());
                     break;

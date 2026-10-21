@@ -14,12 +14,13 @@ public class DatabaseConfig {
     @Bean
     @Primary
     public DataSource dataSource(
-        @Value("${SPRING_DATASOURCE_URL:${DATABASE_URL:jdbc:postgresql://localhost:5432/capybee}}") String primaryUrl,
-        @Value("${SPRING_DATASOURCE_USERNAME:${DB_USERNAME:capybee}}") String username,
-        @Value("${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD:capybee}}") String password
+        @Value("${spring.datasource.url:jdbc:postgresql://localhost:5432/capybee}") String primaryUrl,
+        @Value("${spring.datasource.username:capybee}") String username,
+        @Value("${spring.datasource.password:capybee}") String password,
+        @Value("${spring.datasource.driver-class-name:org.postgresql.Driver}") String driverClassName
     ) {
         HikariDataSource dataSource = new HikariDataSource();
-        dataSource.setDriverClassName("org.postgresql.Driver");
+        dataSource.setDriverClassName(driverClassName);
         dataSource.setJdbcUrl(DatabaseUrlNormalizer.normalize(primaryUrl));
         dataSource.setUsername(username);
         dataSource.setPassword(password);

@@ -43,6 +43,8 @@ class GenerationPipelineTest {
         var cached = pipeline.resolveScene("opening-slot");
 
         assertThat(fake.requests).hasSize(4);
+        assertThat(fake.requests).extracting(StructuredGenerationRequest::slotKey)
+            .containsExactly(null, null, null, "opening-slot");
         assertThat(initial.initialScene().scene().blocks().getFirst().text())
             .isEqualTo("An Open Door\nThe observatory door opens.");
         assertThat(initial.initialScene().scene().options()).extracting(option -> option.id())
@@ -51,6 +53,17 @@ class GenerationPipelineTest {
         assertThat(initial.artifacts()).extracting(artifact -> artifact.outcome())
                 .containsOnly(Outcome.GENERATED);
     }
+
+            @Test
+            void validatesOptionalSceneSlotKeys() {
+            assertThatThrownBy(() -> requestWithSlotKey(" "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Generation slot key is invalid");
+            assertThatThrownBy(() -> requestWithSlotKey("x".repeat(201)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Generation slot key is invalid");
+            assertThat(requestWithSlotKey("meeting-slot").slotKey()).isEqualTo("meeting-slot");
+            }
 
     @Test
     void scenarioOutputAcceptsNarrativeBeatOutline() {
@@ -194,6 +207,11 @@ class GenerationPipelineTest {
     private GenerationPipeline pipeline(Pack pack, TextGenerator generator) {
         return new GenerationPipeline(pack, new LocaleTag("en"), generator,
                 new SequentialIdSource("generation-test"), CLOCK);
+    }
+
+    private StructuredGenerationRequest requestWithSlotKey(String slotKey) {
+        return new StructuredGenerationRequest("request", "GEN_SCENE", "policy", "instructions", "{}",
+                "{}", 100, StructuredGenerationRequest.CostClass.STANDARD, slotKey);
     }
 
     private Pack loadPack() {

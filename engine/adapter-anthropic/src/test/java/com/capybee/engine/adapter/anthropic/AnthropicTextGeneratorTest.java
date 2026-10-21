@@ -62,6 +62,26 @@ class AnthropicTextGeneratorTest {
     }
 
     @Test
+    void sceneSlotKeyDoesNotChangeProviderPayloadBytes() throws IOException {
+        AtomicReference<byte[]> withoutSlotKey = new AtomicReference<>();
+        AtomicReference<byte[]> withSlotKey = new AtomicReference<>();
+        withServer(exchange -> {
+            withoutSlotKey.set(exchange.getRequestBody().readAllBytes());
+            respond(exchange, 200, RESPONSE);
+        }, endpoint -> new AnthropicTextGenerator(config(endpoint)).generate(request()));
+        withServer(exchange -> {
+            withSlotKey.set(exchange.getRequestBody().readAllBytes());
+            respond(exchange, 200, RESPONSE);
+        }, endpoint -> new AnthropicTextGenerator(config(endpoint)).generate(new StructuredGenerationRequest(
+                "non-identifying-request", "INPUT_RESOLUTION", "policy-v1", "Fixed safe instructions",
+                "{\"text\":\"safe sentinel-free text\"}",
+                "{\"type\":\"object\",\"additionalProperties\":false,\"properties\":{\"resolution\":{\"type\":\"string\"}},\"required\":[\"resolution\"]}",
+                400, StructuredGenerationRequest.CostClass.LIGHT, "scene-slot")));
+
+        assertThat(withSlotKey.get()).isEqualTo(withoutSlotKey.get());
+    }
+
+    @Test
     void ignoresThinkingBlocksBeforeReturningTextOutput() throws IOException {
         String withThinking = """
                 {"type":"message","model":"test-pinned-model","stop_reason":"end_turn",
