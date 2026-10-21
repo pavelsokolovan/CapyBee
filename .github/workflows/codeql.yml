@@ -42,8 +42,7 @@ jobs:
 
       - name: Build Java (Maven)
         if: matrix.language == 'java'
-        working-directory: app/server
-        run: mvn -B clean package -DskipTests
+        run: mvn -B -f app/pom.xml -pl server -am clean package -DskipTests
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4

@@ -8,7 +8,7 @@ visualized on a growing honeycomb progress map.
 
 ## Repository Layout
 
-- `engine` - standalone, universal Java game-engine SDK; no Spring or app dependency
+- `app/engine` - standalone, universal Java game-engine SDK; no Spring or app dependency
 - `app/server` - Spring Boot backend, security, persistence, and API endpoints
 - `app/ui` - React frontend, landing page, and app shell
 - `docs` - concept notes and implementation specifications
@@ -47,14 +47,16 @@ The project is scaffolded as a mono-repo, so the backend and frontend can be dev
 
 ### Standalone engine
 
-Run `mvn -f engine/pom.xml clean verify` from the repo root to build and test
-the SDK without PostgreSQL, Spring, OAuth, or the UI. Open `engine/` alone in
-an IDE for independent development. See [engine/README.md](engine/README.md)
+Run `mvn -f app/engine/pom.xml clean verify` from the repo root to build and test
+the SDK without PostgreSQL, Spring, OAuth, or the UI. Open `app/engine/` alone in
+an IDE for independent development. See [app/engine/README.md](app/engine/README.md)
 for the pack API and console-first roadmap.
 
-The root Maven POM aggregates `engine` and `app/server`: `mvn verify` verifies
-both. Existing backend-only builds and Docker deployment remain unchanged;
-the app does not consume the SDK until the web-host integration spec.
+The Maven aggregator is [`app/pom.xml`](app/pom.xml). Run
+`mvn -f app/pom.xml verify` from the repository root to verify both
+`app/engine` and `app/server`. To build only the backend and its reactor
+dependencies, run `mvn -f app/pom.xml -pl server -am verify`. The backend
+consumes the engine SDK through Maven.
 
 ### Suggested workflow
 
@@ -95,4 +97,3 @@ You can also run the same actions from VS Code tasks:
 - `fly.toml` expects the app to listen on port `8080`.
 - `Dockerfile` builds the UI first, then packages the backend with the static assets.
 - Set `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`, `GOOGLE_CLIENT_ID`, and `GOOGLE_CLIENT_SECRET` as Fly secrets.
-

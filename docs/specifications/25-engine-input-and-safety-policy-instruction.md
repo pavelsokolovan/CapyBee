@@ -16,7 +16,7 @@ The engine is for general use. It must not contain CapyBee, honeycomb, friendshi
 
 ## Repository baseline and source confidence
 
-The public repository README confirms a standalone Java engine under `engine/`, separate from `app/server` and `app/ui`; it describes the SDK as independent of Spring and says the app does not consume it until the later web-host integration spec. See the [repository README](https://github.com/pavelsokolovan/CapyBee/blob/main/README.md).
+The public repository README confirms a standalone Java engine under `app/engine/`, separate from `app/server` and `app/ui`; it describes the SDK as independent of Spring and says the app does not consume it until the later web-host integration spec. See the [repository README](https://github.com/pavelsokolovan/CapyBee/blob/main/README.md).
 
 The earlier specification artifacts available for this task describe the public shape used here: `Engine` / `Run` / `Command` / `StepResult`, `Command.SubmitText(String text)` reserved for input support, `View.input`, `InputSpec` modes `NONE`, `CHOICE`, `TEXT`, `CHOICE_OR_TEXT`, pack `contentPolicy` (`freeTextAllowed`, optional `audience`, optional `forbiddenTags`), `RunRequest.startInputs`, and `RunSnapshot.startInputs`. Treat the actual current implementation of specs 22, 23, 24 and 24.1 as the source of truth for those existing features; this document must not reassign their ownership or duplicate their schema.
 
@@ -56,7 +56,7 @@ The earlier specification artifacts available for this task describe the public 
 7. **Pack policy can tighten, never loosen, global policy.** `freeTextAllowed: false` disables free text. A pack's `audience` and `forbiddenTags` add constraints; no pack field may disable PII scrubbing, bypass moderation, retain raw text, or enable content prohibited by the host's global policy.
 8. **Untrusted text is data, not instructions.** It must be passed to interpretation as a clearly delimited user-data field. It cannot override system/developer policy, request tools, change model roles, or expand the allowed action set.
 9. **No content in operational diagnostics.** Diagnostics may report decision codes and bounded metadata, but never input or generated reply content, prompts, payloads, content hashes, or excerpts.
-10. **No network or framework dependency in `engine/core`.** The core defines contracts and deterministic helpers only. Network/provider implementations live behind adapters and are added by the generation/host specs.
+10. **No network or framework dependency in `app/engine/core`.** The core defines contracts and deterministic helpers only. Network/provider implementations live behind adapters and are added by the generation/host specs.
 11. **Rejected input changes nothing.** The current scene, run-state maps, place position, visited lists, objective state, events, outcome, and logical step remain unchanged after a rejected command or an unavailable guard/interpreter.
 12. **Universal and locale-agnostic.** Use generic policy categories and resolved pack text. Avoid hard-coded Polish/English safety messages in core.
 
@@ -220,7 +220,7 @@ public record InputSafetyDecision(
 
 The exact type names may follow existing package conventions, but do not include input text in the decision object. `reasonCode` must be a closed, non-user-controlled code. `category` is optional/closed and contains only broad categories, not detailed content or quotes.
 
-Do not put provider SDKs, HTTP clients, Spring types, JSON library nodes, or provider/model names in `engine/core`. A remote moderation adapter, when added, belongs outside the pure core and may be wired in spec 26 or the host integration spec.
+Do not put provider SDKs, HTTP clients, Spring types, JSON library nodes, or provider/model names in `app/engine/core`. A remote moderation adapter, when added, belongs outside the pure core and may be wired in spec 26 or the host integration spec.
 
 ### 7.2 Closed categories
 
@@ -407,10 +407,10 @@ Issue message rules:
 
 ## 12. Suggested package/API placement
 
-Adapt to the actual `engine/core` tree rather than forcing the layout if the existing input package already exists. Keep domain types free of JSON-library classes and framework dependencies.
+Adapt to the actual `app/engine/core` tree rather than forcing the layout if the existing input package already exists. Keep domain types free of JSON-library classes and framework dependencies.
 
 ```text
-engine/core/src/main/java/com/capybee/engine/
+app/engine/core/src/main/java/com/capybee/engine/
   input/
     InputPolicy.java
     SafeTextInput.java
@@ -492,7 +492,7 @@ Do not change rules/state/Places semantics or upgrade fixture pack versions for 
 17. Legacy snapshot with a free-text value is sanitized/omitted at the correct boundary before it is re-saved; no log or exception leaks the legacy value.
 18. Events and metrics never contain raw/scrubbed text, text hash, prompt, or provider payload.
 19. Structured logging tests prove synthetic sentinel markers never appear under success or error paths.
-20. No-framework/no-network boundary tests remain green; `engine/core` has no provider SDK or web client dependency.
+20. No-framework/no-network boundary tests remain green; `app/engine/core` has no provider SDK or web client dependency.
 
 ### Integration/golden tests
 
@@ -504,7 +504,7 @@ Do not change rules/state/Places semantics or upgrade fixture pack versions for 
 
 ## 15. Build and implementation boundaries
 
-- Main production changes are in `engine/core`; console user-facing behavior changes belong in `engine/cli`.
+- Main production changes are in `app/engine/core`; console user-facing behavior changes belong in `app/engine/cli`.
 - Do not change `app/server`, app DB migrations, OAuth flow, deployment, or UI in this spec. Record the host obligations for the later web/API integration spec as described above.
 - Do not add Spring, JPA/Hibernate, HTTP clients, cloud SDKs, model SDKs, or logging dependencies that carry bodies into core.
 - Reuse existing `SectionValidator`, `PackValidationContext`, `ReferenceIndex`, issue convention, immutable domain objects, and JSON package boundaries.
@@ -528,8 +528,8 @@ Implementation is complete when all of the following hold:
 - [ ] Free-text start input values are omitted from persistent snapshots and snapshot resume tests pass.
 - [ ] Prompt-injection boundaries and no-content diagnostic tests pass.
 - [ ] Existing specs 22, 23, 24, and 24.1 acceptance tests remain green, including existing console, template, rules/state, and Places behavior where present in the current implementation.
-- [ ] `mvn -f engine/pom.xml clean verify` passes under the repository's supported Java version; record the exact command and runtime version.
-- [ ] Core dependency-boundary tests remain green; no framework, provider SDK, or network dependency enters `engine/core`.
+- [ ] `mvn -f app/engine/pom.xml clean verify` passes under the repository's supported Java version; record the exact command and runtime version.
+- [ ] Core dependency-boundary tests remain green; no framework, provider SDK, or network dependency enters `app/engine/core`.
 - [ ] Every mismatch found between this document and the actual current `main` source has been listed in the implementation PR or commit notes rather than silently ignored.
 
 ## 17. Decisions / assumptions to revisit only if current source or intent contradicts them

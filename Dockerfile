@@ -8,12 +8,12 @@ RUN npm run build
 FROM eclipse-temurin:25-jdk AS server-build
 WORKDIR /workspace
 RUN apt-get update && apt-get install -y --no-install-recommends maven && rm -rf /var/lib/apt/lists/*
-COPY pom.xml pom.xml
-COPY engine/ engine/
+COPY app/pom.xml app/pom.xml
+COPY app/engine/ app/engine/
 COPY app/server/pom.xml app/server/pom.xml
 COPY app/server/src app/server/src
 COPY --from=ui-build /workspace/app/ui/dist app/server/src/main/resources/static
-RUN mvn -B -DskipTests -pl app/server -am package
+RUN mvn -B -f app/pom.xml -DskipTests -pl server -am package
 
 FROM eclipse-temurin:25-jre
 WORKDIR /app

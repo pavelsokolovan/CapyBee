@@ -14,14 +14,14 @@ Spec 22 gave the engine a pack format and a loader. This spec makes the engine
 2. The **authored scene format v1** and a runtime that plays it, so a
    hand-written pack can be played start to finish with no AI (§3, §4).
 3. **Reference adapters** for ids and randomness (§5).
-4. The new **`engine/cli` module**: a console host with a first playable loop,
+4. The new **`app/engine/cli` module**: a console host with a first playable loop,
    scripted input, and save/load (§6).
 
 After this spec, a hand-written pack plays in a terminal:
 
 ```
-java -jar engine/cli/target/engine-cli-0.1.0-SNAPSHOT.jar \
-     --pack-dir engine/fixtures/game-packs/fixture-minimal --locale pl
+java -jar app/engine/cli/target/engine-cli-0.1.0-SNAPSHOT.jar \
+     --pack-dir app/engine/fixtures/game-packs/fixture-minimal --locale pl
 ```
 
 Out of scope: counters, flags, effects, conditions, events raised by content
@@ -35,8 +35,8 @@ assets (30).
 - Spec 22 (this series): `PackLoader`, `PackSource` implementations,
   `SectionValidator`, `ReferenceIndex`, `PackRegistry`, `PackFeature`,
   `LocaleTag`, `PackId`, `PackVersion`, the three fixture packs, and the
-  standalone `engine/` project with module `core`. This spec assumes spec 22 is
-  implemented. At the time of writing the repository has no `engine/` folder,
+  standalone `app/engine/` project with module `core`. This spec assumes spec 22 is
+  implemented. At the time of writing the repository has no `app/engine/` folder,
   so implement 22 first.
 - Spec 22 §1.2 rules apply unchanged: no framework dependency in core, Jackson
   only in `json` folders and under `adapter`, no console I/O in core, no
@@ -63,12 +63,12 @@ assets (30).
   The engine logs ids and issue codes only, never player text, views, or
   commands.
 - **The console is the only code that touches `System.*`**, and within
-  `engine/cli` only `PlayMain` does.
-- No change outside `engine/`, `.github/`, and `docs/`.
+  `app/engine/cli` only `PlayMain` does.
+- No change outside `app/engine/`, `.github/`, and `docs/`.
 
 ## 1. Project changes
 
-Add module `cli` to `engine/pom.xml`:
+Add module `cli` to `app/engine/pom.xml`:
 
 ```xml
 <modules>
@@ -77,7 +77,7 @@ Add module `cli` to `engine/pom.xml`:
 </modules>
 ```
 
-`engine/cli/pom.xml`:
+`app/engine/cli/pom.xml`:
 
 ```xml
 <project xmlns="http://maven.apache.org/POM/4.0.0"
@@ -188,13 +188,13 @@ Add module `cli` to `engine/pom.xml`:
 Notes: verify that `maven-shade-plugin` and `slf4j-nop` versions are managed by
 the Spring Boot parent and BOM; if not, pin current releases. `slf4j-nop` keeps
 the console free of "no SLF4J provider" warnings. The shaded jar is
-`engine/cli/target/engine-cli-0.1.0-SNAPSHOT.jar`. If shading causes trouble,
+`app/engine/cli/target/engine-cli-0.1.0-SNAPSHOT.jar`. If shading causes trouble,
 the IDE run configuration for `PlayMain` is an acceptable fallback.
 
-New packages in `engine/core` (`com.capybee.engine`): `api` (public API),
+New packages in `app/engine/core` (`com.capybee.engine`): `api` (public API),
 `api.json` (snapshot codec), `content` (scene model), `content.json` (scene
 parser and validator), `port` (`IdSource`), `adapter` (reference adapters). In
-`engine/cli`: `com.capybee.engine.cli`.
+`app/engine/cli`: `com.capybee.engine.cli`.
 
 ## 2. Public API
 
@@ -474,7 +474,7 @@ Package `com.capybee.engine.adapter` (the only place nondeterminism may live).
 Time uses the JDK directly: `Clock.systemUTC()` in real use, `Clock.fixed(…)` in
 tests. Run stores and generator test doubles arrive in specs 24 and 27.
 
-## 6. Console host (`engine/cli`)
+## 6. Console host (`app/engine/cli`)
 
 Package `com.capybee.engine.cli`. The console is a host: it uses only the
 public API and the pack loader.
@@ -598,7 +598,7 @@ final class ConsoleChrome { /* constants */ }
 ## 7. Fixtures
 
 Spec 22 defined three fixture packs. This spec adds authored scenes to two of
-them and updates their manifests. Locations: `engine/fixtures/game-packs/<id>/`.
+them and updates their manifests. Locations: `app/engine/fixtures/game-packs/<id>/`.
 
 ### 7.1 `fixture-minimal` (pl)
 
@@ -775,7 +775,7 @@ Unchanged. It declares `GENERATION`, so it loads and validates but
 
 ### 7.4 Golden transcripts
 
-Test resources in `engine/cli/src/test/resources/`:
+Test resources in `app/engine/cli/src/test/resources/`:
 
 - `scripts/minimal-boat.txt`: two lines, `1` and an empty line.
 - `golden/minimal-boat.txt` (expected output of `--pack-dir …/fixture-minimal
@@ -921,7 +921,7 @@ public final class Randoms {
   `EngineBoundaryTest` (B2–B6), JaCoCo 70%.
 - Each core package gets a `package-info.java`. `api`'s states that it is the
   public API and everything else is internal.
-- **`engine/cli` gates:**
+- **`app/engine/cli` gates:**
   - `NoFrameworkOnClasspathTest` (same classes as in core).
   - `CliBoundaryTest`: scans `src/main/java/com/capybee/engine/cli`; theme
     vocabulary (B3) is forbidden, and `System.in`, `System.out`, `System.err`,
@@ -929,7 +929,7 @@ public final class Randoms {
   - JaCoCo 70% on the module. `PlayMain` stays a few lines (it only wires
     `System.*` into `ConsoleApp` and exits), so it needs no exclusion.
 - Extend `.github/instructions/engine.instructions.md` with: "The console host is
-  `engine/cli`. Only `PlayMain` touches `System.*`; `ConsoleApp` takes streams,
+  `app/engine/cli`. Only `PlayMain` touches `System.*`; `ConsoleApp` takes streams,
   clock, ids, and random as constructor arguments so it can be tested."
 - CI is unchanged: `engine-ci.yml` runs `mvn -B verify` for the whole project.
 
@@ -937,7 +937,7 @@ public final class Randoms {
 
 Tests mirror package structure. JUnit 5 and AssertJ only.
 
-**Core (`engine/core`):**
+**Core (`app/engine/core`):**
 
 - `SceneParserTest` — valid file; every `SCENE_FIELD_INVALID` rule (each limit,
   exactly-one-of, speaker rules, ref format); unknown field warning.
@@ -966,9 +966,9 @@ Tests mirror package structure. JUnit 5 and AssertJ only.
 - `PackFixturesLoadTest` (spec 22) — updated to build the loader with
   `Engine.sectionValidators()`; all three fixtures still load.
 
-**CLI (`engine/cli`):** tests find fixture packs with
+**CLI (`app/engine/cli`):** tests find fixture packs with
 `Path.of("../fixtures/game-packs/<id>")` (surefire's working directory is the
-module directory `engine/cli`).
+module directory `app/engine/cli`).
 
 - `ConsoleRendererTest` — each block kind; options; a disabled option with and
   without hint; status line; `[Enter]`; `[end]`; `[abandoned]`; empty blocks.
@@ -986,8 +986,8 @@ module directory `engine/cli`).
 
 1. `cd engine && mvn -B verify` is green for both modules on a clean checkout,
    with no `app/server`, database, Node, or API key.
-2. `java -jar engine/cli/target/engine-cli-0.1.0-SNAPSHOT.jar --pack-dir
-   engine/fixtures/game-packs/fixture-minimal --locale pl` plays interactively
+2. `java -jar app/engine/cli/target/engine-cli-0.1.0-SNAPSHOT.jar --pack-dir
+   app/engine/fixtures/game-packs/fixture-minimal --locale pl` plays interactively
    to the end.
 3. The scripted golden transcripts pass; the same seed and script give
    identical output; save/load continues a run exactly.
@@ -1026,16 +1026,16 @@ module directory `engine/cli`).
   `PackIndexLintTest`.
 - [ ] Add module `cli`: POM (§1), `PlayMain`, `ConsoleApp`, `ConsoleArgs`,
   `ConsoleRenderer`, `ConsoleChrome`; add `<module>cli</module>` to
-  `engine/pom.xml`.
+  `app/engine/pom.xml`.
 - [ ] Add scripts and golden files (§7.4).
 - [ ] Add all tests from §10.
 - [ ] Update `.github/instructions/engine.instructions.md` (§9).
-- [ ] Add `engine/README.md` (below).
+- [ ] Add `app/engine/README.md` (below).
 - [ ] Update `docs/specifications/README.md` (add spec 23) and, if new, the
   intent index.
 - [ ] Verify the acceptance criteria in §11.
 
-`engine/README.md`:
+`app/engine/README.md`:
 
 ```markdown
 # engine

@@ -24,15 +24,15 @@ jobs:
           distribution: 'temurin'
           cache: maven
       - name: Verify engine without application services
-        run: mvn -B -f engine/pom.xml clean verify
+        run: mvn -B -f app/engine/pom.xml clean verify
       - name: Upload engine test and coverage reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: engine-reports
           path: |
-            engine/target/surefire-reports/
-            engine/target/site/jacoco/
+            app/engine/target/surefire-reports/
+            app/engine/target/site/jacoco/
           retention-days: 30
 
   build-and-test:
@@ -93,14 +93,14 @@ jobs:
           cache: maven
 
       - name: Run backend tests
-        run: mvn -B -pl app/server -am verify
+        run: mvn -B -f app/pom.xml -pl server -am verify
         env:
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/capybee
           SPRING_DATASOURCE_USERNAME: capybee
           SPRING_DATASOURCE_PASSWORD: capybee
 
       - name: Build backend JAR
-        run: mvn -B -DskipTests -pl app/server -am package
+        run: mvn -B -f app/pom.xml -DskipTests -pl server -am package
 
       - name: Upload test results
         if: always()

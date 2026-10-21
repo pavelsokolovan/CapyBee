@@ -9,7 +9,7 @@ CapyBee helps relocated children around age 12 process homesickness (My Old Worl
 Before changing product behavior, data models, onboarding, or emotional experience, read the [concept](../../docs/CapyBee_concept.md) and the relevant [specifications](../../docs/specifications/). Universal constraints live in the [root guidance](../copilot-instructions.md).
 
 ## Project Map
-- `engine`: independent Java 25 game-engine SDK, plain Maven JAR and JUnit
+- `app/engine`: independent Java 25 game-engine SDK, plain Maven JAR and JUnit
 	tests. No dependency on the app or Spring. Root POM aggregates Java modules.
 - `app/server`: Spring Boot, Java, Maven; package `com.capybee.server`, with `config`, `web`, `service`, `repository`, and `domain` layers. Flyway migrations live in `src/main/resources/db/migration/`.
 - `app/ui`: React, TypeScript, Vite, Tailwind, Framer Motion; screens in `src/AuthenticatedHome.tsx`, reusable UI in `src/components/`, offline writes in `src/offline/`, PWA via `vite-plugin-pwa`. Check manifests for current versions.

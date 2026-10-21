@@ -12,21 +12,21 @@ Repository source was inspected through the public `main` branch. A local `git c
 
 | Existing source | Observed contract / consequence for this spec |
 |---|---|
-| `engine/README.md`, `engine/pom.xml` | `engine/` exists as a standalone Maven SDK with `core` and `cli`; Java release is 25; it has no Spring Boot parent. Keep the SDK boundary and current module layout. |
-| `engine/core/.../api/Engine.java` | `Engine.sectionValidators()` currently returns only `SceneSectionValidator`; add the rules validator without dropping the scene validator. |
-| `engine/core/.../api/RunState.java` | Current state has only `sceneId`, `visited`, `ended`, and `endReason`; add optional state maps and outcome. |
-| `engine/core/.../api/RunSnapshot.java` and `api/json/SnapshotCodec` | Snapshot version 1 already stores a `RunState`; extend `state` additively and keep old snapshots readable. |
-| `engine/core/.../content/Scene.java` | Current scene model contains only `id`, `start`, `blocks`, `options`, `next`, and `end`; add the scene-rule fields below. |
-| `engine/core/.../content/json/SceneSectionValidator.java` | Scene validation is already registered through `SectionValidator` and uses `PackValidationContext` / `ReferenceIndex`; extend this validation rather than creating a parallel scene loader. |
-| `engine/core/.../api/View.java` and `api/Option.java` | `View` currently has blocks, options, input, status, ended, and end reason. `Option` already has `enabled` and `hint`; the runtime must populate them meaningfully. |
-| `engine/cli/.../ConsoleRenderer.java` | Current renderer does not show disabled-option state or hints and does not render objectives/outcomes. Add those outputs while preserving current block text and console chrome. |
-| `engine/cli/.../ConsoleApp.java` | The inspected `run` path does not implement the spec-23 `--script` contract, and its current `readLine()` reads an arbitrary byte chunk rather than one line. The scripted golden-test requirement depends on correcting this existing mismatch in `engine/cli`. |
+| `app/engine/README.md`, `app/engine/pom.xml` | `app/engine/` exists as a standalone Maven SDK with `core` and `cli`; Java release is 25; it has no Spring Boot parent. Keep the SDK boundary and current module layout. |
+| `app/engine/core/.../api/Engine.java` | `Engine.sectionValidators()` currently returns only `SceneSectionValidator`; add the rules validator without dropping the scene validator. |
+| `app/engine/core/.../api/RunState.java` | Current state has only `sceneId`, `visited`, `ended`, and `endReason`; add optional state maps and outcome. |
+| `app/engine/core/.../api/RunSnapshot.java` and `api/json/SnapshotCodec` | Snapshot version 1 already stores a `RunState`; extend `state` additively and keep old snapshots readable. |
+| `app/engine/core/.../content/Scene.java` | Current scene model contains only `id`, `start`, `blocks`, `options`, `next`, and `end`; add the scene-rule fields below. |
+| `app/engine/core/.../content/json/SceneSectionValidator.java` | Scene validation is already registered through `SectionValidator` and uses `PackValidationContext` / `ReferenceIndex`; extend this validation rather than creating a parallel scene loader. |
+| `app/engine/core/.../api/View.java` and `api/Option.java` | `View` currently has blocks, options, input, status, ended, and end reason. `Option` already has `enabled` and `hint`; the runtime must populate them meaningfully. |
+| `app/engine/cli/.../ConsoleRenderer.java` | Current renderer does not show disabled-option state or hints and does not render objectives/outcomes. Add those outputs while preserving current block text and console chrome. |
+| `app/engine/cli/.../ConsoleApp.java` | The inspected `run` path does not implement the spec-23 `--script` contract, and its current `readLine()` reads an arbitrary byte chunk rather than one line. The scripted golden-test requirement depends on correcting this existing mismatch in `app/engine/cli`. |
 | `docs/specifications/22-engine-core-and-pack-format-instruction.md` and `23-engine-api-and-authored-scene-runtime-instruction.md` | Their current series map puts places in spec 24, and spec 23 describes a future `places.json` addition to the dungeon fixture. Under the confirmed split, places move to spec 24.1; those older documents need a follow-up compatibility edit. |
 
 ## Constraints
 
 - Preserve the universal, headless, provider-agnostic engine boundary from spec 22. No theme, genre, language, screen, or product-specific terms in engine code, ids, or tests.
-- Changes are limited to `engine/`, `.github/`, and `docs/`. Do not change `app/server`, its schema, endpoints, or deployment.
+- Changes are limited to `app/engine/`, `.github/`, and `docs/`. Do not change `app/server`, its schema, endpoints, or deployment.
 - Core has no Spring, JPA, Hibernate, console I/O, network calls, or vendor/model names. Jackson 3 stays inside `json` packages and `adapter`.
 - Time and ids remain injected through the existing ports. Spec 24 introduces no randomness.
 - Domain values are immutable and defensive-copied. Content validation collects all issues; malformed pack content must not throw an unchecked exception out of `tryLoad`.
@@ -520,7 +520,7 @@ Upgrade only `fixture-text-dungeon` from `1.0.0` to `1.1.0`. Keep `fixture-minim
 
 ### Scripts
 
-`engine/cli/src/test/resources/scripts/dungeon-win.txt`:
+`app/engine/cli/src/test/resources/scripts/dungeon-win.txt`:
 
 ```text
 1
@@ -530,7 +530,7 @@ Upgrade only `fixture-text-dungeon` from `1.0.0` to `1.1.0`. Keep `fixture-minim
 1
 ```
 
-`engine/cli/src/test/resources/scripts/dungeon-locked-exit.txt`:
+`app/engine/cli/src/test/resources/scripts/dungeon-locked-exit.txt`:
 
 ```text
 1
@@ -539,7 +539,7 @@ Upgrade only `fixture-text-dungeon` from `1.0.0` to `1.1.0`. Keep `fixture-minim
 
 ### Golden: winning path
 
-`engine/cli/src/test/resources/golden/dungeon-win.txt` (script echo and console rules from section 12 are part of the contract):
+`app/engine/cli/src/test/resources/golden/dungeon-win.txt` (script echo and console rules from section 12 are part of the contract):
 
 ```text
 Running fixture-text-dungeon in locale en
@@ -589,7 +589,7 @@ Outcome: escaped
 
 ### Golden: locked exit remains visible but unavailable
 
-`engine/cli/src/test/resources/golden/dungeon-locked-exit.txt`:
+`app/engine/cli/src/test/resources/golden/dungeon-locked-exit.txt`:
 
 ```text
 Running fixture-text-dungeon in locale en
@@ -620,7 +620,7 @@ Tests must assert that trying `Choose("climb")` while it is disabled returns `ac
 
 ## 14. Code skeleton and package placement
 
-Follow the current package boundaries: domain records have no Jackson imports; JSON parsing is under `.json`; adapters implement ports. All code remains under `engine/core` or `engine/cli`.
+Follow the current package boundaries: domain records have no Jackson imports; JSON parsing is under `.json`; adapters implement ports. All code remains under `app/engine/core` or `app/engine/cli`.
 
 | Type | Package | Responsibility |
 |---|---|---|
@@ -637,21 +637,21 @@ Follow the current package boundaries: domain records have no Jackson imports; J
 Required signatures (implementation bodies are not part of the contract):
 
 ```java
-// File: engine/core/src/main/java/com/capybee/engine/api/ObjectiveState.java
+// File: app/engine/core/src/main/java/com/capybee/engine/api/ObjectiveState.java
 package com.capybee.engine.api;
 
 public enum ObjectiveState { ACTIVE, DONE }
 ```
 
 ```java
-// File: engine/core/src/main/java/com/capybee/engine/api/ObjectiveItem.java
+// File: app/engine/core/src/main/java/com/capybee/engine/api/ObjectiveItem.java
 package com.capybee.engine.api;
 
 public record ObjectiveItem(String id, String label, ObjectiveState state) {}
 ```
 
 ```java
-// File: engine/core/src/main/java/com/capybee/engine/api/RunState.java
+// File: app/engine/core/src/main/java/com/capybee/engine/api/RunState.java
 package com.capybee.engine.api;
 
 import java.util.List;
@@ -684,7 +684,7 @@ public record RunState(
 ```
 
 ```java
-// File: engine/core/src/main/java/com/capybee/engine/api/View.java
+// File: app/engine/core/src/main/java/com/capybee/engine/api/View.java
 package com.capybee.engine.api;
 
 import com.capybee.engine.content.Block;
@@ -714,7 +714,7 @@ public record View(
 ```
 
 ```java
-// File: engine/core/src/main/java/com/capybee/engine/api/StartResult.java
+// File: app/engine/core/src/main/java/com/capybee/engine/api/StartResult.java
 package com.capybee.engine.api;
 
 import java.util.List;
@@ -731,7 +731,7 @@ public record StartResult(Run run, List<Issue> issues, List<Event> events) {
 ```
 
 ```java
-// File: engine/core/src/main/java/com/capybee/engine/port/RunStore.java
+// File: app/engine/core/src/main/java/com/capybee/engine/port/RunStore.java
 package com.capybee.engine.port;
 
 import com.capybee.engine.api.RunSnapshot;
@@ -745,7 +745,7 @@ public interface RunStore {
 ```
 
 ```java
-// File: engine/core/src/main/java/com/capybee/engine/adapter/InMemoryRunStore.java
+// File: app/engine/core/src/main/java/com/capybee/engine/adapter/InMemoryRunStore.java
 package com.capybee.engine.adapter;
 
 import com.capybee.engine.api.RunSnapshot;
@@ -771,7 +771,7 @@ public final class InMemoryRunStore implements RunStore {
 ```
 
 ```java
-// File: engine/core/src/main/java/com/capybee/engine/rules/CounterDef.java
+// File: app/engine/core/src/main/java/com/capybee/engine/rules/CounterDef.java
 package com.capybee.engine.rules;
 
 public record CounterDef(
@@ -781,7 +781,7 @@ public record CounterDef(
 ```
 
 ```java
-// File: engine/core/src/main/java/com/capybee/engine/rules/Condition.java
+// File: app/engine/core/src/main/java/com/capybee/engine/rules/Condition.java
 package com.capybee.engine.rules;
 
 import java.util.List;
@@ -808,7 +808,7 @@ public sealed interface Condition permits Condition.CounterAtLeast, Condition.Co
 ```
 
 ```java
-// File: engine/core/src/main/java/com/capybee/engine/rules/Effect.java
+// File: app/engine/core/src/main/java/com/capybee/engine/rules/Effect.java
 package com.capybee.engine.rules;
 
 import java.util.Map;
@@ -836,14 +836,14 @@ public sealed interface Effect permits Effect.CounterAdd, Effect.CounterSet, Eff
 ```
 
 ```java
-// File: engine/core/src/main/java/com/capybee/engine/rules/FlagDef.java
+// File: app/engine/core/src/main/java/com/capybee/engine/rules/FlagDef.java
 package com.capybee.engine.rules;
 
 public record FlagDef(String id, boolean initial) {}
 ```
 
 ```java
-// File: engine/core/src/main/java/com/capybee/engine/rules/SetDef.java
+// File: app/engine/core/src/main/java/com/capybee/engine/rules/SetDef.java
 package com.capybee.engine.rules;
 
 import java.util.List;
@@ -857,7 +857,7 @@ public record SetDef(String id, List<String> values, List<String> initial) {
 ```
 
 ```java
-// File: engine/core/src/main/java/com/capybee/engine/rules/ObjectiveDef.java
+// File: app/engine/core/src/main/java/com/capybee/engine/rules/ObjectiveDef.java
 package com.capybee.engine.rules;
 
 import java.util.List;
@@ -868,14 +868,14 @@ public record ObjectiveDef(String id, String labelKey, Condition completeWhen, L
 ```
 
 ```java
-// File: engine/core/src/main/java/com/capybee/engine/rules/OutcomeDef.java
+// File: app/engine/core/src/main/java/com/capybee/engine/rules/OutcomeDef.java
 package com.capybee.engine.rules;
 
 public record OutcomeDef(String id) {}
 ```
 
 ```java
-// File: engine/core/src/main/java/com/capybee/engine/rules/Rules.java
+// File: app/engine/core/src/main/java/com/capybee/engine/rules/Rules.java
 package com.capybee.engine.rules;
 
 import java.util.List;
@@ -894,7 +894,7 @@ public record Rules(List<CounterDef> counters, List<FlagDef> flags, List<SetDef>
 ```
 
 ```java
-// File: engine/core/src/main/java/com/capybee/engine/content/SceneBranch.java
+// File: app/engine/core/src/main/java/com/capybee/engine/content/SceneBranch.java
 package com.capybee.engine.content;
 
 import com.capybee.engine.rules.Condition;
@@ -903,7 +903,7 @@ public record SceneBranch(Condition condition, String next) {}
 ```
 
 ```java
-// File: engine/core/src/main/java/com/capybee/engine/content/SceneOption.java
+// File: app/engine/core/src/main/java/com/capybee/engine/content/SceneOption.java
 package com.capybee.engine.content;
 
 import com.capybee.engine.rules.Condition;
@@ -920,7 +920,7 @@ public record SceneOption(String id, String label, String next, List<Effect> eff
 ```
 
 ```java
-// File: engine/core/src/main/java/com/capybee/engine/content/Scene.java
+// File: app/engine/core/src/main/java/com/capybee/engine/content/Scene.java
 package com.capybee.engine.content;
 
 import com.capybee.engine.rules.Effect;
@@ -943,7 +943,7 @@ public record Scene(String id, boolean start, List<Block> blocks, List<SceneOpti
 ```
 
 ```java
-// File: engine/core/src/main/java/com/capybee/engine/rules/json/RulesSectionValidator.java
+// File: app/engine/core/src/main/java/com/capybee/engine/rules/json/RulesSectionValidator.java
 package com.capybee.engine.rules.json;
 
 import com.capybee.engine.pack.Pack;
@@ -989,10 +989,10 @@ All engine tests are ordinary JUnit 5 tests and must not need Spring, a database
 ### Verification commands
 
 ```sh
-mvn -f engine/pom.xml -B clean verify
+mvn -f app/engine/pom.xml -B clean verify
 ```
 
-Also run the `engine/cli` golden transcript tests and verify that a handwritten stateless pack can still be launched from the console. Check the built CLI on Windows for UTF-8 output; this environment cannot establish Windows behavior.
+Also run the `app/engine/cli` golden transcript tests and verify that a handwritten stateless pack can still be launched from the console. Check the built CLI on Windows for UTF-8 output; this environment cannot establish Windows behavior.
 
 ## Confirmed decisions
 
@@ -1020,7 +1020,7 @@ Pavlo confirmed these decisions on 2026-10-12:
 This section records required follow-ups; spec 24 implementation must still use the currently checked-in source as its immediate code baseline.
 
 - **Spec 22 series map / vocabulary:** it currently assigns optional places and `GO_TO` to spec 24. Update spec 24's scope to rules/state only and move places, `GO_TO`, and Places vocabulary ownership to spec 24.1. Keep the planned specs 25–31 numbering unchanged. `PackLayout.requiredFiles` does not change in spec 24.
-- **Spec 23 ground truth:** its old statement that the repository has no `engine/` folder is stale; the folder and the authored scene API/runtime exist. Update the ground-truth notes when editing that spec next.
+- **Spec 23 ground truth:** its old statement that the repository has no `app/engine/` folder is stale; the folder and the authored scene API/runtime exist. Update the ground-truth notes when editing that spec next.
 - **Spec 23 scene schema:** extend the existing scene/option records additively with `effects`, `requires`, `unmetHint`, `hideWhenUnmet`, `onEnter`, `branches`, and end-scene `outcome`. Existing packs without these fields remain valid.
 - **Spec 23 API:** add maps/objectives/outcome to `RunState`; objectives/outcome to `View`; events to `StartResult` for startup effects. `Option.enabled` and `Option.hint` already exist in current source and must be populated, not renamed.
 - **Snapshot:** extend `state` only; keep `snapshotVersion = 1`, apply defaults on read, and implement the migration/rejection codes in section 10.
@@ -1030,5 +1030,5 @@ This section records required follow-ups; spec 24 implementation must still use 
 
 ## Notes
 
-- The actual `engine/` source wins over the older “not implemented” assumption in the handoff. This spec is written against the current `Engine`, `RunState`, `RunSnapshot`, `Scene`, `SceneSectionValidator`, `View`, `Option`, `ConsoleApp`, and `ConsoleRenderer` contracts observed in the repository.
+- The actual `app/engine/` source wins over the older “not implemented” assumption in the handoff. This spec is written against the current `Engine`, `RunState`, `RunSnapshot`, `Scene`, `SceneSectionValidator`, `View`, `Option`, `ConsoleApp`, and `ConsoleRenderer` contracts observed in the repository.
 - The Maven build, Java 25 compilation, Windows console UTF-8, and a live scripted CLI run have not been executed in this environment. The handoff reports that Maven and JDK 25 are unavailable in its sandbox; the current working environment has Java 21 and no Maven. Document the actual verification performed when delivering the file.

@@ -22,7 +22,7 @@ This spec fixes:
    bounded, and cheap.
 5. The **Game Pack** format, plus its loader and validator.
 
-Code delivered: standalone `engine/` Maven SDK (`com.capybee:game-engine`),
+Code delivered: standalone `app/engine/` Maven SDK (`com.capybee:game-engine`),
 pure-Java `com.capybee.engine.pack` with tests, and a boundary test that guards
 universality. No database, HTTP endpoint, LLM call, UI, or Spring wiring. The
 running app does not change.
@@ -30,9 +30,9 @@ running app does not change.
 ### Implementation decisions (2026-10-09)
 
 Pavlo requested a separate SDK module so engine development and testing need
-none of the app. This overrides the draft's single-module choice: `engine/`
-has its own POM with no Spring parent; a root aggregator lists `engine` and
-`app/server`. The backend does not depend on the SDK until spec 29. Existing
+none of the app. This overrides the draft's single-module choice: `app/engine/`
+has its own POM with no Spring parent; `app/pom.xml` aggregates `engine` and
+`server` without acting as their parent. The backend does not depend on the SDK until spec 29. Existing
 Docker and backend dev commands therefore stay unchanged. CI verifies the
 SDK in a separate job with no application services.
 
@@ -172,11 +172,11 @@ Rules, enforced by `EngineBoundaryTest` (§8.1):
 
 ### 1.3 Independent SDK module
 
-`engine/` is a standalone Maven module producing a plain JAR. It has no Spring
-parent or application dependency. `mvn -f engine/pom.xml clean verify` builds
+`app/engine/` is a standalone Maven module producing a plain JAR. It has no Spring
+parent or application dependency. `mvn -f app/engine/pom.xml clean verify` builds
 and tests it with only a JDK and Maven. It can also be opened as a separate
-IDE project. The root POM aggregates the SDK and backend without becoming
-their shared parent; `mvn verify` at the repo root verifies both.
+IDE project. `app/pom.xml` aggregates the SDK and backend without becoming
+their shared parent; `mvn -f app/pom.xml verify` from the repo root verifies both.
 
 Compile-time isolation prevents an SDK dependency on the host, and the source
 boundary test also protects purity and universality inside the SDK. Its own
@@ -362,7 +362,7 @@ Locations:
 
 - Host packs: `app/server/src/main/resources/game-packs/<pack-id>/`
   (classpath `game-packs/<pack-id>/`).
-- Test fixtures: `engine/src/test/resources/game-packs/<fixture-id>/`.
+- Test fixtures: `app/engine/src/test/resources/game-packs/<fixture-id>/`.
 
 **Files index.** `pack.json` lists every other file in `files`. The loader
 reads only listed files and never lists directories, because classpath
@@ -700,7 +700,7 @@ Jackson notes for the implementer:
   line. Several tree-API method names changed in Jackson 3, so check them
   against the Jackson 3 migration notes instead of copying Jackson 2 habits.
 - The standalone module declares `tools.jackson.core:jackson-databind`.
-  Confirm with `mvn -f engine/pom.xml dependency:tree`; the tree must contain
+  Confirm with `mvn -f app/engine/pom.xml dependency:tree`; the tree must contain
   Jackson 3 and no Spring, JPA, or application dependency. Jackson annotations
   retain the `com.fasterxml.jackson.annotation` namespace as noted above.
 
@@ -739,7 +739,7 @@ the build, not a review.
 
 ### 8.2 JaCoCo gate
 
-Configure the SDK's own `check` execution in `engine/pom.xml`. Do not touch
+Configure the SDK's own `check` execution in `app/engine/pom.xml`. Do not touch
 the existing service rule in `app/server/pom.xml`. The SDK gate uses:
 
 ```xml
@@ -765,13 +765,13 @@ Create `.github/instructions/engine.instructions.md`:
 ```markdown
 ---
 description: "Use when implementing the standalone game engine SDK, pack validation, engine tests, or game pack content."
-applyTo: "engine/**/*.java,engine/pom.xml,engine/src/**/resources/game-packs/**,app/server/src/main/resources/game-packs/**"
+applyTo: "app/engine/**/*.java,app/engine/pom.xml,app/engine/src/**/resources/game-packs/**,app/server/src/main/resources/game-packs/**"
 ---
 
 # Engine standards
 
-- Standalone SDK in `engine/`: no Spring parent or app dependency. Verify it
-  with `mvn -f engine/pom.xml verify`; root Maven aggregates Java modules.
+- Standalone SDK in `app/engine/`: no Spring parent or app dependency. Verify it
+  with `mvn -f app/engine/pom.xml verify`; root Maven aggregates Java modules.
 - The engine is universal and headless. Pure Java only: no Spring, JPA,
   Hibernate, and nothing from `com.capybee.server`. Jackson 3 only in `json`
   folders and under `adapter`. `EngineBoundaryTest` enforces this.
@@ -791,7 +791,7 @@ applyTo: "engine/**/*.java,engine/pom.xml,engine/src/**/resources/game-packs/**,
 - Host-specific code (CapyBee) lives under `com.capybee.server` and follows
   the normal layering (web → service → repository → domain).
 - Engine tests mirror the package structure under
-  `engine/src/test/java/com/capybee/engine/`. JaCoCo gate: 70% on
+  `app/engine/src/test/java/com/capybee/engine/`. JaCoCo gate: 70% on
   `com.capybee.engine.*`.
 - Changing a pack: bump `version` and keep the `files` index in sync
   (`PackIndexLintTest`).
@@ -801,7 +801,7 @@ applyTo: "engine/**/*.java,engine/pom.xml,engine/src/**/resources/game-packs/**,
 
 Engine tests are plain JUnit 5 with no collaborators to mock, so the Mockito
 service-test pattern does not apply here. Tests mirror the package structure
-under `engine/src/test/java/com/capybee/engine/`.
+under `app/engine/src/test/java/com/capybee/engine/`.
 
 - **`PackIdTest`, `PackVersionTest`, `LocaleTagTest`** — valid and invalid
   formats, length limits, `tryParse` edge cases (`1.2`, `01.2.3`, `1.2.3-rc1`).
@@ -850,8 +850,8 @@ under `engine/src/test/java/com/capybee/engine/`.
    CapyBee namespace now or at extraction time? Renaming later is an IDE
    refactor plus the pack folder name.
 2. **Package vs module (§1.3), resolved.** The engine is a standalone SDK in
-  `engine/`, with its own POM, dependencies, tests, and coverage gate. The
-  root POM aggregates it and the backend; neither inherits from the root.
+  `app/engine/`, with its own POM, dependencies, tests, and coverage gate. The
+  `app/pom.xml` aggregates it and the backend; neither inherits from that POM.
 3. **Console-first order, resolved.** The minimal authored console loop is
   spec 23; the full console host is spec 28. Generated runs are proven there
   before web integration (29). No console runtime is part of spec 22.
@@ -880,13 +880,13 @@ under `engine/src/test/java/com/capybee/engine/`.
   boundary rules from §1.2 in words (no forbidden literal strings).
 - [x] Implement the model and plumbing types in `com.capybee.engine.pack` (§7).
 - [x] Implement `PackLoader` and parsers in `com.capybee.engine.pack.json` on
-  Jackson 3; confirm with `mvn -f engine/pom.xml dependency:tree`.
+  Jackson 3; confirm with `mvn -f app/engine/pom.xml dependency:tree`.
 - [x] Add fixtures `fixture-minimal`, `fixture-text-dungeon`, and
-  `fixture-space-courier` under `engine/src/test/resources/game-packs/`.
+  `fixture-space-courier` under `app/engine/src/test/resources/game-packs/`.
 - [x] Add all tests from §9, including aggregation of manifest-field defects
   with independent file, policy, and reference defects.
 - [x] Add the SDK JaCoCo rule for `com.capybee.engine.*` (§8.2); run
-  `mvn -f engine/pom.xml clean verify`.
+  `mvn -f app/engine/pom.xml clean verify`.
 - [x] Add the root Maven aggregator and an independent SDK CI job requiring
   no application services; leave the backend dependency and deployment unchanged.
 - [x] Add `.github/instructions/engine.instructions.md` (§8.3).
@@ -895,7 +895,7 @@ under `engine/src/test/java/com/capybee/engine/`.
 - [x] Update the `docs/specifications/intent/README.md` index with the row
   `01-universal-game-engine.md | → spec 22 (series 22–31) | 22`.
 - [x] Confirm nothing user-facing changed: no endpoint, migration, backend
-  Maven dependency, or UI edit. SDK dependencies are declared only in `engine/pom.xml`.
+  Maven dependency, or UI edit. SDK dependencies are declared only in `app/engine/pom.xml`.
 
 Verification (2026-10-09): the clean standalone build reports 157 tests,
 zero failures or errors, and all coverage checks met. One symlink-escape test

@@ -1,6 +1,6 @@
 ---
 description: "Use when building, testing, syncing static assets, running local servers, changing CI workflows, or configuring deployment. Owns verification commands and gates."
-applyTo: "engine/**/*,pom.xml,app/**/*,Dockerfile,fly.toml,scripts/dev-workflow.ps1,.vscode/tasks.json,.github/workflows/**/*.yml,.github/workflows/**/*.yaml"
+applyTo: "app/engine/**/*,app/pom.xml,app/**/*,Dockerfile,fly.toml,scripts/dev-workflow.ps1,.vscode/tasks.json,.github/workflows/**/*.yml,.github/workflows/**/*.yaml"
 ---
 
 # Build And Verification
@@ -20,12 +20,12 @@ Owns development commands and final application gates. Reuse the [workflow scrip
 
 ## Required Gates
 - During iteration, run focused checks for the changed behavior first.
-- Engine SDK changes: `mvn -f engine/pom.xml clean verify` from the repo root
+- Engine SDK changes: `mvn -f app/engine/pom.xml clean verify` from the repo root
 	(plain JUnit, boundary/index lint, 70% line coverage per engine package).
 	No Spring, database, frontend, or integrated app startup is needed.
-- `mvn verify` at the repo root aggregates engine and backend checks; the
+- `mvn -f app/pom.xml verify` from the repo root aggregates engine and backend checks; the
 	modules have independent parents and can also be developed separately.
-- Backend changes: `mvn verify` in `app/server` (JUnit + JaCoCo minimum 70% line coverage on `com.capybee.server.service.*`). Add tests, never lower the gate.
+- Backend changes: `mvn -f app/pom.xml -pl server -am verify` from the repo root (JUnit + JaCoCo minimum 70% line coverage on `com.capybee.server.service.*`). Add tests, never lower the gate.
 - Frontend changes: `npm test` (or `npm run test:coverage`) in `app/ui`, then the build-and-sync workflow above.
 - Before shipping application changes, start the integrated app and manually verify affected user flows, not just Vite.
 - Guidance-only edits: validate frontmatter, links, routing, and preserved rules; application builds, static sync, and test suites are not required.

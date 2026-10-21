@@ -1,11 +1,11 @@
 ---
 description: "Use when implementing the standalone game engine SDK, pack validation, engine tests, or game pack content. Owns universality and headless boundaries."
-applyTo: "engine/**/*.java,engine/pom.xml,engine/src/**/resources/game-packs/**,app/server/src/main/resources/game-packs/**"
+applyTo: "app/engine/**/*.java,app/engine/pom.xml,app/engine/src/**/resources/game-packs/**,app/server/src/main/resources/game-packs/**"
 ---
 
 # Engine Standards
 
-- The SDK lives in `engine/`, a standalone Maven module with no Spring Boot
+- The SDK lives in `app/engine/`, a standalone Maven module with no Spring Boot
   parent or application dependency. Root Maven only aggregates the modules.
 - Universal and headless: no Spring, JPA, Hibernate, or
   `com.capybee.server` imports. Jackson 3 only in `json` folders and under
@@ -28,8 +28,8 @@ applyTo: "engine/**/*.java,engine/pom.xml,engine/src/**/resources/game-packs/**,
   through `View.places` (spec 24.1).
 - Host-specific code stays in `app/server` with its existing layering.
   Do not wire the SDK into Spring before the web-host spec.
-- Plain JUnit tests mirror engine packages under `engine/src/test/java`.
-  Run `mvn -f engine/pom.xml verify` independently; 70% line coverage on every
+- Plain JUnit tests mirror engine packages under `app/engine/src/test/java`.
+  Run `mvn -f app/engine/pom.xml verify` independently; 70% line coverage on every
   `com.capybee.engine.*` package. Never lower the backend service gate.
 - Pack changes bump `version` and keep `files` synchronized with disk
-  (`PackIndexLintTest`). Test fixtures live in `engine/src/test/resources`.
+  (`PackIndexLintTest`). Test fixtures live in `app/engine/src/test/resources`.

@@ -17,7 +17,7 @@ Spec 27 defines that host boundary. Specs 28 (client rendering contract) and 29 
 
 | # | Finding | Evidence | Consequence for this spec |
 |---|---|---|---|
-| F1 | Public API is small and stable: `Engine.start(RunRequest)`, `Engine.resume(RunSnapshot)`, `Run.view()/apply(Command)/snapshot()`. Commands: `Choose`, `Advance`, `SubmitText`, `Move`, `Abandon`. | `engine/core/.../api/` | The HTTP contract wraps exactly these; no new engine verbs. |
+| F1 | Public API is small and stable: `Engine.start(RunRequest)`, `Engine.resume(RunSnapshot)`, `Run.view()/apply(Command)/snapshot()`. Commands: `Choose`, `Advance`, `SubmitText`, `Move`, `Abandon`. | `app/engine/core/.../api/` | The HTTP contract wraps exactly these; no new engine verbs. |
 | F2 | `RunSnapshot.step` increases by one for every accepted state change (Choose/Advance/Move/Abandon) and is rolled back when scene resolution fails. Rejected commands leave it unchanged. | `RunImpl.apply`, `choose`, `move` | `step` is the natural **revision** for optimistic concurrency and idempotency. A contract test must assert "accepted=false ⇒ step unchanged" for every command type including `SubmitText`. |
 | F3 | `RunImpl` has no synchronisation and `Run` is a mutable object built from a snapshot. | `RunImpl` (no `synchronized`/locks) | Host must serialise per run and rebuild `Run` from the stored snapshot per command. |
 | F4 | `Engine.start` calls `GenerationPipeline.initialize()` **synchronously** (SCENARIO → CAST/QUEST → SCENE). `Run.apply` may call the provider again for a lazily resolved scene. | `DefaultEngine.start`, `GenerationPipeline.resolveScene` | One HTTP request can take tens of seconds. Adapter default response timeout is 25 s with one repair attempt (`AnthropicConfig`), so a single stage can take ~50 s and `start` several minutes worst case. Start and slow commands need a **wait-then-poll** model (§8.3). |
@@ -25,11 +25,11 @@ Spec 27 defines that host boundary. Specs 28 (client rendering contract) and 29 
 | F6 | Spec 26 asked for a `BudgetLedger`/quota port and a `GENERATION_ARTIFACT_MISSING` resume code. **Neither exists in code.** Resume of an incomplete generated snapshot returns `SNAPSHOT_ARTIFACT_VERSION_MISMATCH`. Spec 26.1 chose "embed artifacts in the snapshot". | `grep` for ledger/quota: no hits; `DefaultEngine.resume` | Spec 27 defines the host-side ledger (§10) and the recovery policy for unresumable runs (§6.4). Artifacts stay embedded in snapshots. |
 | F7 | Free-text start inputs are stripped before they enter the snapshot (`persistentInputs`). | `DefaultEngine.persistentInputs` | A `PREPARING` run that must be restarted after a machine suspend needs the free text; store it only for the preparing window and null it afterwards (§9, §13). |
 | F8 | Backend is Spring Boot **4.1.0**, Java **25**, Jackson 3 (`tools.jackson`). Engine core uses the same Jackson 3 (`3.1.2`). Hikari pool is **5**; Fly VM is 1 shared CPU / 1 GB with `auto_stop_machines = "suspend"`. CSRF is disabled; auth is Google OAuth2 + Spring Session JDBC. | `app/server/pom.xml`, `application.yml`, `fly.toml`, `SecurityConfig` | No Jackson clash (good). Pool and RAM are tight: never hold a DB connection across a provider call; cap concurrent generation jobs. A suspended machine can kill an in-flight job. |
-| F9 | `Dockerfile` builds only `app/server` (copies `app/server/pom.xml` and `src`); the engine is not in the image build. Root `pom.xml` is an aggregator with modules `engine` and `app/server`. CI already has a standalone engine job. | `Dockerfile`, root `pom.xml`, `.github/workflows/build-test-deploy.yml` | Dockerfile and CI must change when the server depends on the SDK (§14). |
+| F9 | `Dockerfile` builds only `app/server` (copies `app/server/pom.xml` and `src`); the engine is not in the image build. `app/pom.xml` is an aggregator with modules `engine` and `server`. CI already has a standalone engine job. | `Dockerfile`, `app/pom.xml`, `.github/workflows/build-test-deploy.yml` | Dockerfile and CI must change when the server depends on the SDK (§14). |
 | F10 | The real offline queue (`syncEngine.ts`) differs from the spec-15 text in ways that matter: it **discards response bodies**; it treats **409 as success**; it retries every non-OK response (including permanent 400/404/422) up to 8 times with up to 60 s backoff **inside the flush loop**, so one bad item delays everything behind it; it only handles `POST`/`DELETE` bodies of the form `{id: clientId, ...payload}`. | `app/ui/src/offline/syncEngine.ts` | Game commands need response delivery, a distinct "stale revision" outcome, and terminal-vs-retryable classification (§12). |
 | F11 | The server has **no** `@ControllerAdvice`/`@ExceptionHandler`; existing validation failures are `IllegalArgumentException` (default Spring handling). | `grep` in `app/server/src/main` | The game API gets its own scoped error advice with stable codes (§8.6). Do not copy the existing pattern. |
 | F12 | The mini-game daily hive-cell cap is enforced **client-side only**, per device-local calendar day (`sameCalendarDay`). Missions and mini-games use client-supplied UUIDs for idempotency. | specs 20/21, `GameService` | Engine-driven rewards (spec 29) need a **server-side** cap and a server-defined day. Spec 27 exposes the event outbox and day-zone config; spec 29 owns the reward rules (§11). |
-| F13 | Docs drift: `engine/README.md` names the artifact `com.capybee:game-engine:0.0.1-SNAPSHOT`; the POMs say `engine-core` / `0.1.0-SNAPSHOT`. `docs/CapyBee_concept.md` says Java 21. Spec 22/README number 27–31 differently from the roadmap you gave. Stray files in repo root: `generated-smoke.txt`, `snapshot.json`, `tmp-runcheck.jsh`. | repo root, READMEs | Reconciliation note (§2) and a small docs-cleanup task (§16, step 0). |
+| F13 | Docs drift: `app/engine/README.md` names the artifact `com.capybee:game-engine:0.0.1-SNAPSHOT`; the POMs say `engine-core` / `0.1.0-SNAPSHOT`. `docs/CapyBee_concept.md` says Java 21. Spec 22/README number 27–31 differently from the roadmap you gave. Stray files in repo root: `generated-smoke.txt`, `snapshot.json`, `tmp-runcheck.jsh`. | repo root, READMEs | Reconciliation note (§2) and a small docs-cleanup task (§16, step 0). |
 | F14 | Scene generation input is only: scenario/cast/quest artifacts, the scene id, its trusted choice ids and actor ids. It does **not** include player state or which choice led there. | `GenerationPipeline.contextJson` | A scene generated ahead of time is identical whichever path reaches it, so **prefetch has no quality cost** (§10.1). Side effect for spec 29: generated text never reacts to earlier choices; adaptation must come from trusted engine state. |
 | F15 | `restoreArtifacts` accepts scene artifacts for any slot, not only visited ones; resume only requires cached artifacts for *visited* scenes. | `GenerationPipeline.restoreSceneArtifact`, `DefaultEngine.resume` | Prefetched artifacts can be merged into a snapshot and restored safely. |
 | F16 | Per-run limits (`totalCallsPerRun`, `callsPerStage`) live in the pipeline **instance**. A restored pipeline starts its counters at 0. Because the host rebuilds `Run` for every command and every prefetch job, these limits no longer bound a run's lifetime. | `GenerationPipeline` (`totalCalls`, `stageCalls`), `restoreArtifacts` | **Correction to rev. 1 §10.** The host must enforce a lifetime per-run call ceiling itself (§10). |
@@ -39,7 +39,7 @@ Spec 27 defines that host boundary. Specs 28 (client rendering contract) and 29 
 
 ## 2. Roadmap reconciliation
 
-Earlier documents number the follow-up work differently (spec 22 maps 27 to "generation pipeline"; `engine/README.md` maps 27 to the session lifecycle and 28–31 to console/web host/client rendering/pack). The current plan is:
+Earlier documents number the follow-up work differently (spec 22 maps 27 to "generation pipeline"; `app/engine/README.md` maps 27 to the session lifecycle and 28–31 to console/web host/client rendering/pack). The current plan is:
 
 | Spec | Scope |
 |---|---|
@@ -47,7 +47,7 @@ Earlier documents number the follow-up work differently (spec 22 maps 27 to "gen
 | **28** | Client rendering contract: view models for hex board and scene screens; AI returns asset IDs only; React renders from a fixed SVG catalog |
 | **29** | CapyBee pack (Polish): theme inputs from check-in mood, preferences, free text; real-life echo feeds Missions; honeycomb-cell rewards with a daily cap like the mini-games |
 
-Do not renumber existing spec files. Add a short "Roadmap reconciliation" note to `docs/specifications/README.md` and `engine/README.md` stating: *the web host and server-side SDK wiring move from "spec 29" to spec 27; the expanded console host is no longer a separate numbered spec.*
+Do not renumber existing spec files. Add a short "Roadmap reconciliation" note to `docs/specifications/README.md` and `app/engine/README.md` stating: *the web host and server-side SDK wiring move from "spec 29" to spec 27; the expanded console host is no longer a separate numbered spec.*
 
 ---
 
@@ -654,7 +654,7 @@ Free text: persisted only in `pending_start` during `PREPARING`; never in `snaps
 - **Build and deploy changes (required):**
   - `app/server/pom.xml` depends on `com.capybee:engine-core`, `engine-session` and, if generated play is enabled, `engine-adapter-anthropic` (artifact ids as in the POMs, version `0.1.0-SNAPSHOT`).
   - Packs are loaded at startup from the classpath/`ClasspathPackSource`; the registry is immutable. Document which packs ship in the image.
-  - `Dockerfile` server-build stage must copy the root `pom.xml` and `engine/` and build with `mvn -B -DskipTests -pl app/server -am package` (today it copies only `app/server`).
+  - `Dockerfile` server-build stage must copy `app/pom.xml` and `app/engine/` and build with `mvn -B -f app/pom.xml -DskipTests -pl server -am package` (today it copies only `app/server`).
   - CI: keep the standalone engine job; make the server job build the reactor so the dependency resolves. Mind the `engine-core` Jacoco 70% per-package rule for new packages.
 
 ---
@@ -690,7 +690,7 @@ When a command takes longer than the wait limit, the console behaves like the we
 
 ### Keeping the web client in sync
 
-DTOs in `engine-session` (`wire`) are the contract the HTTP controllers return. TypeScript API types in `app/ui` mirror them. Golden JSON files in `engine/session/src/test/resources/wire/` are the single source of truth: Java tests round-trip them through `SessionJson`; UI tests read the same files (relative path) and type-check them. A DTO change that breaks either side fails CI.
+DTOs in `engine-session` (`wire`) are the contract the HTTP controllers return. TypeScript API types in `app/ui` mirror them. Golden JSON files in `app/engine/session/src/test/resources/wire/` are the single source of truth: Java tests round-trip them through `SessionJson`; UI tests read the same files (relative path) and type-check them. A DTO change that breaks either side fails CI.
 
 ### Service vs HTTP conformance
 
@@ -754,9 +754,9 @@ One scripted scenario set (start → choices → free text → move → abandon;
 
 ## 16. Implementation sequence
 
-0. **Docs hygiene:** roadmap reconciliation notes (§2); fix `engine/README.md` artifact coordinates; remove or `.gitignore` `generated-smoke.txt`, `snapshot.json`, `tmp-runcheck.jsh`; record that 26.1 is implemented.
+0. **Docs hygiene:** roadmap reconciliation notes (§2); fix `app/engine/README.md` artifact coordinates; remove or `.gitignore` `generated-smoke.txt`, `snapshot.json`, `tmp-runcheck.jsh`; record that 26.1 is implemented.
 1. Create `engine-session` module with ports, in-memory fakes, `RunSessionService`, `MeteredTextGenerator`; tests 1–12.
-2. Wire `engine-session` into the reactor and CI; keep `mvn -f engine/pom.xml clean verify` green.
+2. Wire `engine-session` into the reactor and CI; keep `mvn -f app/engine/pom.xml clean verify` green.
 2a. Engine-core additions `Run.prefetchCandidates()` / `Run.prefetch()` (§7.4) with tests 21–22; then host-side prefetch (job, in-flight registry, `PrefetchStore`, reserves, `ensurePrefetch`) with tests 23–27.
 2b. `wire` DTOs + `SessionJson`, public in-memory adapters, `LocalSessionStore`; console `--session` mode (flags in §14.1); tests 28–33. The console can be used for manual testing as soon as 2b is done, before any web work.
 3. Flyway `V12`, JDBC adapters (`RunRepository`, `CommandLog`, `GenerationLedger`, `EventOutbox`), `@RestControllerAdvice`, controllers behind `capybee.game.enabled`; tests 13–17.

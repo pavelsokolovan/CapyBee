@@ -9,6 +9,6 @@
   <name>Workspace Build</name>
   <modules>
     <module>engine</module>
-    <module>app/server</module>
+    <module>server</module>
   </modules>
 </project>

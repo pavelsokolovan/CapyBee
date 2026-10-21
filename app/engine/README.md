@@ -13,12 +13,12 @@ not a Boot executable JAR. The working Java namespace remains
 From the repository root:
 
 ```sh
-mvn -f engine/pom.xml clean verify
-mvn -f engine/pom.xml -Dtest=PackLoaderTest test
-mvn -f engine/pom.xml install
+mvn -f app/engine/pom.xml clean verify
+mvn -f app/engine/pom.xml -Dtest=PackLoaderTest test
+mvn -f app/engine/pom.xml install
 ```
 
-Or open `engine/` as a standalone IDE project and run `mvn verify` there.
+Or open `app/engine/` as a standalone IDE project and run `mvn verify` there.
 Reports are in `target/surefire-reports/` and `target/site/jacoco/` inside
 this module. Every engine package must reach 70% line coverage. Tests need
 only the JDK and Maven; after dependencies are cached, `mvn -o verify` works.
@@ -30,7 +30,7 @@ explicit generated play; authored play never configures or invokes it. Verify
 the adapter and CLI through the reactor with:
 
 ```sh
-mvn -f engine/pom.xml -pl cli -am verify
+mvn -f app/engine/pom.xml -pl cli -am verify
 ```
 
 Live adapter configuration requires `GENERATION_MODEL_ID` and
@@ -79,9 +79,9 @@ does not regenerate content already shown. Provider summaries contain stage,
 status, call count, timing, usage, and stable error codes only; prompts,
 responses, player text, and credentials are not logged.
 
-The root POM is an aggregator, not a shared parent. `mvn verify` at the
-repository root verifies both the engine and backend; backend tests still
-need their existing environment. Spec 27 adds the framework-neutral session
+The [app POM](../pom.xml) is an aggregator, not a shared parent.
+`mvn -f app/pom.xml verify` from the repository root verifies both the engine
+and backend; backend tests still need their existing environment. Spec 27 adds the framework-neutral session
 contract and the backend's engine dependency. Packs are only available to the
 web host when copied into its classpath under `game-packs/<pack-id>`; the
 CapyBee Polish pack remains the responsibility of spec 29.
@@ -117,7 +117,7 @@ for cross-file links.
 
 ## Roadmap Reconciliation
 
-[Spec 22](../docs/specifications/22-engine-core-and-pack-format-instruction.md)
+[Spec 22](../../docs/specifications/22-engine-core-and-pack-format-instruction.md)
 delivers the pack SDK. Specs 23-26.1 now provide the in-process runtime,
 rules/state, safety boundary, generation pipeline, generated-play CLI, and
 artifact continuity. The web host and server-side SDK wiring move from the

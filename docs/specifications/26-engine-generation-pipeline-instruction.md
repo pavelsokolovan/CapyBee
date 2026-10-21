@@ -31,13 +31,13 @@ The user reports that specs 22, 23, 24, 24.1, and 25 are implemented and committ
 
 **Source inspection limitation:** this session could not fetch the GitHub repository or resolve `github.com`, so it could not freshly inspect current Java sources, the latest `main` commit, or the committed spec 25 implementation. Before changing code, inspect the real checkout and use existing types and signatures. This file does not claim that its illustrative API has been compile-verified.
 
-**Template dependency check is mandatory.** The roadmap identifies a template system (scenario skeletons, archetypes, beat types, slots, JSON schemas), but the locally available spec 24 artifact covers rules/state rather than defining that catalogue. Inspect the implemented `engine/core/.../template` package, pack fixture data, and template validators. Reuse the implementation if present. Do not create a second template format or silently change the ownership/schema of `templates/*.json`. If the template contract is absent or materially different, record the missing dependency in the implementation summary and implement only compatible generation contracts until the template owner is reconciled.
+**Template dependency check is mandatory.** The roadmap identifies a template system (scenario skeletons, archetypes, beat types, slots, JSON schemas), but the locally available spec 24 artifact covers rules/state rather than defining that catalogue. Inspect the implemented `app/engine/core/.../template` package, pack fixture data, and template validators. Reuse the implementation if present. Do not create a second template format or silently change the ownership/schema of `templates/*.json`. If the template contract is absent or materially different, record the missing dependency in the implementation summary and implement only compatible generation contracts until the template owner is reconciled.
 
 ## 1. Scope
 
 ### In scope
 
-- A generic `TextGenerator` port and a provider-specific adapter outside `engine/core`.
+- A generic `TextGenerator` port and a provider-specific adapter outside `app/engine/core`.
 - Pipeline orchestration for theme, scenario, actor/quest, and lazy scene generation.
 - Structured prompts and bounded, stage-specific output contracts.
 - Safe prompt assembly from global policy, pack prompts, templates, authored data, and explicitly permitted user input.
@@ -69,7 +69,7 @@ The user reports that specs 22, 23, 24, 24.1, and 25 are implemented and committ
 7. **Spec 25 remains authoritative.** Free text must be normalized, locally scrubbed, guarded, and kept out of logs/persistent prompts. The generation pipeline must not bypass safety checks or send original unsanitized user text to a provider.
 8. **No raw prompt persistence.** Do not persist full system prompts, assembled prompts, raw user text, scrubbed user text, model request bodies, or raw response bodies for debugging or caching. Persist only approved validated artifacts and content-free metadata where host retention policy allows.
 9. **Bound every resource.** Limit prompt input, output tokens, generated item counts, scene count, wall-clock timeout, repair calls, and total provider calls/cost.
-10. **No provider in core.** `engine/core` defines types and ports only. HTTP, vendor SDK, credentials, provider model names, request headers, and network error translation belong in a separate adapter boundary.
+10. **No provider in core.** `app/engine/core` defines types and ports only. HTTP, vendor SDK, credentials, provider model names, request headers, and network error translation belong in a separate adapter boundary.
 11. **No provider required for core tests.** The unit/integration suite runs with fake generator and fake clock/ID/quota dependencies; no network, account, or API key is required by `mvn verify`.
 12. **No model-created identifiers as authority.** IDs used for routing, rule references, objective references, and assets come from the pack/template or are assigned by trusted code. Model-proposed display text is not an ID.
 13. **No hidden choices leakage.** A scene-generation or interpretation prompt receives only the choices/slots allowed for the active stage; never pass hidden options or internal state the player is not permitted to observe.
@@ -209,7 +209,7 @@ Rules:
 
 ## 7. Pipeline API and ports
 
-Inspect current `engine/core` packages first. The following is a target contract, not a requirement to duplicate existing types. Prefer closed stage-specific DTOs over a generic untyped document API.
+Inspect current `app/engine/core` packages first. The following is a target contract, not a requirement to duplicate existing types. Prefer closed stage-specific DTOs over a generic untyped document API.
 
 ### 7.1 Provider-neutral text generation port
 
@@ -373,11 +373,11 @@ Spec 25 takes precedence over every prompt or provider requirement in this secti
 
 ### 11.1 Module boundary
 
-Keep `TextGenerator` and its DTOs provider-neutral in `engine/core`. Put the concrete Anthropic network adapter in a separate adapter module/package such as `engine/adapter-anthropic` or the repository's existing adapter module. Do not add Anthropic classes or model IDs to core domain/API packages.
+Keep `TextGenerator` and its DTOs provider-neutral in `app/engine/core`. Put the concrete Anthropic network adapter in a separate adapter module/package such as `app/engine/adapter-anthropic` or the repository's existing adapter module. Do not add Anthropic classes or model IDs to core domain/API packages.
 
-If adding a Maven module is necessary, update `engine/pom.xml` and CI intentionally. The core module must remain buildable and testable without the provider adapter. The CLI and future host can depend on an adapter only when explicitly configured.
+If adding a Maven module is necessary, update `app/engine/pom.xml` and CI intentionally. The core module must remain buildable and testable without the provider adapter. The CLI and future host can depend on an adapter only when explicitly configured.
 
-Prefer the repository's existing HTTP/JSON stack if it is suitable. Avoid adding a large SDK when the same supported API can be implemented safely through the repository's existing adapter conventions. If a provider SDK is chosen, keep it entirely outside `engine/core` and pin its dependency version.
+Prefer the repository's existing HTTP/JSON stack if it is suitable. Avoid adding a large SDK when the same supported API can be implemented safely through the repository's existing adapter conventions. If a provider SDK is chosen, keep it entirely outside `app/engine/core` and pin its dependency version.
 
 ### 11.2 Model target
 
@@ -601,18 +601,18 @@ Use a fake `TextGenerator` whose responses are deterministic by requested stage 
 
 ### Architecture and compatibility
 
-27. `engine/core` has no Anthropic classes, model IDs, API key handling, HTTP client, Spring, ORM, or provider SDK dependency.
+27. `app/engine/core` has no Anthropic classes, model IDs, API key handling, HTTP client, Spring, ORM, or provider SDK dependency.
 28. The provider adapter can be omitted from the build/use path and all core tests still pass.
 29. Existing `fixture-minimal`, authored-only packs, specs 22/23/24/24.1 tests, and spec 25 privacy/input tests stay green.
 30. Existing public constructors/API contracts remain source-compatible where possible; any necessary additive API/snapshot changes are covered by compatibility tests.
 
 ## 18. Build and implementation boundaries
 
-- Keep changes in the existing engine/docs/test boundaries. Add a separate provider adapter module only if the current repository does not already have a suitable adapter module. Do not change `app/server` endpoints or production database schema in this spec; that belongs to spec 27.
+- Keep changes in the existing app/engine/docs/test boundaries. Add a separate provider adapter module only if the current repository does not already have a suitable adapter module. Do not change `app/server` endpoints or production database schema in this spec; that belongs to spec 27.
 - Do not add a network test to the default `mvn -B verify` path. If a manual real-provider smoke test is useful, make it opt-in, clearly named, credential-gated, and never run in CI by default.
 - Update the engine CI workflow only if needed for the new module. CI should test core, adapter compilation, and fake-generator contract tests, but must not require API secrets.
 - Preserve JaCoCo/build coverage thresholds already in the repository. Do not reduce them to make the pipeline pass.
-- Run existing build/tests first to capture baseline; run focused generation tests, then the complete `mvn -B verify` from `engine/` (or the actual repository's documented root); review `git diff` for unrelated changes.
+- Run existing build/tests first to capture baseline; run focused generation tests, then the complete `mvn -B verify` from `app/engine/` (or the actual repository's documented root); review `git diff` for unrelated changes.
 
 ## 19. Implementation sequence
 
@@ -625,7 +625,7 @@ Use a fake `TextGenerator` whose responses are deterministic by requested stage 
 7. **Implement quota/cost ports.** Add in-memory test ledger, reserve/reconcile logic, model pricing catalog, safe cost records, and strict limits.
 8. **Implement provider adapter.** Add configurable/pinned Anthropic model call, structured output if supported, bounded timeouts/retries, credential redaction, content-free errors, and usage parsing.
 9. **Add fixture-driven end-to-end tests.** Run the pipeline exclusively through a fake generator in ordinary CI. Add an optional manual smoke-test task only if practical.
-10. **Validate compatibility and build.** Run spec 22/23/24/24.1/25 regressions, all engine tests, coverage, and boundary tests. Verify that provider dependencies are not transitive into `engine/core`.
+10. **Validate compatibility and build.** Run spec 22/23/24/24.1/25 regressions, all engine tests, coverage, and boundary tests. Verify that provider dependencies are not transitive into `app/engine/core`.
 11. **Document verified behavior.** Update the engine README/spec index and the implementation summary with modules/files changed, test commands/results, provider setup, known limitations, and any remaining template-source mismatch. Do not claim a live model call was tested unless it was actually run with authorized credentials.
 
 ## 20. Acceptance criteria
@@ -647,7 +647,7 @@ Spec 26 is complete when:
 
 | Decision | Rule |
 |---|---|
-| Provider shape | Provider-neutral `TextGenerator` port; one concrete adapter outside `engine/core`. |
+| Provider shape | Provider-neutral `TextGenerator` port; one concrete adapter outside `app/engine/core`. |
 | Initial model | Claude Haiku 4.5 per plan, but explicit configurable/pinned model ID; verify availability before deployment. |
 | Stage order | Theme → scenario → cast/quests → scene-on-demand; input interpretation uses spec 25's existing types. |
 | Output | Structured JSON, then mandatory local validation. |

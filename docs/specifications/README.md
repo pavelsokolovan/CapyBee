@@ -37,7 +37,7 @@ For anything substantial (new screen, new feature, data model change), write a s
 - [24.1-engine-places-and-map-instruction.md](24.1-engine-places-and-map-instruction.md) - optional place graph, movement, and map runtime
 
 All of the above are implemented; see [../../.github/copilot-instructions.md](../../.github/copilot-instructions.md) for current coding conventions.
-Spec 22 lives in the independent `engine/` Maven module. Console-first runtime
+Spec 22 lives in the independent `app/engine/` Maven module. Console-first runtime
 and host integration follow in the series below.
 
 ## Engine Roadmap Reconciliation
@@ -66,4 +66,4 @@ files remain unchanged.
 
 Spec 26.1 found no existing Spec 24 template-definition package. It therefore
 adds the smallest versioned `generation/templates.json` registry and documents
-that compatibility addition in [the engine guide](../../engine/README.md).
+that compatibility addition in [the engine guide](../../app/engine/README.md).

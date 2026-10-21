@@ -95,9 +95,9 @@ is one pack plus the web host. A console is another host.
   fallback so a failure never becomes an error screen.
 - **Safety hooks live in the engine:** free text is an explicit per-pack
   opt-in, and no player content is written to logs.
-- **Separate SDK module (2026-10-09 decision).** `engine/` is independently
+- **Separate SDK module (2026-10-09 decision).** `app/engine/` is independently
   buildable and testable without the app, with its own dependencies and
-  coverage gate. A root Maven aggregator builds both Java modules. Source
+  coverage gate. `app/pom.xml` aggregates both Java modules. Source
   boundary tests also enforce universality within the SDK. The console host
   will drive its in-process API before any web integration.
 
