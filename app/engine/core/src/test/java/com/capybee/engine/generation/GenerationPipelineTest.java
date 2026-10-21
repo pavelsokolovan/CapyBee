@@ -104,22 +104,22 @@ class GenerationPipelineTest {
     @Test
     void restoresNarrativeScenarioBeatsWithoutTreatingThemAsSceneSlotIds() {
         String narrativeScenario = "{\"title\":\"The Lantern Path\",\"premise\":\"A small group follows a lantern\",\"setting\":\"An ancient forest\",\"beats\":[\"Opening: the lantern appears\",\"Exploration: they search the path\",\"Rest: they regroup by a stream\"]}";
-        GenerationArtifact scenario = new GenerationArtifact(GenerationArtifact.SUPPORTED_SCHEMA_VERSION,
+        GenerationArtifact scenario = new GenerationArtifact(1,
                 loadPack().manifest().id(), loadPack().manifest().version(), new com.capybee.engine.pack.LocaleTag("en"),
                 GenerationCatalog.Stage.SCENARIO, "scenario-basic", "scenario-artifact",
                 Outcome.GENERATED, new GenerationArtifact.ScenarioPayload(
                         "The Lantern Path", "A small group follows a lantern", "An ancient forest",
                         List.of("Opening: the lantern appears", "Exploration: they search the path", "Rest: they regroup by a stream")));
-        GenerationArtifact castArtifact = new GenerationArtifact(GenerationArtifact.SUPPORTED_SCHEMA_VERSION,
+        GenerationArtifact castArtifact = new GenerationArtifact(1,
                 loadPack().manifest().id(), loadPack().manifest().version(), new com.capybee.engine.pack.LocaleTag("en"),
                 GenerationCatalog.Stage.CAST, "cast-basic", "cast-artifact",
                 Outcome.GENERATED, new GenerationArtifact.CastPayload(List.of(
                         new GenerationArtifact.CastMember("guide", "actor-1", "Mira", "Warm guide"))));
-        GenerationArtifact questArtifact = new GenerationArtifact(GenerationArtifact.SUPPORTED_SCHEMA_VERSION,
+        GenerationArtifact questArtifact = new GenerationArtifact(1,
                 loadPack().manifest().id(), loadPack().manifest().version(), new com.capybee.engine.pack.LocaleTag("en"),
                 GenerationCatalog.Stage.QUEST, "quest-basic", "quest-artifact",
                 Outcome.GENERATED, new GenerationArtifact.QuestPayload(List.of()));
-        GenerationArtifact sceneArtifact = new GenerationArtifact(GenerationArtifact.SUPPORTED_SCHEMA_VERSION,
+        GenerationArtifact sceneArtifact = new GenerationArtifact(1,
                 loadPack().manifest().id(), loadPack().manifest().version(), new com.capybee.engine.pack.LocaleTag("en"),
                 GenerationCatalog.Stage.SCENE, "scene-basic", "scene-artifact",
                 Outcome.GENERATED, new GenerationArtifact.ScenePayload("opening", "The Opening",

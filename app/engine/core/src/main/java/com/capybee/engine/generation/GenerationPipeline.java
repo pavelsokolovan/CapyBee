@@ -57,6 +57,7 @@ public final class GenerationPipeline {
     private final Map<String, Scene> trustedScenes;
     private int totalCalls;
     private boolean initialized;
+    private List<String> visitedSceneIds = List.of();
 
     public GenerationPipeline(Pack pack, LocaleTag explicitLocale, TextGenerator generator, IdSource ids, Clock clock) {
         if (pack == null || !pack.manifest().features().contains(PackFeature.GENERATION)) {
@@ -158,8 +159,7 @@ public final class GenerationPipeline {
         Scene trusted = trustedScenes.get(slot.sceneId());
         if (trusted == null) throw new IllegalStateException("GENERATION_SCENE_MISSING");
         StageExecutionResult result = execute(GenerationCatalog.Stage.SCENE, slot);
-        ScenePayload payload = (ScenePayload) result.artifact().payload();
-        Scene composed = compose(trusted, payload, slot);
+        Scene composed = compose(trusted, result.artifact().payload(), slot);
         SceneResolution resolution = new SceneResolution(slot, composed, result.artifact(), result.execution());
         resolvedScenes.put(slotId, resolution);
         return resolution;
@@ -180,6 +180,7 @@ public final class GenerationPipeline {
     public boolean hasCachedScene(String sceneId) {
         return resolvedScenes.values().stream().anyMatch(resolution -> resolution.slot().sceneId().equals(sceneId));
     }
+    public void setVisitedSceneIds(List<String> visited) { visitedSceneIds = List.copyOf(visited); }
 
     public Scene resolveGeneratedScene(String sceneId) {
         SceneResolution resolution = resolveGeneratedSceneResolution(sceneId);
@@ -231,7 +232,7 @@ public final class GenerationPipeline {
                 String outputSchema = schema(stage);
                 if (requestData.length() + instructions.length() + outputSchema.length()
                         > catalog.limits().maxInputCharacters()) {
-                    failureCode = "GENERATION_CONTEXT_LIMIT";
+                    failureCode = "GENERATION_CONTEXT_REQUIRED_TOO_LARGE";
                     break;
                 }
                 TextGenerationResult response;
@@ -280,7 +281,8 @@ public final class GenerationPipeline {
             outcome = GenerationArtifact.Outcome.FALLBACK;
         }
         payload = assignEngineIds(payload);
-        GenerationArtifact artifact = new GenerationArtifact(GenerationArtifact.SUPPORTED_SCHEMA_VERSION,
+        int artifactVersion = fullGame() ? 2 : 1;
+        GenerationArtifact artifact = new GenerationArtifact(artifactVersion,
                 pack.manifest().id(), pack.manifest().version(), locale, stage, templateId,
                 ids.nextId(), outcome, payload);
         long elapsed = Math.max(0, Duration.between(startedAt, clock.instant()).toMillis());
@@ -306,16 +308,18 @@ public final class GenerationPipeline {
     }
 
     private void restoreSceneArtifact(GenerationArtifact artifact) {
-        if (!(artifact.payload() instanceof ScenePayload payload)) throw new IllegalArgumentException("GENERATION_ARTIFACT_MISMATCH");
+        String sceneId = artifact.payload() instanceof ScenePayload value ? value.sceneId()
+                : artifact.payload() instanceof PlannedScenePayload value ? value.sceneId() : null;
+        if (sceneId == null) throw new IllegalArgumentException("GENERATION_ARTIFACT_MISMATCH");
         GenerationCatalog.SceneSlot slot = slots.values().stream()
-                .filter(candidate -> candidate.sceneId().equals(payload.sceneId())).findFirst()
+                .filter(candidate -> candidate.sceneId().equals(sceneId)).findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("GENERATION_ARTIFACT_MISMATCH"));
         if (!slot.templateId().equals(artifact.templateId()) || resolvedScenes.containsKey(slot.slotId())) {
             throw new IllegalArgumentException("GENERATION_ARTIFACT_MISMATCH");
         }
         validateRestoredPayload(artifact);
         Scene trusted = trustedScenes.get(slot.sceneId());
-        Scene composed = compose(trusted, payload, slot);
+        Scene composed = compose(trusted, artifact.payload(), slot);
         GenerationExecutionSummary.StageExecution execution = new GenerationExecutionSummary.StageExecution(
             GenerationCatalog.Stage.SCENE, artifact.outcome(), 0, 0, null, null, null);
         executions.add(execution);
@@ -324,7 +328,14 @@ public final class GenerationPipeline {
 
     private void validateRestoredPayload(GenerationArtifact artifact) {
         Payload payload = artifact.payload();
-        if (artifact.stage() == GenerationCatalog.Stage.SCENARIO && payload instanceof ScenarioPayload scenario) {
+        if (artifact.artifactSchemaVersion() != (fullGame() ? 2 : 1)) throw new IllegalArgumentException("GENERATION_ARTIFACT_VERSION_MISMATCH");
+        if (artifact.stage() == GenerationCatalog.Stage.SCENARIO && payload instanceof StoryPlanPayload plan && fullGame()) {
+            GenerationOutputParser.Result checked = parsePayload(GenerationCatalog.Stage.SCENARIO,
+                    encode(plan), null, Set.of());
+            if (checked.payload() == null) throw new IllegalArgumentException("GENERATION_ARTIFACT_PLAN_MISMATCH");
+            return;
+        }
+        if (artifact.stage() == GenerationCatalog.Stage.SCENARIO && payload instanceof ScenarioPayload scenario && !fullGame()) {
             safeRestored(scenario.title(), 80); safeRestored(scenario.premise(), 500); safeRestored(scenario.setting(), 300);
             if (scenario.beats().isEmpty() || scenario.beats().size() > 8) {
                 throw new IllegalArgumentException("GENERATION_ARTIFACT_INVALID");
@@ -374,19 +385,30 @@ public final class GenerationPipeline {
             }
             return;
         }
-        if (artifact.stage() == GenerationCatalog.Stage.SCENE && payload instanceof ScenePayload scene) {
-            safeRestored(scene.title(), 80); safeRestored(scene.narration(), 500);
-            if (scene.dialogue().size() > 8 || scene.choices().size() > 8) throw new IllegalArgumentException("GENERATION_ARTIFACT_INVALID");
+        if (artifact.stage() == GenerationCatalog.Stage.SCENE && (payload instanceof ScenePayload || payload instanceof PlannedScenePayload)) {
+            String sceneId = payload instanceof ScenePayload s ? s.sceneId() : ((PlannedScenePayload) payload).sceneId();
+            String title = payload instanceof ScenePayload s ? s.title() : ((PlannedScenePayload) payload).title();
+            String narration = payload instanceof ScenePayload s ? s.narration() : ((PlannedScenePayload) payload).narration();
+            List<Dialogue> dialogue = payload instanceof ScenePayload s ? s.dialogue() : ((PlannedScenePayload) payload).dialogue();
+            List<ChoiceLabel> choices = payload instanceof ScenePayload s ? s.choices() : ((PlannedScenePayload) payload).choices();
+            safeRestored(title, 80); safeRestored(narration, 500);
+            if (payload instanceof PlannedScenePayload planned) {
+                if (!fullGame() || planned.continuityFacts().size() > 4
+                        || planned.continuityFacts().stream().mapToInt(f -> f.codePointCount(0, f.length())).sum() > 400)
+                    throw new IllegalArgumentException("GENERATION_ARTIFACT_INVALID");
+                planned.continuityFacts().forEach(f -> safeRestored(f, 140));
+            }
+            if (dialogue.size() > 8 || choices.size() > 8) throw new IllegalArgumentException("GENERATION_ARTIFACT_INVALID");
             Set<String> actors = stageArtifacts.containsKey(GenerationCatalog.Stage.CAST)
                     ? allowedActorIds() : Set.of();
-            for (Dialogue line : scene.dialogue()) {
+            for (Dialogue line : dialogue) {
                 safeRestored(line.text(), 300);
                 if (!actors.contains(line.actorId())) throw new IllegalArgumentException("GENERATION_ARTIFACT_INVALID");
             }
             GenerationCatalog.SceneSlot slot = slots.values().stream()
-                    .filter(candidate -> candidate.sceneId().equals(scene.sceneId())).findFirst().orElseThrow();
+                    .filter(candidate -> candidate.sceneId().equals(sceneId)).findFirst().orElseThrow();
             Set<String> choiceIds = new HashSet<>();
-            for (ChoiceLabel choice : scene.choices()) {
+            for (ChoiceLabel choice : choices) {
                 safeRestored(choice.label(), 80);
                 if (!slot.choiceIds().contains(choice.id()) || !choiceIds.add(choice.id())) {
                     throw new IllegalArgumentException("GENERATION_ARTIFACT_INVALID");
@@ -417,16 +439,20 @@ public final class GenerationPipeline {
                 catalog, template, slot, actorIds, objectiveIds);
     }
 
-    private Scene compose(Scene trusted, ScenePayload payload, GenerationCatalog.SceneSlot slot) {
+    private Scene compose(Scene trusted, Payload raw, GenerationCatalog.SceneSlot slot) {
+        String title; String narrationText; List<Dialogue> dialogue; List<ChoiceLabel> choices;
+        if (raw instanceof ScenePayload payload) { title=payload.title(); narrationText=payload.narration(); dialogue=payload.dialogue(); choices=payload.choices(); }
+        else if (raw instanceof PlannedScenePayload payload) { title=payload.title(); narrationText=payload.narration(); dialogue=payload.dialogue(); choices=payload.choices(); }
+        else throw new IllegalArgumentException("GENERATION_ARTIFACT_MISMATCH");
         Map<String, String> labels = new HashMap<>();
-        payload.choices().forEach(choice -> labels.put(choice.id(), choice.label()));
+        choices.forEach(choice -> labels.put(choice.id(), choice.label()));
         List<SceneOption> options = trusted.options().stream().map(option -> {
             if (!slot.choiceIds().contains(option.id())) throw new IllegalStateException("GENERATION_TRUSTED_CHOICE_MISMATCH");
             return new SceneOption(option.id(), labels.get(option.id()), option.next(), option.effects(),
                     option.requires(), option.unmetHint(), option.hideWhenUnmet());
         }).toList();
         List<Block> blocks = new ArrayList<>(trusted.blocks());
-        String narration = payload.title().isBlank() ? payload.narration() : payload.title() + "\n" + payload.narration();
+        String narration = title.isBlank() ? narrationText : title + "\n" + narrationText;
         int narrationIndex = -1;
         for (int index = 0; index < blocks.size(); index++) {
             if (blocks.get(index).kind() == BlockKind.NARRATION) { narrationIndex = index; break; }
@@ -434,7 +460,7 @@ public final class GenerationPipeline {
         if (narrationIndex < 0) blocks.add(0, new Block(BlockKind.NARRATION, null, narration, List.of()));
         else blocks.set(narrationIndex, new Block(BlockKind.NARRATION, null, narration, blocks.get(narrationIndex).refs()));
         int insertion = narrationIndex < 0 ? 1 : narrationIndex + 1;
-        for (Dialogue line : payload.dialogue()) {
+        for (Dialogue line : dialogue) {
             blocks.add(insertion++, new Block(BlockKind.SPEECH, line.actorId(), line.text(), List.of()));
         }
         return new Scene(trusted.id(), trusted.start(), blocks, options, trusted.next(), trusted.end(),
@@ -467,19 +493,39 @@ public final class GenerationPipeline {
         context.put("locale", locale.value());
         context.put("templateId", slot == null ? definitions.get(stage).templateId() : slot.templateId());
         if (slot != null) context.put("trustedChoices", slot.choiceIds());
-        if (stage == GenerationCatalog.Stage.SCENARIO) context.put("sceneSlots", slots.keySet());
+        if (stage == GenerationCatalog.Stage.SCENARIO && !fullGame()) context.put("sceneSlots", slots.keySet());
         if (stage == GenerationCatalog.Stage.CAST) context.put("actorSlots", templateFor(stage, slot).actorSlots());
         if (stage == GenerationCatalog.Stage.QUEST) context.put("objectiveIds", templateFor(stage, slot).objectiveIds());
         if (stage == GenerationCatalog.Stage.SCENE) {
             context.put("sceneId", slot.sceneId());
             context.put("trustedChoiceIds", slot.choiceIds());
             context.put("actorIds", allowedActorIds());
+            if (fullGame()) {
+                context.put("phaseId", slot.phaseId()); context.put("storyRole", slot.storyRole());
+                context.put("allowedActorSlots", slot.actorSlots()); context.put("allowedObjectiveIds", slot.objectiveIds());
+                context.put("allowedToneTags", slot.toneTags());
+                StoryPlanPayload plan = (StoryPlanPayload) stageArtifacts.get(GenerationCatalog.Stage.SCENARIO).payload();
+                context.put("storyPlan", Map.of("title", plan.title(), "premise", plan.premise(),
+                        "storyPromises", plan.storyPromises(), "phase", plan.phases().stream()
+                        .filter(p -> p.phaseId().equals(slot.phaseId())).findFirst().orElseThrow()));
+                Map<String, GenerationArtifact> scenes = new LinkedHashMap<>();
+                resolvedScenes.values().forEach(r -> scenes.put(r.slot().sceneId(), r.artifact()));
+                Map<String, String> phases = new LinkedHashMap<>(); slots.values().forEach(s -> phases.put(s.sceneId(), s.phaseId()));
+                context.put("continuityFacts", StoryContinuity.selectContinuity(visitedSceneIds, scenes, phases,
+                        slot.sceneId(), slot.phaseId(), 12, 1200));
+            }
         }
-        List<Map<String, Object>> prior = new ArrayList<>();
-        stageArtifacts.values().forEach(artifact -> prior.add(Map.of("stage", artifact.stage().name(), "payload", artifact.payload())));
-        context.put("priorArtifacts", prior);
+        if (!fullGame()) {
+            List<Map<String, Object>> prior = new ArrayList<>();
+            stageArtifacts.values().forEach(artifact -> prior.add(Map.of("stage", artifact.stage().name(), "payload", artifact.payload())));
+            context.put("priorArtifacts", prior);
+        } else if (stage == GenerationCatalog.Stage.CAST || stage == GenerationCatalog.Stage.QUEST) {
+            context.put("storyPlan", stageArtifacts.get(GenerationCatalog.Stage.SCENARIO).payload());
+        } else if (stage == GenerationCatalog.Stage.SCENARIO) {
+            context.put("phases", catalog.runContract().phases().stream().map(p -> Map.of("phaseId", p.id(),
+                    "kind", p.kind().name(), "slots", catalog.sceneSlots().stream().filter(s -> p.id().equals(s.phaseId())).toList())).toList());
+        }
         String json = encode(context);
-        if (json.length() > catalog.limits().maxInputCharacters()) throw new IllegalStateException("GENERATION_CONTEXT_LIMIT");
         return json;
     }
 
@@ -499,7 +545,8 @@ public final class GenerationPipeline {
                 .orElseThrow(() -> new IllegalStateException("GENERATION_TEMPLATE_MISSING"));
     }
 
-    private String schema(GenerationCatalog.Stage stage) { return outputParser.schema(stage); }
+    private String schema(GenerationCatalog.Stage stage) { return outputParser.schema(stage, fullGame()); }
+    private boolean fullGame() { return catalog.runContract() != null && catalog.runContract().kind() == RunContractKind.FULL_GAME; }
 
     private TextGenerationResult.TokenUsage mergeUsage(TextGenerationResult.TokenUsage left,
                                                         TextGenerationResult.TokenUsage right) {

@@ -56,7 +56,7 @@ list. The current implementation boundary is:
 - 27 - Public session lifecycle, host-facing API contract, web host and queue integration
 - 27.1-27.3 - Durable local sessions, console coverage, and measurable prefetch behavior
 - 27.4 - Versioned full generated-game contract, structural preflight, and capability metadata
-- 27.5 - Generated story planning (next)
+- 27.5 - Generated story planning (implemented)
 - 28 - Client rendering contract
 - 29 - CapyBee Polish game pack and game-pack integration
 

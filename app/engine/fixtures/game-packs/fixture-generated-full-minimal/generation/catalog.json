@@ -7,13 +7,13 @@
     {"stage":"SCENE","templateId":"scene-basic","dependencies":["SCENARIO","CAST","QUEST"],"fallbackResource":"generation/fallbacks/opening.json"}
   ],
   "sceneSlots":[
-    {"slotId":"opening-slot","sceneId":"opening","templateId":"scene-basic","fallbackResource":"generation/fallbacks/opening.json","choiceIds":["left","right"]},
-    {"slotId":"development-a-slot","sceneId":"development-a","templateId":"scene-basic","fallbackResource":"generation/fallbacks/development-a.json","choiceIds":[]},
-    {"slotId":"development-b-slot","sceneId":"development-b","templateId":"scene-basic","fallbackResource":"generation/fallbacks/development-b.json","choiceIds":[]},
-    {"slotId":"challenge-slot","sceneId":"challenge","templateId":"scene-basic","fallbackResource":"generation/fallbacks/challenge.json","choiceIds":[]},
-    {"slotId":"resolution-slot","sceneId":"resolution","templateId":"scene-basic","fallbackResource":"generation/fallbacks/resolution.json","choiceIds":["succeed","accept"]},
-    {"slotId":"ending-success-slot","sceneId":"ending-success","templateId":"scene-basic","fallbackResource":"generation/fallbacks/ending-success.json","choiceIds":[]},
-    {"slotId":"ending-partial-slot","sceneId":"ending-partial","templateId":"scene-basic","fallbackResource":"generation/fallbacks/ending-partial.json","choiceIds":[]}
+    {"slotId":"opening-slot","sceneId":"opening","templateId":"scene-basic","fallbackResource":"generation/fallbacks/opening.json","choiceIds":["left","right"],"phaseId":"opening","storyRole":"arrival","actorSlots":[],"objectiveIds":[],"toneTags":["hopeful"]},
+    {"slotId":"development-a-slot","sceneId":"development-a","templateId":"scene-basic","fallbackResource":"generation/fallbacks/development-a.json","choiceIds":[],"phaseId":"development","storyRole":"journey","actorSlots":[],"objectiveIds":[],"toneTags":["hopeful"]},
+    {"slotId":"development-b-slot","sceneId":"development-b","templateId":"scene-basic","fallbackResource":"generation/fallbacks/development-b.json","choiceIds":[],"phaseId":"development","storyRole":"journey","actorSlots":[],"objectiveIds":[],"toneTags":["hopeful"]},
+    {"slotId":"challenge-slot","sceneId":"challenge","templateId":"scene-basic","fallbackResource":"generation/fallbacks/challenge.json","choiceIds":[],"phaseId":"challenge","storyRole":"challenge","actorSlots":[],"objectiveIds":[],"toneTags":["hopeful"]},
+    {"slotId":"resolution-slot","sceneId":"resolution","templateId":"scene-basic","fallbackResource":"generation/fallbacks/resolution.json","choiceIds":["succeed","accept"],"phaseId":"resolution","storyRole":"choice","actorSlots":[],"objectiveIds":[],"toneTags":["hopeful"]},
+    {"slotId":"ending-success-slot","sceneId":"ending-success","templateId":"scene-basic","fallbackResource":"generation/fallbacks/ending-success.json","choiceIds":[],"phaseId":"ending","storyRole":"ending","actorSlots":[],"objectiveIds":[],"toneTags":["hopeful"]},
+    {"slotId":"ending-partial-slot","sceneId":"ending-partial","templateId":"scene-basic","fallbackResource":"generation/fallbacks/ending-partial.json","choiceIds":[],"phaseId":"ending","storyRole":"ending","actorSlots":[],"objectiveIds":[],"toneTags":["hopeful"]}
   ],
   "limits":{"totalCallsPerRun":8,"callsPerStage":1,"maxOutputTokens":800,"maxInputCharacters":12000,"repairAttempts":0},
   "runContract":{"kind":"FULL_GAME","contractVersion":1,

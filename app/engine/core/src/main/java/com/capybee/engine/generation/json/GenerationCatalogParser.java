@@ -45,7 +45,7 @@ public final class GenerationCatalogParser {
         if (schemaVersion < 1 || schemaVersion > GenerationCatalog.SUPPORTED_SCHEMA_VERSION) {
             error(context, "GENERATION_SCHEMA_UNSUPPORTED", CATALOG_FILE, "/schemaVersion", "Unsupported generation catalog version");
         }
-        if (integer(templates.get("schemaVersion")) != 1) {
+        if (integer(templates.get("schemaVersion")) < 1 || integer(templates.get("schemaVersion")) > 2) {
             error(context, "GENERATION_SCHEMA_UNSUPPORTED", TEMPLATES_FILE, "/schemaVersion", "Unsupported generation template version");
         }
 
@@ -169,26 +169,32 @@ public final class GenerationCatalogParser {
                 continue;
             }
                 fields(item, TEMPLATES_FILE, "GENERATION_TEMPLATE_INVALID", context,
-                    "id", "stage", "actorSlots", "objectiveIds", "toneTags");
+                    "id", "stage", "actorSlots", "objectiveIds", "toneTags", "storyRoles");
             String id = text(item.get("id"));
             GenerationCatalog.Stage stage = stage(item.get("stage"), TEMPLATES_FILE, pointer + "/stage", context);
                 List<String> actorSlots = optionalStrings(item.get("actorSlots"), pointer + "/actorSlots", context, 12);
                 List<String> objectiveIds = optionalStrings(item.get("objectiveIds"), pointer + "/objectiveIds", context, 12);
                 List<String> toneTags = optionalStrings(item.get("toneTags"), pointer + "/toneTags", context, 8);
+                List<String> storyRoles = optionalStrings(item.get("storyRoles"), pointer + "/storyRoles", context, 24);
             if (!validId(id) || stage == null) {
                 error(context, "GENERATION_TEMPLATE_INVALID", TEMPLATES_FILE, pointer, "Template id or stage is invalid");
                 continue;
             }
             if ((stage != GenerationCatalog.Stage.CAST && !actorSlots.isEmpty())
                     || (stage != GenerationCatalog.Stage.QUEST && !objectiveIds.isEmpty())
-                    || (stage != GenerationCatalog.Stage.THEME && !toneTags.isEmpty())
+                    || (stage != GenerationCatalog.Stage.THEME && stage != GenerationCatalog.Stage.SCENARIO
+                        && stage != GenerationCatalog.Stage.SCENE && !toneTags.isEmpty())
+                    || (stage != GenerationCatalog.Stage.SCENARIO && stage != GenerationCatalog.Stage.SCENE
+                        && !storyRoles.isEmpty())
                     || new HashSet<>(actorSlots).size() != actorSlots.size()
                     || new HashSet<>(objectiveIds).size() != objectiveIds.size()
-                    || new HashSet<>(toneTags).size() != toneTags.size()) {
+                    || new HashSet<>(toneTags).size() != toneTags.size()
+                    || new HashSet<>(storyRoles).size() != storyRoles.size()
+                    || storyRoles.stream().anyMatch(role -> !contractId(role))) {
                 error(context, "GENERATION_TEMPLATE_INVALID", TEMPLATES_FILE, pointer, "Template slots or vocabularies do not match its stage");
             }
             GenerationCatalog.TemplateDefinition definition = new GenerationCatalog.TemplateDefinition(
-                    id, stage, actorSlots, objectiveIds, toneTags);
+                    id, stage, actorSlots, objectiveIds, toneTags, storyRoles);
             if (templates.putIfAbsent(id, definition) != null) {
                 error(context, "GENERATION_TEMPLATE_INVALID", TEMPLATES_FILE, pointer + "/id", "Duplicate template id");
             }
@@ -275,12 +281,18 @@ public final class GenerationCatalogParser {
                 continue;
             }
             fields(item, CATALOG_FILE, "GENERATION_CATALOG_INVALID", context,
-                    "slotId", "sceneId", "templateId", "fallbackResource", "choiceIds");
+                    "slotId", "sceneId", "templateId", "fallbackResource", "choiceIds",
+                    "phaseId", "storyRole", "actorSlots", "objectiveIds", "toneTags");
             String slotId = text(item.get("slotId"));
             String sceneId = text(item.get("sceneId"));
             String templateId = text(item.get("templateId"));
             String fallback = text(item.get("fallbackResource"));
             List<String> choices = strings(item.get("choiceIds"), CATALOG_FILE, pointer + "/choiceIds", context, 8);
+            String phaseId = text(item.get("phaseId"));
+            String storyRole = text(item.get("storyRole"));
+            List<String> actorSlots = optionalStrings(item.get("actorSlots"), pointer + "/actorSlots", context, 8);
+            List<String> objectiveIds = optionalStrings(item.get("objectiveIds"), pointer + "/objectiveIds", context, 8);
+            List<String> toneTags = optionalStrings(item.get("toneTags"), pointer + "/toneTags", context, 8);
             if (!validId(slotId) || !ids.add(slotId) || !validId(sceneId) || !validId(templateId)
                     || !validResource(fallback, pack) || templates.get(templateId) == null
                     || templates.get(templateId).stage() != GenerationCatalog.Stage.SCENE
@@ -292,7 +304,8 @@ public final class GenerationCatalogParser {
                 error(context, "GENERATION_REFERENCE_INVALID", CATALOG_FILE, pointer,
                         "Scene slot must match a trusted scene and its declared choice ids");
             }
-            slots.add(new GenerationCatalog.SceneSlot(slotId, sceneId, templateId, fallback, choices));
+            slots.add(new GenerationCatalog.SceneSlot(slotId, sceneId, templateId, fallback, choices,
+                    phaseId, storyRole, actorSlots, objectiveIds, toneTags));
         }
         return slots;
     }

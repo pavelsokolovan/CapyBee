@@ -167,6 +167,7 @@ final class RunImpl implements Run {
 
     private Scene scene(String id) {
         if (generationPipeline != null && generationPipeline.hasSceneSlot(id)) {
+            generationPipeline.setVisitedSceneIds(visited);
             Scene generated = generationPipeline.resolveGeneratedScene(id);
             if (generated != null) return generated;
         }

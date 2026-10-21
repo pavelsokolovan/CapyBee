@@ -58,7 +58,7 @@ class FullGeneratedGameContractTest {
         assertThat(backwards.issues()).extracting(issue -> issue.code()).contains("PACK_RUN_ROUTE_BACKWARDS");
 
         String catalog = source.read("generation/catalog.json").orElseThrow()
-                .replaceAll("(?s),?\\s*\\{\"slotId\":\"challenge-slot\".*?\"choiceIds\":\\[\\]}", "");
+                .replaceAll("(?s),?\\s*\\{\"slotId\":\"challenge-slot\".*?\"toneTags\":\\[\"hopeful\"\\]}", "");
         var missing = new PackLoader(Engine.sectionValidators()).tryLoad(
                 new PackId("fixture-generated-full-minimal"), override(source, "generation/catalog.json", catalog));
         assertThat(missing.issues()).extracting(issue -> issue.code()).contains("PACK_RUN_SCENE_SLOT_MISSING");

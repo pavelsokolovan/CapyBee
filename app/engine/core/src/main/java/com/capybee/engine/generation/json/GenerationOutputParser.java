@@ -16,6 +16,7 @@ import java.util.regex.Pattern;
 public final class GenerationOutputParser {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final Pattern MARKUP = Pattern.compile("(?is)<\\s*/?\\s*(script|html|iframe|img|svg)|javascript:");
+    private static final Pattern CONTROL = Pattern.compile("(?i)\\b(set|increment|decrement|complete|unlock|route|next|flag|counter|outcome|objective)\\b\\s*[:=]");
     private final PiiScrubber piiScrubber = new PiiScrubber();
 
     public Result parse(GenerationCatalog.Stage stage, String json, int maxCharacters,
@@ -29,10 +30,10 @@ public final class GenerationOutputParser {
         try {
             return switch (stage) {
                 case THEME -> theme(root, template);
-                case SCENARIO -> scenario(root, catalog);
+                case SCENARIO -> fullGame(catalog) ? storyPlan(root, catalog) : scenario(root, catalog);
                 case CAST -> cast(root, template);
                 case QUEST -> quest(root, template, objectiveIds);
-                case SCENE -> scene(root, slot, actorIds);
+                case SCENE -> fullGame(catalog) ? plannedScene(root, slot, actorIds) : scene(root, slot, actorIds);
             };
         } catch (ValidationException exception) {
             return Result.invalid(exception.code);
@@ -40,21 +41,88 @@ public final class GenerationOutputParser {
     }
 
     public String schema(GenerationCatalog.Stage stage) {
+        return schema(stage, false);
+    }
+
+    public String schema(GenerationCatalog.Stage stage, boolean fullGame) {
         Map<String, Object> text = Map.of("type", "string");
         Map<String, Object> document = switch (stage) {
             case THEME -> objectSchema(Map.of("title", text, "premise", text,
                 "toneTags", arraySchema(text)));
-            case SCENARIO -> objectSchema(Map.of("title", text, "premise", text, "setting", text,
-                "beats", arraySchema(text)));
+            case SCENARIO -> fullGame ? objectSchema(Map.of("title", text, "premise", text, "setting", text,
+                    "themes", arraySchema(text), "storyPromises", arraySchema(text),
+                    "phases", arraySchema(objectSchema(Map.of("phaseId", text, "goal", text,
+                        "development", text, "transition", text, "actorSlots", arraySchema(text),
+                        "objectiveIds", arraySchema(text), "toneTags", arraySchema(text),
+                        "storyRoles", arraySchema(text))))))
+                : objectSchema(Map.of("title", text, "premise", text, "setting", text, "beats", arraySchema(text)));
             case CAST -> objectSchema(Map.of("characters", arraySchema(objectSchema(
                 Map.of("name", text, "description", text)))));
             case QUEST -> objectSchema(Map.of("objectives", arraySchema(objectSchema(
                 Map.of("objectiveId", text, "title", text, "description", text)))));
-            case SCENE -> objectSchema(Map.of("title", text, "narration", text,
+            case SCENE -> objectSchema(fullGame ? Map.of("title", text, "narration", text,
+                "dialogue", arraySchema(objectSchema(Map.of("actorId", text, "text", text))),
+                "choices", arraySchema(objectSchema(Map.of("id", text, "label", text))),
+                "continuityFacts", arraySchema(text)) : Map.of("title", text, "narration", text,
                 "dialogue", arraySchema(objectSchema(Map.of("actorId", text, "text", text))),
                 "choices", arraySchema(objectSchema(Map.of("id", text, "label", text)))));
         };
         return MAPPER.writeValueAsString(document);
+    }
+
+    private boolean fullGame(GenerationCatalog catalog) {
+        return catalog.runContract() != null && catalog.runContract().kind() == com.capybee.engine.generation.RunContractKind.FULL_GAME;
+    }
+
+    private Result storyPlan(JsonNode root, GenerationCatalog catalog) {
+        exactFields(root, "title", "premise", "setting", "themes", "storyPromises", "phases");
+        String title = safeText(root, "title", 80), premise = safeText(root, "premise", 500);
+        String setting = safeText(root, "setting", 300);
+        List<String> themes = uniqueStrings(root, "themes", 8, 32, "GENERATION_STORY_PLAN_REFERENCE_INVALID");
+        List<String> promises = uniqueStrings(root, "storyPromises", 8, 180, "GENERATION_STORY_PLAN_PROMISE_INVALID");
+        if (promises.isEmpty()) throw invalid("GENERATION_STORY_PLAN_PROMISE_INVALID");
+        JsonNode nodes = array(root, "phases", 5);
+        if (nodes.size() != catalog.runContract().phases().size()) throw invalid("GENERATION_STORY_PLAN_PHASE_MISMATCH");
+        List<GenerationArtifact.PhasePlan> phases = new ArrayList<>();
+        for (int i = 0; i < nodes.size(); i++) {
+            JsonNode node = nodes.get(i);
+            exactFields(node, "phaseId", "goal", "development", "transition", "actorSlots", "objectiveIds", "toneTags", "storyRoles");
+            String phaseId = requiredText(node, "phaseId");
+            if (!catalog.runContract().phases().get(i).id().equals(phaseId)) throw invalid("GENERATION_STORY_PLAN_PHASE_MISMATCH");
+            List<GenerationCatalog.SceneSlot> slots = catalog.sceneSlots().stream().filter(s -> phaseId.equals(s.phaseId())).toList();
+            Set<String> actors = union(slots, GenerationCatalog.SceneSlot::actorSlots);
+            Set<String> objectives = union(slots, GenerationCatalog.SceneSlot::objectiveIds);
+            Set<String> tones = union(slots, GenerationCatalog.SceneSlot::toneTags);
+            Set<String> roles = slots.stream().map(GenerationCatalog.SceneSlot::storyRole).collect(java.util.stream.Collectors.toSet());
+            List<String> selectedActors = trusted(node, "actorSlots", 12, actors);
+            List<String> selectedObjectives = trusted(node, "objectiveIds", 12, objectives);
+            List<String> selectedTones = trusted(node, "toneTags", 8, tones);
+            List<String> selectedRoles = trusted(node, "storyRoles", 12, roles);
+            if (selectedRoles.isEmpty() || !selectedActors.containsAll(actors) || !selectedObjectives.containsAll(objectives)
+                    || !selectedRoles.containsAll(roles)) throw invalid("GENERATION_STORY_PLAN_REFERENCE_INVALID");
+            phases.add(new GenerationArtifact.PhasePlan(phaseId, safeText(node, "goal", 240),
+                    safeText(node, "development", 240), safeText(node, "transition", 200),
+                    selectedActors, selectedObjectives, selectedTones, selectedRoles));
+        }
+        Set<String> allowedThemes = catalog.templates().stream().filter(t -> t.stage() == GenerationCatalog.Stage.SCENARIO)
+                .findFirst().map(t -> Set.copyOf(t.toneTags())).orElse(Set.of());
+        if (!allowedThemes.containsAll(themes)) throw invalid("GENERATION_STORY_PLAN_REFERENCE_INVALID");
+        return Result.valid(new GenerationArtifact.StoryPlanPayload(title, premise, setting, themes, promises, phases));
+    }
+
+    private Set<String> union(List<GenerationCatalog.SceneSlot> slots,
+                              java.util.function.Function<GenerationCatalog.SceneSlot, List<String>> getter) {
+        Set<String> result = new java.util.LinkedHashSet<>(); slots.forEach(s -> result.addAll(getter.apply(s))); return result;
+    }
+
+    private List<String> trusted(JsonNode node, String field, int max, Set<String> allowed) {
+        List<String> values = uniqueStrings(node, field, max, 64, "GENERATION_STORY_PLAN_REFERENCE_INVALID");
+        if (!allowed.containsAll(values)) throw invalid("GENERATION_STORY_PLAN_REFERENCE_INVALID"); return values;
+    }
+
+    private List<String> uniqueStrings(JsonNode node, String field, int max, int cp, String code) {
+        List<String> values = stringArray(node, field, max, cp);
+        if (new HashSet<>(values).size() != values.size()) throw invalid(code); return values;
     }
 
     private Map<String, Object> objectSchema(Map<String, Object> properties) {
@@ -151,6 +219,35 @@ public final class GenerationOutputParser {
             labels.add(new GenerationArtifact.ChoiceLabel(id, label));
         }
         if (!choiceIds.equals(new HashSet<>(slot.choiceIds()))) throw invalid("OUTPUT_REFERENCE_INVALID");
+        return Result.valid(new GenerationArtifact.ScenePayload(slot.sceneId(), title, narration, lines, labels));
+    }
+
+    private Result plannedScene(JsonNode root, GenerationCatalog.SceneSlot slot, Set<String> actorIds) {
+        exactFields(root, "title", "narration", "dialogue", "choices", "continuityFacts");
+        Result base = sceneFields(root, slot, actorIds);
+        GenerationArtifact.ScenePayload scene = (GenerationArtifact.ScenePayload) base.payload();
+        List<String> facts = uniqueStrings(root, "continuityFacts", 4, 140, "GENERATION_SCENE_FACT_INVALID");
+        if (facts.stream().mapToInt(s -> s.codePointCount(0, s.length())).sum() > 400
+                || facts.stream().anyMatch(f -> CONTROL.matcher(f).find())) throw invalid("GENERATION_SCENE_FACT_INVALID");
+        return Result.valid(new GenerationArtifact.PlannedScenePayload(scene.sceneId(), scene.title(), scene.narration(),
+                scene.dialogue(), scene.choices(), facts));
+    }
+
+    private Result sceneFields(JsonNode root, GenerationCatalog.SceneSlot slot, Set<String> actorIds) {
+        String title = safeText(root, "title", 80), narration = safeText(root, "narration", 500);
+        List<GenerationArtifact.Dialogue> lines = new ArrayList<>();
+        for (JsonNode line : array(root, "dialogue", 8)) {
+            exactFields(line, "actorId", "text"); String actorId = requiredText(line, "actorId");
+            if (!actorIds.contains(actorId)) throw invalid("OUTPUT_REFERENCE_INVALID");
+            lines.add(new GenerationArtifact.Dialogue(actorId, safeText(line, "text", 300)));
+        }
+        List<GenerationArtifact.ChoiceLabel> labels = new ArrayList<>(); Set<String> ids = new HashSet<>();
+        for (JsonNode choice : array(root, "choices", 8)) {
+            exactFields(choice, "id", "label"); String id = requiredText(choice, "id");
+            if (!slot.choiceIds().contains(id) || !ids.add(id)) throw invalid("OUTPUT_REFERENCE_INVALID");
+            labels.add(new GenerationArtifact.ChoiceLabel(id, safeText(choice, "label", 80)));
+        }
+        if (!ids.equals(new HashSet<>(slot.choiceIds()))) throw invalid("OUTPUT_REFERENCE_INVALID");
         return Result.valid(new GenerationArtifact.ScenePayload(slot.sceneId(), title, narration, lines, labels));
     }
 

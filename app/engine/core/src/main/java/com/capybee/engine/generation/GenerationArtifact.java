@@ -18,10 +18,10 @@ public record GenerationArtifact(
         Outcome outcome,
         Payload payload) {
 
-    public static final int SUPPORTED_SCHEMA_VERSION = 1;
+    public static final int SUPPORTED_SCHEMA_VERSION = 2;
 
     public GenerationArtifact {
-        if (artifactSchemaVersion != SUPPORTED_SCHEMA_VERSION) throw new IllegalArgumentException("Unsupported artifact version");
+        if (artifactSchemaVersion < 1 || artifactSchemaVersion > SUPPORTED_SCHEMA_VERSION) throw new IllegalArgumentException("Unsupported artifact version");
         Objects.requireNonNull(packId, "packId");
         Objects.requireNonNull(packVersion, "packVersion");
         Objects.requireNonNull(locale, "locale");
@@ -38,7 +38,8 @@ public record GenerationArtifact(
                 + ", artifactId=" + artifactId + ", outcome=" + outcome + ", payload=redacted]";
     }
 
-    public sealed interface Payload permits ThemePayload, ScenarioPayload, CastPayload, QuestPayload, ScenePayload {}
+    public sealed interface Payload permits ThemePayload, ScenarioPayload, StoryPlanPayload, CastPayload,
+            QuestPayload, ScenePayload, PlannedScenePayload {}
 
     public record ThemePayload(String title, String premise, List<String> toneTags) implements Payload {
         public ThemePayload { toneTags = List.copyOf(toneTags); }
@@ -46,6 +47,22 @@ public record GenerationArtifact(
 
     public record ScenarioPayload(String title, String premise, String setting, List<String> beats) implements Payload {
         public ScenarioPayload { beats = List.copyOf(beats); }
+    }
+
+    public record StoryPlanPayload(String title, String premise, String setting, List<String> themes,
+                                   List<String> storyPromises, List<PhasePlan> phases) implements Payload {
+        public StoryPlanPayload {
+            themes = List.copyOf(themes); storyPromises = List.copyOf(storyPromises); phases = List.copyOf(phases);
+        }
+    }
+
+    public record PhasePlan(String phaseId, String goal, String development, String transition,
+                            List<String> actorSlots, List<String> objectiveIds, List<String> toneTags,
+                            List<String> storyRoles) {
+        public PhasePlan {
+            actorSlots = List.copyOf(actorSlots); objectiveIds = List.copyOf(objectiveIds);
+            toneTags = List.copyOf(toneTags); storyRoles = List.copyOf(storyRoles);
+        }
     }
 
     public record CastPayload(List<CastMember> characters) implements Payload {
@@ -65,6 +82,14 @@ public record GenerationArtifact(
         public ScenePayload {
             dialogue = List.copyOf(dialogue);
             choices = List.copyOf(choices);
+        }
+    }
+
+    public record PlannedScenePayload(String sceneId, String title, String narration, List<Dialogue> dialogue,
+                                      List<ChoiceLabel> choices, List<String> continuityFacts) implements Payload {
+        public PlannedScenePayload {
+            dialogue = List.copyOf(dialogue); choices = List.copyOf(choices);
+            continuityFacts = List.copyOf(continuityFacts);
         }
     }
 

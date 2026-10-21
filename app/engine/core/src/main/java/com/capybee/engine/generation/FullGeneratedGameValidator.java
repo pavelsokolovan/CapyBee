@@ -71,6 +71,7 @@ public final class FullGeneratedGameValidator {
         }
 
         validateSlots(base, catalog, phaseOf.keySet(), utility, context);
+        validatePlanning(catalog, phaseOf, context);
         validateLocaleParity(sets, catalog, context);
 
         Map<String, Set<String>> raw = edges(base.scenes());
@@ -116,6 +117,36 @@ public final class FullGeneratedGameValidator {
                 contract.phases().stream().map(p -> new PhaseProfile(p.id(), p.kind(), p.sceneIds().size())).toList(),
                 reachable.size(), endings.size(), bounds.min, bounds.max, calls);
     }
+
+    private static void validatePlanning(GenerationCatalog catalog, Map<String, Integer> phaseOf,
+                                         PackValidationContext context) {
+        GenerationCatalog.TemplateDefinition scenario = catalog.templates().stream()
+                .filter(t -> t.stage() == GenerationCatalog.Stage.SCENARIO).findFirst().orElse(null);
+        GenerationCatalog.TemplateDefinition cast = catalog.templates().stream()
+                .filter(t -> t.stage() == GenerationCatalog.Stage.CAST).findFirst().orElse(null);
+        GenerationCatalog.TemplateDefinition quest = catalog.templates().stream()
+                .filter(t -> t.stage() == GenerationCatalog.Stage.QUEST).findFirst().orElse(null);
+        for (GenerationCatalog.SceneSlot slot : catalog.sceneSlots()) {
+            GenerationCatalog.TemplateDefinition scene = catalog.templates().stream()
+                    .filter(t -> t.id().equals(slot.templateId())).findFirst().orElse(null);
+            String expectedPhase = phaseOf.containsKey(slot.sceneId())
+                    ? catalog.runContract().phases().get(phaseOf.get(slot.sceneId())).id() : null;
+            boolean valid = expectedPhase != null && expectedPhase.equals(slot.phaseId())
+                    && slot.storyRole() != null && scene != null
+                    && scene.storyRoles().contains(slot.storyRole())
+                    && scenario != null && scenario.storyRoles().contains(slot.storyRole())
+                    && cast != null && cast.actorSlots().containsAll(slot.actorSlots())
+                    && quest != null && quest.objectiveIds().containsAll(slot.objectiveIds())
+                    && scene.toneTags().containsAll(slot.toneTags())
+                    && scenario.toneTags().containsAll(slot.toneTags())
+                    && unique(slot.actorSlots()) && unique(slot.objectiveIds()) && unique(slot.toneTags());
+            if (!valid) error(context, "PACK_GENERATION_SLOT_PLAN_INVALID", "Invalid planning metadata: " + slot.sceneId());
+        }
+        if (scenario == null || scenario.storyRoles().isEmpty())
+            error(context, "PACK_GENERATION_ROLE_INVALID", "Scenario story roles are required");
+    }
+
+    private static boolean unique(List<String> values) { return new HashSet<>(values).size() == values.size(); }
 
     private static void validateSlots(SceneSet set, GenerationCatalog catalog, Set<String> story, Set<String> utility,
                                       PackValidationContext context) {

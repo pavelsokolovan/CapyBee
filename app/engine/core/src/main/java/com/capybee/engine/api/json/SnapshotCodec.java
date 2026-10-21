@@ -342,6 +342,16 @@ public final class SnapshotCodec {
         } else if (artifact.payload() instanceof GenerationArtifact.ScenarioPayload value) {
             payload.put("title", value.title()); payload.put("premise", value.premise());
             payload.put("setting", value.setting()); payload.set("beats", stringArray(value.beats()));
+        } else if (artifact.payload() instanceof GenerationArtifact.StoryPlanPayload value) {
+            payload.put("title", value.title()); payload.put("premise", value.premise()); payload.put("setting", value.setting());
+            payload.set("themes", stringArray(value.themes())); payload.set("storyPromises", stringArray(value.storyPromises()));
+            ArrayNode phases = MAPPER.createArrayNode();
+            value.phases().forEach(phase -> {
+                ObjectNode item = MAPPER.createObjectNode(); item.put("phaseId", phase.phaseId()); item.put("goal", phase.goal());
+                item.put("development", phase.development()); item.put("transition", phase.transition());
+                item.set("actorSlots", stringArray(phase.actorSlots())); item.set("objectiveIds", stringArray(phase.objectiveIds()));
+                item.set("toneTags", stringArray(phase.toneTags())); item.set("storyRoles", stringArray(phase.storyRoles())); phases.add(item);
+            }); payload.set("phases", phases);
         } else if (artifact.payload() instanceof GenerationArtifact.CastPayload value) {
             ArrayNode members = MAPPER.createArrayNode();
             value.characters().forEach(member -> {
@@ -373,6 +383,11 @@ public final class SnapshotCodec {
                 ObjectNode item = MAPPER.createObjectNode(); item.put("id", choice.id()); item.put("label", choice.label()); choices.add(item);
             });
             payload.set("choices", choices);
+        } else if (artifact.payload() instanceof GenerationArtifact.PlannedScenePayload value) {
+            payload.put("sceneId", value.sceneId()); payload.put("title", value.title()); payload.put("narration", value.narration());
+            ArrayNode dialogue = MAPPER.createArrayNode(); value.dialogue().forEach(line -> { ObjectNode item=MAPPER.createObjectNode(); item.put("actorId",line.actorId()); item.put("text",line.text()); dialogue.add(item); }); payload.set("dialogue", dialogue);
+            ArrayNode choices = MAPPER.createArrayNode(); value.choices().forEach(choice -> { ObjectNode item=MAPPER.createObjectNode(); item.put("id",choice.id()); item.put("label",choice.label()); choices.add(item); }); payload.set("choices", choices);
+            payload.set("continuityFacts", stringArray(value.continuityFacts()));
         }
         node.set("payload", payload);
         return node;
@@ -410,8 +425,8 @@ public final class SnapshotCodec {
             GenerationCatalog.Stage stage = enumValue(GenerationCatalog.Stage.class, stageText);
             GenerationArtifact.Outcome outcome = enumValue(GenerationArtifact.Outcome.class, outcomeText);
             PackVersion packVersion = PackVersion.tryParse(packVersionText).orElse(null);
-            GenerationArtifact.Payload payload = readPayload(stage, item.get("payload"), issues, pointer + "/payload");
-            if (schemaVersion != GenerationArtifact.SUPPORTED_SCHEMA_VERSION || packId == null || packVersion == null
+            GenerationArtifact.Payload payload = readPayload(stage, schemaVersion, item.get("payload"), issues, pointer + "/payload");
+            if (schemaVersion < 1 || schemaVersion > GenerationArtifact.SUPPORTED_SCHEMA_VERSION || packId == null || packVersion == null
                     || locale == null || !LocaleTag.isValid(locale) || stage == null || outcome == null
                     || templateId == null || artifactId == null || artifactId.isBlank() || payload == null) {
                 invalid(issues, pointer);
@@ -427,7 +442,7 @@ public final class SnapshotCodec {
         return artifacts;
     }
 
-    private static GenerationArtifact.Payload readPayload(GenerationCatalog.Stage stage, JsonNode node,
+    private static GenerationArtifact.Payload readPayload(GenerationCatalog.Stage stage, int schemaVersion, JsonNode node,
                                                            List<Issue> issues, String pointer) {
         if (stage == null || node == null || !node.isObject()) return null;
         try {
@@ -438,6 +453,15 @@ public final class SnapshotCodec {
                             textArray(node.get("toneTags")));
                 }
                 case SCENARIO -> {
+                    if (schemaVersion == 2) {
+                        if (!exactFields(node, "title", "premise", "setting", "themes", "storyPromises", "phases") || !node.get("phases").isArray()) yield null;
+                        List<GenerationArtifact.PhasePlan> phases = new ArrayList<>();
+                        for (JsonNode phase : node.get("phases")) {
+                            if (!exactFields(phase, "phaseId", "goal", "development", "transition", "actorSlots", "objectiveIds", "toneTags", "storyRoles")) yield null;
+                            phases.add(new GenerationArtifact.PhasePlan(requiredText(phase,"phaseId"), requiredText(phase,"goal"), requiredText(phase,"development"), requiredText(phase,"transition"), textArray(phase.get("actorSlots")), textArray(phase.get("objectiveIds")), textArray(phase.get("toneTags")), textArray(phase.get("storyRoles"))));
+                        }
+                        yield new GenerationArtifact.StoryPlanPayload(requiredText(node,"title"), requiredText(node,"premise"), requiredText(node,"setting"), textArray(node.get("themes")), textArray(node.get("storyPromises")), phases);
+                    }
                     if (!exactFields(node, "title", "premise", "setting", "beats")) yield null;
                     yield new GenerationArtifact.ScenarioPayload(requiredText(node, "title"), requiredText(node, "premise"),
                             requiredText(node, "setting"), textArray(node.get("beats")));
@@ -464,7 +488,8 @@ public final class SnapshotCodec {
                     yield new GenerationArtifact.QuestPayload(quests);
                 }
                 case SCENE -> {
-                    if (!exactFields(node, "sceneId", "title", "narration", "dialogue", "choices")
+                    boolean planned = schemaVersion == 2;
+                    if (!(planned ? exactFields(node, "sceneId", "title", "narration", "dialogue", "choices", "continuityFacts") : exactFields(node, "sceneId", "title", "narration", "dialogue", "choices"))
                             || !node.get("dialogue").isArray() || !node.get("choices").isArray()) yield null;
                     List<GenerationArtifact.Dialogue> dialogue = new ArrayList<>();
                     for (JsonNode line : node.get("dialogue")) {
@@ -476,8 +501,8 @@ public final class SnapshotCodec {
                         if (!exactFields(choice, "id", "label")) yield null;
                         choices.add(new GenerationArtifact.ChoiceLabel(requiredText(choice, "id"), requiredText(choice, "label")));
                     }
-                    yield new GenerationArtifact.ScenePayload(requiredText(node, "sceneId"), requiredText(node, "title"),
-                            requiredText(node, "narration"), dialogue, choices);
+                    yield planned ? new GenerationArtifact.PlannedScenePayload(requiredText(node, "sceneId"), requiredText(node, "title"), requiredText(node, "narration"), dialogue, choices, textArray(node.get("continuityFacts")))
+                            : new GenerationArtifact.ScenePayload(requiredText(node, "sceneId"), requiredText(node, "title"), requiredText(node, "narration"), dialogue, choices);
                 }
             };
         } catch (RuntimeException exception) {

@@ -31,13 +31,19 @@ public record GenerationCatalog(
     }
 
     public record TemplateDefinition(String id, Stage stage, List<String> actorSlots,
-                                     List<String> objectiveIds, List<String> toneTags) {
+                                     List<String> objectiveIds, List<String> toneTags,
+                                     List<String> storyRoles) {
+        public TemplateDefinition(String id, Stage stage, List<String> actorSlots,
+                                  List<String> objectiveIds, List<String> toneTags) {
+            this(id, stage, actorSlots, objectiveIds, toneTags, List.of());
+        }
         public TemplateDefinition {
             Objects.requireNonNull(id, "id");
             Objects.requireNonNull(stage, "stage");
             actorSlots = List.copyOf(actorSlots);
             objectiveIds = List.copyOf(objectiveIds);
             toneTags = List.copyOf(toneTags);
+            storyRoles = List.copyOf(storyRoles);
         }
     }
 
@@ -59,13 +65,26 @@ public record GenerationCatalog(
             String sceneId,
             String templateId,
             String fallbackResource,
-            List<String> choiceIds) {
+            List<String> choiceIds,
+            String phaseId,
+            String storyRole,
+            List<String> actorSlots,
+            List<String> objectiveIds,
+            List<String> toneTags) {
+        public SceneSlot(String slotId, String sceneId, String templateId, String fallbackResource,
+                         List<String> choiceIds) {
+            this(slotId, sceneId, templateId, fallbackResource, choiceIds, null, null,
+                    List.of(), List.of(), List.of());
+        }
         public SceneSlot {
             Objects.requireNonNull(slotId, "slotId");
             Objects.requireNonNull(sceneId, "sceneId");
             Objects.requireNonNull(templateId, "templateId");
             Objects.requireNonNull(fallbackResource, "fallbackResource");
             choiceIds = List.copyOf(choiceIds);
+            actorSlots = List.copyOf(actorSlots);
+            objectiveIds = List.copyOf(objectiveIds);
+            toneTags = List.copyOf(toneTags);
         }
     }
 
