@@ -40,6 +40,22 @@ adapter tests use a local stub server and need no key or external network.
 
 ## Generated Play
 
+The normal player entry point is session-backed and saves automatically:
+
+```powershell
+./dev.ps1 game --pack-dir ./app/engine/fixtures/game-packs/fixture-generated-full-minimal --generated
+```
+
+Or invoke the packaged cross-platform artifact directly:
+
+```sh
+java -jar app/engine/cli/target/engine-cli-0.1.0-SNAPSHOT.jar play --pack-dir <pack-directory> --generated
+```
+
+Use `--memory` for explicitly temporary play. Player commands include `/help`, `/look`,
+`/status`, `/objectives`, `/characters`, `/map`, `/save`, `/quit`, and confirmed `/abandon`.
+`/quit` detaches without ending the saved run.
+
 Generation is opt-in. Authored packs and the default console path remain
 provider-free. A generation-enabled pack indexes `generation/catalog.json`,
 `generation/templates.json`, stage/slot fallback JSON, and the existing

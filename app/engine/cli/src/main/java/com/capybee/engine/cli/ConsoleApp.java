@@ -25,6 +25,7 @@ public final class ConsoleApp {
     private final RandomGenerator random;
     private final TextGenerator textGenerator;
     private final ConsoleTuning consoleTuning;
+    private final ConsolePaths consolePaths;
 
     public ConsoleApp(InputStream in, PrintStream out, PrintStream err, Clock clock, IdSource ids, RandomGenerator random) {
         this(in, out, err, clock, ids, random, null);
@@ -32,11 +33,17 @@ public final class ConsoleApp {
 
     public ConsoleApp(InputStream in, PrintStream out, PrintStream err, Clock clock, IdSource ids,
                       RandomGenerator random, TextGenerator textGenerator) {
-        this(in, out, err, clock, ids, random, textGenerator, ConsoleTuning.defaults());
+        this(in, out, err, clock, ids, random, textGenerator, ConsoleTuning.defaults(), ConsolePaths.system());
     }
 
     ConsoleApp(InputStream in, PrintStream out, PrintStream err, Clock clock, IdSource ids,
                RandomGenerator random, TextGenerator textGenerator, ConsoleTuning consoleTuning) {
+        this(in, out, err, clock, ids, random, textGenerator, consoleTuning, ConsolePaths.system());
+    }
+
+    ConsoleApp(InputStream in, PrintStream out, PrintStream err, Clock clock, IdSource ids,
+               RandomGenerator random, TextGenerator textGenerator, ConsoleTuning consoleTuning,
+               ConsolePaths consolePaths) {
         this.in = in;
         this.out = out;
         this.err = err;
@@ -45,6 +52,7 @@ public final class ConsoleApp {
         this.random = random;
         this.textGenerator = textGenerator;
         this.consoleTuning = consoleTuning;
+        this.consolePaths = consolePaths;
     }
 
     public int run(String[] args) {
@@ -87,15 +95,24 @@ public final class ConsoleApp {
         }
 
         var pack = load.pack().orElseThrow();
+        var suppliedInputs = options.inputs();
         if (options.generated() && pack.generatedGameProfile()
                 .filter(profile -> profile.kind() == com.capybee.engine.generation.GeneratedGameProfile.Kind.FULL_GAME)
                 .isPresent()) {
             boolean commandLineText = pack.manifest().startInputs().stream()
                     .filter(StartInputDef.FreeTextInput.class::isInstance)
-                    .anyMatch(input -> options.inputs().containsKey(input.id()));
+                    .anyMatch(input -> suppliedInputs.containsKey(input.id()));
             if (commandLineText) {
                 err.println("FREE_TEXT_COMMAND_LINE_FORBIDDEN: enter optional story text only in interactive setup.");
                 return 2;
+            }
+        }
+        if (options.play() && options.storeDir() == null && !options.memory()) {
+            try {
+                options = withStoreDir(options, consolePaths.stateDirectory().toAbsolutePath().normalize());
+            } catch (RuntimeException failure) {
+                err.println("STORE_UNAVAILABLE: Could not resolve the default save directory. Use --store-dir <directory> or --memory.");
+                return 3;
             }
         }
         if (options.session()) return runSessionMode(options, packId, pack);
@@ -103,13 +120,23 @@ public final class ConsoleApp {
     }
 
     private String consoleUsage() {
-        return "Usage: java -jar engine-cli.jar --pack-dir <dir> [--locale <tag>] [--input <key=value>]... [--script <file>] [--generated]\n"
-                + "       Add --session for resumable play; without --store-dir session data is in memory only.\n"
+        return "Usage: java -jar engine-cli.jar play --pack-dir <dir> [--locale <tag>] [--generated] [options]\n"
+                + "       Normal play is saved automatically. Use --memory for temporary play.\n"
+                + "       Legacy: java -jar engine-cli.jar --pack-dir <dir> [--script <file>] [--generated]\n"
+                + "       Add --session for resumable legacy play; without --store-dir session data is in memory only.\n"
                 + "       Session options: --store-dir <dir>, --run <id>, --new, --debug, --prefetch on|off.\n"
                 + "                        --calls-per-day <0..100000>, --run-calls <1..1000>.\n"
                 + "       Add --live-smoke --script <file> to call the configured provider (may incur cost).\n"
                 + "       Full-game free text is accepted only by interactive setup, never by --input or scripts.\n"
                 + "       Provider configuration: GENERATION_MODEL_ID and ANTHROPIC_API_KEY environment variables.";
+    }
+
+    private ConsoleOptions withStoreDir(ConsoleOptions value, Path storeDir) {
+        return new ConsoleOptions(value.packDir(), value.locale(), value.inputs(), value.seed(), value.script(),
+                value.save(), value.load(), value.generated(), value.liveSmoke(), value.help(), value.session(),
+                storeDir, value.runId(), value.newRun(), value.debug(), value.prefetch(), value.callsPerDay(),
+                value.runCalls(), value.play(), value.memory(), value.classic(), value.continueRun(),
+                value.replaceCurrent(), value.noColor(), value.acceptGenerationDisclosure());
     }
 
     private int runSessionMode(ConsoleOptions options, PackId packId, com.capybee.engine.pack.Pack pack) {

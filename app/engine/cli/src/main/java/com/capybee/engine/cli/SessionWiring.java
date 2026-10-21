@@ -83,19 +83,32 @@ final class SessionWiring {
                     }, generators == null ? new com.capybee.engine.session.SingleFlightRegistry()
                             : generators.registry());
             SessionTypes.OwnerRef owner = new SessionTypes.OwnerRef("local-console");
-            SessionTypes.RunSummary summary;
+            if (options.play()) printPackCard(options, pack, out);
+            SessionConsole console = new SessionConsole(in, out, err, tuning);
+            SessionTypes.RunSummary summary = null;
             if (options.runId() != null) {
                 summary = sessions.get(owner, options.runId());
-            } else if (!options.newRun() && store.findCurrent(owner).isPresent()) {
+            } else if (store.findCurrent(owner).isPresent()) {
                 summary = sessions.get(owner, store.findCurrent(owner).orElseThrow().id());
-                if (options.locale() != null || !options.inputs().isEmpty() || options.seed() != null || options.generated()) {
+                if (!options.play() && !options.newRun() && (options.locale() != null || !options.inputs().isEmpty() || options.seed() != null || options.generated())) {
                     out.println("Note: resuming run " + summary.runId() + "; start options are ignored. Use --new to start over.");
                 }
-            } else {
-                if (options.newRun() && store.findCurrent(owner).isPresent()) {
-                    UUID previous = store.findCurrent(owner).orElseThrow().id();
-                    sessions.delete(owner, previous);
-                    out.println("Discarded previous run " + previous + ".");
+            }
+            SessionConsole.StartupChoice choice = console.startup(options, summary);
+            if (choice == SessionConsole.StartupChoice.QUIT) return 0;
+            if (choice == SessionConsole.StartupChoice.ERROR) {
+                err.println("STARTUP_AMBIGUOUS: choose --continue, --new, --replace-current, or --run <uuid>.");
+                return 2;
+            }
+            if (choice == SessionConsole.StartupChoice.NEW) {
+                if (summary != null && summary.status() == SessionTypes.RunStatus.ACTIVE) {
+                    SessionTypes.CommandOutcome abandoned = sessions.command(owner, summary.runId(),
+                            new SessionTypes.CommandRequest(UUID.randomUUID(), summary.revision(), new com.capybee.engine.api.Command.Abandon()),
+                            tuning.syncWait());
+                    if (abandoned.outcome() == SessionTypes.Outcome.PROCESSING) {
+                        err.println("RUN_BUSY: saved game is still being abandoned; try again.");
+                        return 3;
+                    }
                 }
                 SessionTypes.StartRequest start = new SessionTypes.StartRequest(UUID.randomUUID(), packId,
                         options.locale() == null ? pack.manifest().defaultLocale() : options.locale(),
@@ -103,7 +116,6 @@ final class SessionWiring {
                 SessionTypes.StartAccepted accepted = sessions.start(owner, start, tuning.syncWait());
                 summary = sessions.get(owner, accepted.runId());
             }
-            SessionConsole console = new SessionConsole(in, out, err, tuning);
             summary = console.awaitActive(sessions, owner, summary);
             if (summary == null) return 3;
             return console.run(options, sessions, owner, summary);
@@ -121,5 +133,22 @@ final class SessionWiring {
         } finally {
             if (local != null) local.close();
         }
+    }
+
+    private static void printPackCard(ConsoleOptions options, Pack pack, PrintStream out) {
+        var manifest = pack.manifest();
+        out.println("CapyBee\n");
+        out.println(ConsoleRenderer.sanitize(manifest.name() == null || manifest.name().isBlank()
+                ? manifest.id().value() : manifest.name()));
+        if (manifest.description() != null && !manifest.description().isBlank())
+            out.println(ConsoleRenderer.sanitize(manifest.description()));
+        out.println("Pack: " + manifest.id().value() + " " + manifest.version());
+        var locale = options.locale() == null ? manifest.defaultLocale() : options.locale();
+        out.println("Language: " + locale.value());
+        String profile = pack.generatedGameProfile().map(value -> value.kind().name().equals("FULL_GAME")
+                ? "full generated game" : "generated content").orElse("authored");
+        out.println("Story: " + profile + (options.generated() && options.acceptGenerationDisclosure()
+                ? "\nGeneration disclosure: accepted" : ""));
+        out.println("Saving: " + (options.memory() || options.storeDir() == null ? "temporary" : "on") + "\n");
     }
 }

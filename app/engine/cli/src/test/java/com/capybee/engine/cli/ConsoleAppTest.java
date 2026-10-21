@@ -285,6 +285,48 @@ class ConsoleAppTest {
         }
     }
 
+    @Test
+    void canonicalPlayShowsPackCardAndFocusedPlayerScreens() {
+        var result = run(new String[]{"play", "--pack-dir", DUNGEON_PACK, "--memory"},
+                "\n/help\n/look\n/status\n/objectives\n/characters\n/map\n/save\nq\n/quit\n");
+
+        assertThat(result.exitCode).isZero();
+        assertThat(result.errors).isEmpty();
+        assertThat(result.output).contains("CapyBee", "Pack: fixture-text-dungeon", "Saving: temporary",
+                "Press Enter to set up this game", "/objectives", "Status", "Objectives", "Characters", "Map",
+                "This run is temporary", "QUIT_REQUIRES_SLASH");
+        assertThat(result.output).doesNotContain("[abandoned]");
+    }
+
+    @Test
+    void canonicalScriptRequiresExplicitRunChoiceAndCanResume() throws Exception {
+        Path store = Files.createTempDirectory("capybee-play-store");
+        Path script = Files.createTempFile("play-quit", ".txt");
+        try {
+            Files.writeString(script, "/quit\n", StandardCharsets.UTF_8);
+            String[] base = {"play", "--pack-dir", MINIMAL_PACK, "--store-dir", store.toString(),
+                    "--script", script.toString()};
+            var ambiguous = run(base, "");
+            assertThat(ambiguous.exitCode).isZero();
+            assertThat(ambiguous.output).contains("Saving: on");
+
+            var unresolved = run(base, "");
+            assertThat(unresolved.exitCode).isEqualTo(2);
+            assertThat(unresolved.errors).contains("STARTUP_AMBIGUOUS");
+
+            String[] resume = java.util.Arrays.copyOf(base, base.length + 1);
+            resume[base.length] = "--continue";
+            var continued = run(resume, "");
+            assertThat(continued.exitCode).isZero();
+            assertThat(continued.output).contains("Run ", "> /quit");
+        } finally {
+            Files.deleteIfExists(script);
+            try (var paths = Files.walk(store)) {
+                for (Path path : paths.sorted(java.util.Comparator.reverseOrder()).toList()) Files.deleteIfExists(path);
+            }
+        }
+    }
+
     private static String scene(String sceneId, String title, String firstId, String firstLabel,
                                 String secondId, String secondLabel) {
         String narration = sceneId.equals("opening") ? "Opening generated." : "Meeting generated.";

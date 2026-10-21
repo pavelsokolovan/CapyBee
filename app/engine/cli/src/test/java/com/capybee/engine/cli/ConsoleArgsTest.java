@@ -96,4 +96,17 @@ class ConsoleArgsTest {
         assertThat(ConsoleArgs.parse(new String[]{"--session", "--calls-per-day", "100001"}).ok()).isFalse();
         assertThat(ConsoleArgs.parse(new String[]{"--session", "--run-calls", "0"}).ok()).isFalse();
     }
+
+    @Test
+    void parsesCanonicalPlayAndStorageChoices() {
+        var play = ConsoleArgs.parse(new String[]{"play", "--pack-dir", "packs/demo", "--memory", "--no-color"});
+        assertThat(play.ok()).isTrue();
+        assertThat(play.options().play()).isTrue();
+        assertThat(play.options().session()).isTrue();
+        assertThat(play.options().memory()).isTrue();
+        assertThat(ConsoleArgs.parse(new String[]{"play", "--pack-dir", "packs/demo", "--memory", "--store-dir", "runs"}).error())
+                .isEqualTo("--memory cannot be combined with --store-dir.");
+        assertThat(ConsoleArgs.parse(new String[]{"play", "--pack-dir", "packs/demo", "--replace-current"}).error())
+                .isEqualTo("--replace-current requires --new.");
+    }
 }

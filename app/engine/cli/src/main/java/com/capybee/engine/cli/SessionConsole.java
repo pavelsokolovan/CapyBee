@@ -21,12 +21,52 @@ final class SessionConsole {
     private final PrintStream err;
     private final ConsoleTuning tuning;
     private UUID pendingCommandId;
+    private BufferedReader reader;
+
+    enum StartupChoice { CONTINUE, NEW, QUIT, ERROR }
 
     SessionConsole(InputStream in, PrintStream out, PrintStream err, ConsoleTuning tuning) {
         this.in = in;
         this.out = out;
         this.err = err;
         this.tuning = tuning;
+    }
+
+    StartupChoice startup(ConsoleOptions options, SessionTypes.RunSummary current) {
+        if (!options.play()) return current == null ? StartupChoice.NEW : options.newRun() ? StartupChoice.NEW : StartupChoice.CONTINUE;
+        if (options.script() != null) {
+            if (options.runId() != null || options.continueRun()) return current == null ? StartupChoice.ERROR : StartupChoice.CONTINUE;
+            if (options.newRun()) return current == null || options.replaceCurrent() ? StartupChoice.NEW : StartupChoice.ERROR;
+            return current == null ? StartupChoice.NEW : StartupChoice.ERROR;
+        }
+        BufferedReader input = reader(options);
+        if (input == null) return StartupChoice.ERROR;
+        if (current == null) {
+            out.println("Press Enter to set up this game, or type /quit.");
+            String line = readLine(input);
+            return line == null || line.trim().equalsIgnoreCase("/quit") ? StartupChoice.QUIT
+                    : line.isBlank() ? StartupChoice.NEW : StartupChoice.ERROR;
+        }
+        out.println("Saved game found");
+        out.println("Story: " + ConsoleRenderer.sanitize(current.view() != null && current.view().story() != null
+                ? current.view().story().title() : current.packId().value()));
+        out.println("Status: " + (current.status() == SessionTypes.RunStatus.ACTIVE ? "In progress" : current.status()));
+        out.println("Last saved: " + current.updatedAt());
+        out.println("\n1) Continue\n2) Start over\n3) Show details\n/quit) Leave");
+        while (true) {
+            String line = readLine(input);
+            if (line == null || line.trim().equalsIgnoreCase("/quit")) return StartupChoice.QUIT;
+            if (line.trim().equals("1")) return StartupChoice.CONTINUE;
+            if (line.trim().equals("2")) {
+                out.print("Start over and abandon the saved game? [y/N] ");
+                String answer = readLine(input);
+                if (answer != null && (answer.equalsIgnoreCase("y") || answer.equalsIgnoreCase("yes"))) return StartupChoice.NEW;
+                out.println("Cancelled.");
+            } else if (line.trim().equals("3")) {
+                out.println("Run: " + current.runId() + "\nPack: " + current.packId().value() + " "
+                        + current.packVersion() + "\nLocale: " + current.locale().value() + "\nRevision: " + current.revision());
+            } else out.println("Choose 1, 2, 3, or /quit.");
+        }
     }
 
     SessionTypes.RunSummary awaitActive(RunSessionService sessions, SessionTypes.OwnerRef owner,
@@ -63,12 +103,8 @@ final class SessionConsole {
 
     int run(ConsoleOptions options, RunSessionService sessions, SessionTypes.OwnerRef owner,
             SessionTypes.RunSummary initialSummary) {
-        BufferedReader reader;
-        try {
-            reader = options.script() == null
-                    ? new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))
-                    : Files.newBufferedReader(options.script(), StandardCharsets.UTF_8);
-        } catch (Exception failure) {
+        BufferedReader reader = reader(options);
+        if (reader == null) {
             err.println("SCRIPT_INVALID");
             return 2;
         }
@@ -78,13 +114,14 @@ final class SessionConsole {
         out.println("Running " + summary.packId().value() + " in locale " + summary.locale().value());
         String header = ConsoleRenderer.renderHeader(view);
         if (!header.isEmpty()) out.println(header);
-        out.println(ConsoleRenderer.render(view));
+        out.println(renderView(options, view));
         printDebug(options.debug(), sessions, owner, summary);
         while (!view.ended()) {
             if (options.script() == null) out.print("> ");
             String line = readLine(reader);
             if (line == null) return 0;
-            if (options.script() != null) out.println("> " + line);
+            if (options.script() != null) out.println(line.trim().startsWith("/text ")
+                    ? "> [text submitted]" : "> " + line);
             String trimmed = line.trim();
             if (pendingCommandId != null) {
                 try {
@@ -111,11 +148,22 @@ final class SessionConsole {
             }
             if (trimmed.equalsIgnoreCase("/quit") || trimmed.equalsIgnoreCase("/q")) return 0;
             if (trimmed.equalsIgnoreCase("/status")) {
-                out.println(ConsoleRenderer.render(view));
+                out.println(ConsoleRenderer.renderStatus(view));
                 printDebug(options.debug(), sessions, owner, summary);
                 continue;
             }
-            if (trimmed.startsWith("/events")) {
+            if (trimmed.equalsIgnoreCase("/look")) { out.println(ConsoleRenderer.renderScene(view)); continue; }
+            if (trimmed.equalsIgnoreCase("/objectives") || trimmed.equalsIgnoreCase("/quests")) {
+                out.println(ConsoleRenderer.renderObjectives(view)); continue;
+            }
+            if (trimmed.equalsIgnoreCase("/characters")) { out.println(ConsoleRenderer.renderCharacters(view)); continue; }
+            if (trimmed.equalsIgnoreCase("/map")) { out.println(ConsoleRenderer.renderMap(view)); continue; }
+            if (trimmed.equalsIgnoreCase("/save")) {
+                if (options.storeDir() == null) out.println("This run is temporary and cannot be continued after the program closes.\nRestart with --store-dir <directory> to enable saving.");
+                else out.println("Saved. Run " + summary.runId() + " is at revision " + summary.revision() + ".");
+                continue;
+            }
+            if (trimmed.startsWith("/events") && (options.debug() || !options.play())) {
                 long after = 0;
                 try { if (trimmed.length() > 7) after = Long.parseLong(trimmed.substring(7).trim()); }
                 catch (NumberFormatException ignored) { out.println("! Unknown command. Type ? for help."); continue; }
@@ -128,6 +176,7 @@ final class SessionConsole {
                 continue;
             }
             if (trimmed.equalsIgnoreCase("/debug on")) {
+                if (options.play() && !options.debug()) { out.println("! Debug mode can only be enabled with --debug."); continue; }
                 options = withDebug(options, true);
                 printDebug(true, sessions, owner, summary);
                 continue;
@@ -137,7 +186,11 @@ final class SessionConsole {
                 continue;
             }
             if (trimmed.equals("?") || trimmed.equalsIgnoreCase("/help")) {
-                out.println("/text <words>, /move <placeId>, /status, /events [afterSeq], /debug on|off, /abandon, /quit");
+                if (options.play()) {
+                    out.println("Choose with a number or trusted option ID. Press Enter when prompted.\n"
+                            + "/look, /status, /objectives, /characters, /map, /move <place-id>, /text <words>, /save, /quit, /abandon");
+                    if (options.debug()) out.println("Developer: /events [afterSeq], /debug off, /diagnostics");
+                } else out.println("/text <words>, /move <placeId>, /status, /events [afterSeq], /debug on|off, /abandon, /quit");
                 continue;
             }
             try {
@@ -148,14 +201,19 @@ final class SessionConsole {
                 continue;
             }
             Command command;
-            if (trimmed.equalsIgnoreCase("/abandon") || (trimmed.equalsIgnoreCase("q") && sessionOption(trimmed, view) == null)) {
+            if (trimmed.equalsIgnoreCase("/abandon") || trimmed.equalsIgnoreCase("/abandon --yes")
+                    || (!options.play() && trimmed.equalsIgnoreCase("q") && sessionOption(trimmed, view) == null)) {
                 if (options.script() == null) {
-                    out.print("Abandon this run for good? (y/N) ");
+                    out.print(options.play() ? "Abandon this game? You will not be able to continue it. [y/N] "
+                            : "Abandon this run for good? (y/N) ");
                     String answer = readLine(reader);
                     if (answer == null || !(answer.equalsIgnoreCase("y") || answer.equalsIgnoreCase("yes"))) {
                         out.println("Cancelled.");
                         continue;
                     }
+                } else if (options.play() && !trimmed.equalsIgnoreCase("/abandon --yes")) {
+                    out.println("! ABANDON_CONFIRMATION_REQUIRED: scripts must use /abandon --yes.");
+                    return 4;
                 }
                 command = new Command.Abandon();
             } else if (trimmed.startsWith("/text ")) {
@@ -174,7 +232,9 @@ final class SessionConsole {
                         || view.input().mode() == com.capybee.engine.api.InputMode.CHOICE_OR_TEXT)) {
                     command = new Command.SubmitText(line);
                 } else {
-                    out.println("! Choose an option, or press Enter to continue.");
+                    out.println(options.play() && trimmed.equalsIgnoreCase("q")
+                            ? "! QUIT_REQUIRES_SLASH: Type /quit to leave this game."
+                            : "! Choose an option, or press Enter to continue.");
                     continue;
                 }
             }
@@ -212,13 +272,25 @@ final class SessionConsole {
             if (outcome == null) continue;
             summary = sessions.get(owner, summary.runId());
             view = summary.view();
-            if (view != null) out.println(ConsoleRenderer.render(view));
+            if (view != null) out.println(renderView(options, view));
             printDebug(options.debug(), sessions, owner, summary);
             if (outcome.outcome() == SessionTypes.Outcome.REJECTED) {
                 outcome.issues().forEach(issue -> out.println(issue.code()));
             }
         }
         return 0;
+    }
+
+    private BufferedReader reader(ConsoleOptions options) {
+        if (reader != null) return reader;
+        try {
+            reader = options.script() == null
+                    ? new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))
+                    : Files.newBufferedReader(options.script(), StandardCharsets.UTF_8);
+            return reader;
+        } catch (Exception failure) {
+            return null;
+        }
     }
 
     private String readLine(BufferedReader reader) {
@@ -233,7 +305,10 @@ final class SessionConsole {
         return input.equalsIgnoreCase("/quit") || input.equalsIgnoreCase("/q")
                 || input.equalsIgnoreCase("/status") || input.startsWith("/events")
                 || input.equalsIgnoreCase("/debug on") || input.equalsIgnoreCase("/debug off")
-                || input.equals("?") || input.equalsIgnoreCase("/help");
+                || input.equals("?") || input.equalsIgnoreCase("/help") || input.equalsIgnoreCase("/look")
+                || input.equalsIgnoreCase("/objectives") || input.equalsIgnoreCase("/quests")
+                || input.equalsIgnoreCase("/characters") || input.equalsIgnoreCase("/map")
+                || input.equalsIgnoreCase("/save");
     }
 
     private String sessionOption(String input, View view) {
@@ -270,6 +345,12 @@ final class SessionConsole {
         return new ConsoleOptions(options.packDir(), options.locale(), options.inputs(), options.seed(),
                 options.script(), options.save(), options.load(), options.generated(), options.liveSmoke(),
                 options.help(), options.session(), options.storeDir(), options.runId(), options.newRun(), debug,
-                options.prefetch(), options.callsPerDay(), options.runCalls());
+                options.prefetch(), options.callsPerDay(), options.runCalls(), options.play(), options.memory(),
+                options.classic(), options.continueRun(), options.replaceCurrent(), options.noColor(),
+                options.acceptGenerationDisclosure());
+    }
+
+    private String renderView(ConsoleOptions options, View view) {
+        return options.play() ? ConsoleRenderer.renderScene(view) : ConsoleRenderer.render(view);
     }
 }

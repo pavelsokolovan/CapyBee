@@ -9,6 +9,8 @@ import com.capybee.engine.api.StatusItem;
 import com.capybee.engine.api.View;
 import com.capybee.engine.content.Block;
 
+import java.util.List;
+
 public final class ConsoleRenderer {
 	private ConsoleRenderer() {}
 
@@ -147,6 +149,71 @@ public final class ConsoleRenderer {
 
 	public static String renderHeader(View view) {
 		return view == null || view.story() == null ? "" : view.story().title();
+	}
+
+	public static String renderScene(View view) {
+		if (view == null) return "";
+		View scene = new View(view.blocks(), view.options(), view.input(), List.of(), view.ended(),
+				view.endReason(), List.of(), null, null, view.story(), List.of(), view.result());
+		return sanitize(render(scene));
+	}
+
+	public static String renderStatus(View view) {
+		if (view == null) return "No current game.";
+		StringBuilder text = new StringBuilder("Status");
+		if (view.story() != null) text.append(System.lineSeparator()).append("Story: ").append(sanitize(view.story().title()));
+		for (StatusItem item : view.status()) text.append(System.lineSeparator()).append("  ")
+				.append(sanitize(item.label())).append(": ").append(sanitize(item.value()));
+		if (view.outcome() != null) text.append(System.lineSeparator()).append("Outcome: ").append(sanitize(view.outcome()));
+		return text.toString();
+	}
+
+	public static String renderObjectives(View view) {
+		if (view == null || view.objectives().isEmpty()) return "Objectives\n  None discovered.";
+		StringBuilder text = new StringBuilder("Objectives");
+		for (ObjectiveItem item : view.objectives()) {
+			text.append(System.lineSeparator()).append("  [").append(item.state().name().toLowerCase()).append("] ")
+					.append(sanitize(item.label()));
+			if (item.description() != null) text.append(" — ").append(sanitize(item.description()));
+		}
+		return text.toString();
+	}
+
+	public static String renderCharacters(View view) {
+		if (view == null || view.characters().isEmpty()) return "Characters\n  None discovered.";
+		StringBuilder text = new StringBuilder("Characters");
+		for (var character : view.characters()) {
+			text.append(System.lineSeparator()).append("  ").append(sanitize(character.name()));
+			if (character.inCurrentScene()) text.append(" (here)");
+			if (character.description() != null) text.append(" — ").append(sanitize(character.description()));
+		}
+		return text.toString();
+	}
+
+	public static String renderMap(View view) {
+		if (view == null || view.places() == null) return "Map\n  No map is available.";
+		StringBuilder text = new StringBuilder("Map");
+		for (PlaceView place : view.places().places()) {
+			text.append(System.lineSeparator()).append(place.id().equals(view.places().currentPlaceId()) ? "  * " : "    ")
+					.append(sanitize(place.label()));
+			if (view.places().availableMoves().contains(place.id())) text.append(" — /move ").append(place.id());
+		}
+		if (!view.places().links().isEmpty()) {
+			text.append(System.lineSeparator()).append("Links:");
+			for (var link : view.places().links()) text.append(System.lineSeparator()).append("  ")
+					.append(link.from()).append(link.bidirectional() ? " <-> " : " -> ").append(link.to());
+		}
+		return text.toString();
+	}
+
+	public static String sanitize(String value) {
+		if (value == null) return "";
+		StringBuilder safe = new StringBuilder(value.length());
+		for (int index = 0; index < value.length(); index++) {
+			char character = value.charAt(index);
+			if (character == '\n' || character == '\r' || character == '\t' || character >= 0x20 && character != 0x7f) safe.append(character);
+		}
+		return safe.toString();
 	}
 
 	private static void appendLine(StringBuilder builder) {

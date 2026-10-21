@@ -21,6 +21,8 @@ public final class ConsoleArgs {
             return new ParseResult(null, "A pack directory is required.");
         }
 
+        boolean play = args.length > 0 && "play".equals(args[0]);
+        int firstArgument = play ? 1 : 0;
         Path packDir = null;
         LocaleTag locale = null;
         Map<String, String> inputs = new LinkedHashMap<>();
@@ -39,14 +41,26 @@ public final class ConsoleArgs {
         Boolean prefetch = null;
         Integer callsPerDay = null;
         Integer runCalls = null;
+        boolean memory = false;
+        boolean classic = false;
+        boolean continueRun = false;
+        boolean replaceCurrent = false;
+        boolean noColor = false;
+        boolean acceptGenerationDisclosure = false;
 
-        for (int index = 0; index < args.length; index++) {
+        for (int index = firstArgument; index < args.length; index++) {
             String arg = args[index];
             switch (arg) {
                 case "--help" -> help = true;
                 case "--generated" -> generated = true;
                 case "--live-smoke" -> { liveSmoke = true; generated = true; }
                 case "--session" -> session = true;
+                case "--memory" -> memory = true;
+                case "--classic" -> classic = true;
+                case "--continue" -> continueRun = true;
+                case "--replace-current" -> replaceCurrent = true;
+                case "--no-color" -> noColor = true;
+                case "--accept-generation-disclosure" -> acceptGenerationDisclosure = true;
                 case "--new" -> newRun = true;
                 case "--debug" -> debug = true;
                 case "--prefetch" -> {
@@ -125,7 +139,8 @@ public final class ConsoleArgs {
 
         if (help && (packDir != null || locale != null || !inputs.isEmpty() || seed != null || script != null
                 || save != null || load != null || generated || liveSmoke || session || storeDir != null
-                || runId != null || newRun || debug || prefetch != null || callsPerDay != null || runCalls != null)) {
+                || runId != null || newRun || debug || prefetch != null || callsPerDay != null || runCalls != null
+                || memory || classic || continueRun || replaceCurrent || acceptGenerationDisclosure)) {
             return new ParseResult(null, "--help cannot be combined with other arguments.");
         }
 
@@ -137,7 +152,9 @@ public final class ConsoleArgs {
             return new ParseResult(null, "--live-smoke requires --script and cannot be combined with --load.");
         }
 
-        if (!session && (storeDir != null || runId != null || newRun || debug || prefetch != null || callsPerDay != null || runCalls != null)) {
+        if (play && !classic) session = true;
+        if (!session && (storeDir != null || runId != null || newRun || debug || prefetch != null || callsPerDay != null || runCalls != null
+                || memory || continueRun || replaceCurrent)) {
             return new ParseResult(null, "--store-dir, --run, --new, --debug, --prefetch, --calls-per-day and --run-calls require --session.");
         }
         if (session && (save != null || load != null || liveSmoke)) {
@@ -149,8 +166,13 @@ public final class ConsoleArgs {
         if (runId != null && (locale != null || !inputs.isEmpty() || seed != null || generated)) {
             return new ParseResult(null, "--run cannot be combined with --locale, --input, --seed or --generated.");
         }
+        if (memory && storeDir != null) return new ParseResult(null, "--memory cannot be combined with --store-dir.");
+        if (classic && (memory || storeDir != null || session)) return new ParseResult(null, "--classic cannot be combined with session storage options.");
+        if (continueRun && (newRun || replaceCurrent || runId != null)) return new ParseResult(null, "--continue cannot be combined with --new, --replace-current or --run.");
+        if (replaceCurrent && !newRun) return new ParseResult(null, "--replace-current requires --new.");
 
         return new ParseResult(new ConsoleOptions(packDir, locale, inputs, seed, script, save, load,
-            generated, liveSmoke, help, session, storeDir, runId, newRun, debug, prefetch, callsPerDay, runCalls), null);
+            generated, liveSmoke, help, session, storeDir, runId, newRun, debug, prefetch, callsPerDay, runCalls,
+            play, memory, classic, continueRun, replaceCurrent, noColor, acceptGenerationDisclosure), null);
     }
 }
