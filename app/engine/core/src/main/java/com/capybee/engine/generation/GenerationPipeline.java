@@ -10,6 +10,7 @@ import com.capybee.engine.generation.GenerationArtifact.*;
 import com.capybee.engine.generation.json.GenerationCatalogParser;
 import com.capybee.engine.generation.json.GenerationJson;
 import com.capybee.engine.generation.json.GenerationOutputParser;
+import com.capybee.engine.generation.json.GenerationQualityProfileParser;
 import com.capybee.engine.input.PiiScrubber;
 import com.capybee.engine.input.PreparedStartInputs;
 import com.capybee.engine.pack.LocaleTag;
@@ -26,6 +27,9 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -48,6 +52,8 @@ public final class GenerationPipeline {
     private final Clock clock;
     private final PiiScrubber piiScrubber = new PiiScrubber();
     private final GenerationOutputParser outputParser = new GenerationOutputParser();
+    private final GenerationQualityEvaluator qualityEvaluator = new GenerationQualityEvaluator();
+    private final GenerationQualityProfile qualityProfile;
     private final Map<GenerationCatalog.Stage, GenerationCatalog.StageDefinition> definitions = new LinkedHashMap<>();
     private final Map<String, GenerationCatalog.SceneSlot> slots = new LinkedHashMap<>();
     private final Map<String, SceneResolution> resolvedScenes = new LinkedHashMap<>();
@@ -83,6 +89,12 @@ public final class GenerationPipeline {
         if (sceneSet == null || sceneSet.scenes().isEmpty()) throw new IllegalArgumentException("GENERATION_SCENES_MISSING");
         trustedScenes = sceneSet.scenes();
         objectiveIds = Set.copyOf(RulesParser.parse(pack).objectives().stream().map(objective -> objective.id()).toList());
+        if (fullGame()) {
+            String qualityPath = catalog.runContract().qualityResources().get(locale.value());
+            qualityProfile = GenerationQualityProfileParser.parse(pack, locale, qualityPath);
+            if (!catalog.runContract().qualityResources().keySet().equals(Set.copyOf(catalog.supportedLocales())))
+                throw new IllegalArgumentException("PACK_QUALITY_RESOURCE_MISSING");
+        } else qualityProfile = null;
         if (catalog.templates().stream().filter(template -> template.stage() == GenerationCatalog.Stage.QUEST)
                 .anyMatch(template -> !objectiveIds.containsAll(template.objectiveIds()))) {
             throw new IllegalArgumentException("GENERATION_REFERENCE_INVALID");
@@ -244,6 +256,7 @@ public final class GenerationPipeline {
         String providerId = null;
         TextGenerationResult.TokenUsage usage = null;
         Payload payload = null;
+        GenerationQualityEvaluator.QualityReport qualityReport = null;
         GenerationArtifact.Outcome outcome = GenerationArtifact.Outcome.FALLBACK;
 
         if (generator == null) failureCode = "PROVIDER_NOT_CONFIGURED";
@@ -254,7 +267,7 @@ public final class GenerationPipeline {
                     failureCode = "GENERATION_BUDGET_REACHED";
                     break;
                 }
-                String requestData = attempt == 0 ? contextJson : repairContext(stage, slot, failureCode);
+                String requestData = attempt == 0 ? contextJson : repairContext(stage, slot, failureCode, qualityReport);
                 String instructions = taskInstructions();
                 String outputSchema = outputParser.schema(stage, fullGame(),
                         slot != null && "ending".equals(slot.storyRole()));
@@ -287,10 +300,14 @@ public final class GenerationPipeline {
                 } else if (response.finishReason() == TextGenerationResult.FinishReason.OUTPUT_LIMIT) {
                     failureCode = "PROVIDER_OUTPUT_LIMIT";
                 } else if (parsed.payload() != null) {
-                    payload = parsed.payload();
-                    outcome = attempt == 0 ? GenerationArtifact.Outcome.GENERATED : GenerationArtifact.Outcome.REPAIRED;
-                    failureCode = attempt == 0 ? null : repairCode;
-                    break;
+                    qualityReport = evaluateQuality(stage, parsed.payload(), slot);
+                    if (qualityReport.decision() != GenerationQualityEvaluator.QualityDecision.REJECT) {
+                        payload = parsed.payload();
+                        outcome = attempt == 0 ? GenerationArtifact.Outcome.GENERATED : GenerationArtifact.Outcome.REPAIRED;
+                        failureCode = attempt == 0 ? null : repairCode;
+                        break;
+                    }
+                    failureCode = primaryQualityCode(qualityReport);
                 } else {
                     failureCode = parsed.errorCode();
                 }
@@ -307,15 +324,24 @@ public final class GenerationPipeline {
             if (fallback.payload() == null) throw new IllegalStateException("GENERATION_FALLBACK_INVALID");
             payload = fallback.payload();
             outcome = GenerationArtifact.Outcome.FALLBACK;
+            qualityReport = evaluateQuality(stage, payload, slot);
+            if (qualityReport.decision() == GenerationQualityEvaluator.QualityDecision.REJECT)
+                throw new IllegalStateException("GENERATION_FALLBACK_QUALITY_INVALID");
         }
         payload = assignEngineIds(payload);
-        int artifactVersion = fullGame() ? 2 : 1;
+        int artifactVersion = fullGame() ? 3 : 1;
+        GenerationArtifact.QualityStamp stamp = fullGame() ? qualityStamp(qualityReport) : null;
         GenerationArtifact artifact = new GenerationArtifact(artifactVersion,
                 pack.manifest().id(), pack.manifest().version(), locale, stage, templateId,
-                ids.nextId(), outcome, payload);
+                ids.nextId(), outcome, payload, stamp);
         long elapsed = Math.max(0, Duration.between(startedAt, clock.instant()).toMillis());
         GenerationExecutionSummary.StageExecution execution = new GenerationExecutionSummary.StageExecution(
-            stage, outcome, calls, elapsed, providerId, failureCode, usage);
+            stage, outcome, calls, elapsed, providerId, failureCode, usage,
+            qualityReport == null ? null : qualityReport.decision(),
+            count(qualityReport, GenerationQualityEvaluator.FindingSeverity.BLOCKING),
+            count(qualityReport, GenerationQualityEvaluator.FindingSeverity.ADVISORY),
+            qualityReport == null ? List.of() : qualityReport.findings().stream()
+                    .map(GenerationQualityEvaluator.QualityFinding::ruleId).distinct().sorted().toList());
         executions.add(execution);
         if (slot == null) stageArtifacts.put(stage, artifact);
         return new StageExecutionResult(artifact, execution);
@@ -356,7 +382,14 @@ public final class GenerationPipeline {
 
     private void validateRestoredPayload(GenerationArtifact artifact) {
         Payload payload = artifact.payload();
-        if (artifact.artifactSchemaVersion() != (fullGame() ? 2 : 1)) throw new IllegalArgumentException("GENERATION_ARTIFACT_VERSION_MISMATCH");
+        if (fullGame()) {
+            if (artifact.artifactSchemaVersion() != 2 && artifact.artifactSchemaVersion() != 3)
+                throw new IllegalArgumentException("GENERATION_ARTIFACT_VERSION_MISMATCH");
+            if (artifact.artifactSchemaVersion() == 3
+                    && (!qualityProfile.profileId().equals(artifact.qualityStamp().profileId())
+                    || !qualityProfile.fingerprint().equals(artifact.qualityStamp().profileFingerprint())))
+                throw new IllegalArgumentException("GENERATION_ARTIFACT_QUALITY_MISMATCH");
+        } else if (artifact.artifactSchemaVersion() != 1) throw new IllegalArgumentException("GENERATION_ARTIFACT_VERSION_MISMATCH");
         if (artifact.stage() == GenerationCatalog.Stage.SCENARIO && payload instanceof StoryPlanPayload plan && fullGame()) {
             GenerationOutputParser.Result checked = parsePayload(GenerationCatalog.Stage.SCENARIO,
                     encode(plan), null, Set.of());
@@ -476,6 +509,8 @@ public final class GenerationPipeline {
     private void validateFallback(GenerationCatalog.Stage stage, GenerationCatalog.SceneSlot slot, String path) {
         GenerationOutputParser.Result parsed = parsePayload(stage, pack.requireFile(path), slot, Set.of());
         if (parsed.payload() == null) throw new IllegalArgumentException("GENERATION_FALLBACK_INVALID");
+        if (fullGame() && evaluateQuality(stage, parsed.payload(), slot).decision() == GenerationQualityEvaluator.QualityDecision.REJECT)
+            throw new IllegalArgumentException("PACK_FALLBACK_QUALITY_INVALID");
     }
 
     private GenerationOutputParser.Result parsePayload(GenerationCatalog.Stage stage, String json,
@@ -602,9 +637,74 @@ public final class GenerationPipeline {
         }
     }
 
-    private String repairContext(GenerationCatalog.Stage stage, GenerationCatalog.SceneSlot slot, String errorCode) {
-        return encode(Map.of("stage", stage.name(), "validationErrorCode", errorCode,
+    private String repairContext(GenerationCatalog.Stage stage, GenerationCatalog.SceneSlot slot, String errorCode,
+                                 GenerationQualityEvaluator.QualityReport report) {
+        if (report == null) return encode(Map.of("stage", stage.name(), "validationErrorCode", errorCode,
                 "retryContext", contextJson(stage, slot)));
+        List<String> codes = report.findings().stream().map(GenerationQualityEvaluator.QualityFinding::ruleId)
+                .distinct().sorted().limit(16).toList();
+        List<String> scopes = report.findings().stream().map(GenerationQualityEvaluator.QualityFinding::scope)
+                .distinct().sorted().limit(16).toList();
+        List<String> requirements = codes.stream().map(GenerationPipeline::repairRequirement).distinct().toList();
+        return encode(Map.of("stage", stage.name(), "repair", Map.of("failureCode", errorCode,
+                "findingCodes", codes, "scopes", scopes, "requirements", requirements),
+                "retryContext", contextJson(stage, slot)));
+    }
+
+    private static String repairRequirement(String ruleId) {
+        if (ruleId.contains("CONTRADICTION")) return "Present the supplied trusted facts without changing them.";
+        if (ruleId.contains("CHOICE")) return "Make each visible choice concise and meaningfully distinct.";
+        if (ruleId.contains("DUPLICATE")) return "Use distinct wording and advance the current story phase.";
+        if (ruleId.contains("READABILITY")) return "Use clear, bounded sentences and paragraphs.";
+        if (ruleId.contains("TONE") || ruleId.contains("AUDIENCE")) return "Use language compatible with the supplied audience and tone.";
+        return "Return only safe player-facing narrative that follows the supplied schema.";
+    }
+
+    private GenerationQualityEvaluator.QualityReport evaluateQuality(GenerationCatalog.Stage stage, Payload payload,
+                                                                      GenerationCatalog.SceneSlot slot) {
+        if (qualityProfile == null) return new GenerationQualityEvaluator.QualityReport(
+                GenerationQualityEvaluator.QualityDecision.ACCEPT, List.of(),
+                new GenerationQualityEvaluator.QualityMetrics(0));
+        List<String> tones = slot == null ? templateFor(stage, null).toneTags() : slot.toneTags();
+        List<GenerationQualityEvaluator.AcceptedSceneText> recent = resolvedScenes.values().stream()
+                .map(SceneResolution::artifact).map(GenerationArtifact::payload)
+                .filter(PlannedScenePayload.class::isInstance).map(PlannedScenePayload.class::cast)
+                .map(scene -> new GenerationQualityEvaluator.AcceptedSceneText(scene.title(), scene.narration()))
+                .skip(Math.max(0, resolvedScenes.size() - qualityProfile.repetition().recentSceneWindow())).toList();
+        boolean ending = slot != null && "ending".equals(slot.storyRole());
+        return qualityEvaluator.evaluate(stage, payload,
+                new GenerationQualityEvaluator.QualityContext(tones, recent, Set.of(), ending), qualityProfile);
+    }
+
+    private static String primaryQualityCode(GenerationQualityEvaluator.QualityReport report) {
+        Set<String> codes = report.findings().stream().map(GenerationQualityEvaluator.QualityFinding::ruleId).collect(java.util.stream.Collectors.toSet());
+        if (codes.stream().anyMatch(code -> code.contains("AUDIENCE") || code.contains("PRIVATE") || code.contains("UNSAFE"))) return "GENERATION_QUALITY_SAFETY_REJECTED";
+        if (codes.stream().anyMatch(code -> code.contains("CONTRADICTION"))) return "GENERATION_QUALITY_STATE_CONTRADICTION";
+        if (codes.stream().anyMatch(code -> code.contains("CONTROL") || code.contains("META"))) return "GENERATION_QUALITY_INVALID";
+        if (codes.contains("Q_CHOICE_LABEL_AMBIGUOUS")) return "GENERATION_QUALITY_CHOICE_AMBIGUOUS";
+        if (codes.stream().anyMatch(code -> code.contains("DUPLICATE"))) return "GENERATION_QUALITY_REPETITIVE";
+        if (codes.stream().anyMatch(code -> code.contains("READABILITY"))) return "GENERATION_QUALITY_READABILITY";
+        if (codes.stream().anyMatch(code -> code.contains("TONE"))) return "GENERATION_QUALITY_TONE";
+        return "GENERATION_QUALITY_INVALID";
+    }
+
+    private GenerationArtifact.QualityStamp qualityStamp(GenerationQualityEvaluator.QualityReport report) {
+        List<String> advisory = report.findings().stream()
+                .filter(f -> f.severity() == GenerationQualityEvaluator.FindingSeverity.ADVISORY)
+                .map(GenerationQualityEvaluator.QualityFinding::ruleId).distinct().sorted().limit(16).toList();
+        String canonical = encode(Map.of("decision", report.decision().name(), "findings", report.findings().stream()
+                .map(f -> Map.of("ruleId", f.ruleId(), "severity", f.severity().name(), "scope", f.scope(), "measures", f.measures())).toList()));
+        return new GenerationArtifact.QualityStamp(GenerationQualityEvaluator.EVALUATOR_VERSION,
+                qualityProfile.profileId(), qualityProfile.fingerprint(), report.decision(), advisory, sha256(canonical));
+    }
+
+    private static int count(GenerationQualityEvaluator.QualityReport report, GenerationQualityEvaluator.FindingSeverity severity) {
+        return report == null ? 0 : (int) report.findings().stream().filter(f -> f.severity() == severity).count();
+    }
+
+    private static String sha256(String value) {
+        try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
+        catch (Exception exception) { throw new IllegalStateException(exception); }
     }
 
     private String taskInstructions() {

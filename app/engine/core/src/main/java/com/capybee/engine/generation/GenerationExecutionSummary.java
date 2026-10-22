@@ -14,5 +14,17 @@ public record GenerationExecutionSummary(List<StageExecution> stages, int totalP
             long elapsedMillis,
             String providerId,
             String failureCode,
-            TextGenerationResult.TokenUsage usage) {}
+            TextGenerationResult.TokenUsage usage,
+            GenerationQualityEvaluator.QualityDecision qualityDecision,
+            int blockingFindingCount,
+            int advisoryFindingCount,
+            List<String> findingCodes) {
+        public StageExecution(GenerationCatalog.Stage stage, GenerationArtifact.Outcome outcome, int providerCalls,
+                              long elapsedMillis, String providerId, String failureCode,
+                              TextGenerationResult.TokenUsage usage) {
+            this(stage, outcome, providerCalls, elapsedMillis, providerId, failureCode, usage,
+                    null, 0, 0, List.of());
+        }
+        public StageExecution { findingCodes = findingCodes == null ? List.of() : List.copyOf(findingCodes); }
+    }
 }

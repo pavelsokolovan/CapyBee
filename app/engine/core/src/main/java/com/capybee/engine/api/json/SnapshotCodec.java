@@ -335,6 +335,16 @@ public final class SnapshotCodec {
         node.put("templateId", artifact.templateId());
         node.put("artifactId", artifact.artifactId());
         node.put("outcome", artifact.outcome().name());
+        if (artifact.qualityStamp() != null) {
+            ObjectNode stamp = MAPPER.createObjectNode();
+            stamp.put("evaluatorVersion", artifact.qualityStamp().evaluatorVersion());
+            stamp.put("profileId", artifact.qualityStamp().profileId());
+            stamp.put("profileFingerprint", artifact.qualityStamp().profileFingerprint());
+            stamp.put("decision", artifact.qualityStamp().decision().name());
+            stamp.set("advisoryCodes", stringArray(artifact.qualityStamp().advisoryCodes()));
+            stamp.put("reportFingerprint", artifact.qualityStamp().reportFingerprint());
+            node.set("qualityStamp", stamp);
+        }
         ObjectNode payload = MAPPER.createObjectNode();
         if (artifact.payload() instanceof GenerationArtifact.ThemePayload value) {
             payload.put("title", value.title()); payload.put("premise", value.premise());
@@ -424,12 +434,16 @@ public final class SnapshotCodec {
         for (int index = 0; index < node.size(); index++) {
             String pointer = "/state/generationArtifacts/" + index;
             JsonNode item = node.get(index);
-            if (!exactFields(item, "artifactSchemaVersion", "packId", "packVersion", "locale", "stage",
-                    "templateId", "artifactId", "outcome", "payload")) {
+            int schemaVersion = intValue(item.get("artifactSchemaVersion"));
+            boolean fieldsValid = schemaVersion == 3
+                    ? exactFields(item, "artifactSchemaVersion", "packId", "packVersion", "locale", "stage",
+                        "templateId", "artifactId", "outcome", "payload", "qualityStamp")
+                    : exactFields(item, "artifactSchemaVersion", "packId", "packVersion", "locale", "stage",
+                        "templateId", "artifactId", "outcome", "payload");
+            if (!fieldsValid) {
                 invalid(issues, pointer);
                 continue;
             }
-            int schemaVersion = intValue(item.get("artifactSchemaVersion"));
             String packId = text(item.get("packId"));
             String packVersionText = text(item.get("packVersion"));
             String locale = text(item.get("locale"));
@@ -441,20 +455,34 @@ public final class SnapshotCodec {
             GenerationArtifact.Outcome outcome = enumValue(GenerationArtifact.Outcome.class, outcomeText);
             PackVersion packVersion = PackVersion.tryParse(packVersionText).orElse(null);
             GenerationArtifact.Payload payload = readPayload(stage, schemaVersion, item.get("payload"), issues, pointer + "/payload");
+            GenerationArtifact.QualityStamp qualityStamp = schemaVersion == 3 ? readQualityStamp(item.get("qualityStamp")) : null;
             if (schemaVersion < 1 || schemaVersion > GenerationArtifact.SUPPORTED_SCHEMA_VERSION || packId == null || packVersion == null
                     || locale == null || !LocaleTag.isValid(locale) || stage == null || outcome == null
-                    || templateId == null || artifactId == null || artifactId.isBlank() || payload == null) {
+                    || templateId == null || artifactId == null || artifactId.isBlank() || payload == null
+                    || schemaVersion == 3 && qualityStamp == null) {
                 invalid(issues, pointer);
                 continue;
             }
             try {
                 artifacts.add(new GenerationArtifact(schemaVersion, new PackId(packId), packVersion,
-                        new LocaleTag(locale), stage, templateId, artifactId, outcome, payload));
+                        new LocaleTag(locale), stage, templateId, artifactId, outcome, payload, qualityStamp));
             } catch (RuntimeException exception) {
                 invalid(issues, pointer);
             }
         }
         return artifacts;
+    }
+
+    private static GenerationArtifact.QualityStamp readQualityStamp(JsonNode node) {
+        if (!exactFields(node, "evaluatorVersion", "profileId", "profileFingerprint", "decision", "advisoryCodes", "reportFingerprint")) return null;
+        var decision = enumValue(com.capybee.engine.generation.GenerationQualityEvaluator.QualityDecision.class, text(node.get("decision")));
+        int version = intValue(node.get("evaluatorVersion"));
+        String profileId = text(node.get("profileId")), profileFingerprint = text(node.get("profileFingerprint"));
+        String reportFingerprint = text(node.get("reportFingerprint"));
+        List<String> advisories = textArray(node.get("advisoryCodes"));
+        if (version < 1 || profileId == null || profileFingerprint == null || reportFingerprint == null || decision == null || advisories.size() > 16) return null;
+        try { return new GenerationArtifact.QualityStamp(version, profileId, profileFingerprint, decision, advisories, reportFingerprint); }
+        catch (RuntimeException exception) { return null; }
     }
 
     private static GenerationArtifact.Payload readPayload(GenerationCatalog.Stage stage, int schemaVersion, JsonNode node,

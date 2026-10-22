@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "profileId": "fixture-family-en-v1",
+  "locale": "en",
+  "readability": {
+    "maxSentenceCodePoints": 300,
+    "maxParagraphCodePoints": 700,
+    "maxConsecutiveShortSentences": 8,
+    "maxUppercaseRatioBasisPoints": 4000
+  },
+  "repetition": {
+    "fieldDuplicateThresholdBasisPoints": 10000,
+    "recentSceneThresholdBasisPoints": 9500,
+    "choiceThresholdBasisPoints": 9500,
+    "recentSceneWindow": 4
+  },
+  "phraseSets": {
+    "completionClaims": ["the adventure is over", "everything is finished"],
+    "forbiddenAudienceTerms": ["tell me your password"],
+    "hostileTone": ["you must obey"]
+  },
+  "toneProfiles": {
+    "hopeful": {"incompatiblePhraseSets": ["hostileTone"], "advisoryPhraseSets": []}
+  },
+  "truthPhrases": []
+}

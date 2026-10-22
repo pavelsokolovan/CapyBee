@@ -16,9 +16,16 @@ public record GenerationArtifact(
         String templateId,
         String artifactId,
         Outcome outcome,
-        Payload payload) {
+        Payload payload,
+        QualityStamp qualityStamp) {
 
-    public static final int SUPPORTED_SCHEMA_VERSION = 2;
+    public static final int SUPPORTED_SCHEMA_VERSION = 3;
+
+    public GenerationArtifact(int artifactSchemaVersion, PackId packId, PackVersion packVersion, LocaleTag locale,
+                              GenerationCatalog.Stage stage, String templateId, String artifactId, Outcome outcome,
+                              Payload payload) {
+        this(artifactSchemaVersion, packId, packVersion, locale, stage, templateId, artifactId, outcome, payload, null);
+    }
 
     public GenerationArtifact {
         if (artifactSchemaVersion < 1 || artifactSchemaVersion > SUPPORTED_SCHEMA_VERSION) throw new IllegalArgumentException("Unsupported artifact version");
@@ -30,6 +37,8 @@ public record GenerationArtifact(
         Objects.requireNonNull(artifactId, "artifactId");
         Objects.requireNonNull(outcome, "outcome");
         Objects.requireNonNull(payload, "payload");
+        if (artifactSchemaVersion == 3 && qualityStamp == null) throw new IllegalArgumentException("Quality stamp required");
+        if (artifactSchemaVersion < 3 && qualityStamp != null) throw new IllegalArgumentException("Quality stamp unsupported");
     }
 
     @Override
@@ -112,4 +121,15 @@ public record GenerationArtifact(
     public record ChoiceLabel(String id, String label) {}
 
     public enum Outcome { GENERATED, REPAIRED, FALLBACK }
+
+    public record QualityStamp(int evaluatorVersion, String profileId, String profileFingerprint,
+                               GenerationQualityEvaluator.QualityDecision decision,
+                               List<String> advisoryCodes, String reportFingerprint) {
+        public QualityStamp {
+            if (evaluatorVersion < 1 || profileId == null || profileFingerprint == null || decision == null
+                    || reportFingerprint == null || advisoryCodes == null || advisoryCodes.size() > 16)
+                throw new IllegalArgumentException("Invalid quality stamp");
+            advisoryCodes = advisoryCodes.stream().distinct().sorted().toList();
+        }
+    }
 }

@@ -6,5 +6,5 @@
     {"id":"story-wish","kind":"FREE_TEXT","required":false,"labelKey":"setup.storyWish.label","maxChars":300}
   ],
   "contentPolicy":{"freeTextAllowed":true,"forbiddenTags":["personal-data"]},
-  "files":["strings/en.json","prompts/en/system.md","scenes/en/story.json","rules.json","generation/catalog.json","generation/setup.json","generation/templates.json","generation/fallbacks/scenario.json","generation/fallbacks/cast.json","generation/fallbacks/quest.json","generation/fallbacks/opening.json","generation/fallbacks/development-a.json","generation/fallbacks/development-b.json","generation/fallbacks/challenge.json","generation/fallbacks/resolution.json","generation/fallbacks/ending-success.json","generation/fallbacks/ending-partial.json"]
+  "files":["strings/en.json","prompts/en/system.md","scenes/en/story.json","rules.json","generation/catalog.json","generation/setup.json","generation/templates.json","generation/quality/en.json","generation/fallbacks/scenario.json","generation/fallbacks/cast.json","generation/fallbacks/quest.json","generation/fallbacks/opening.json","generation/fallbacks/development-a.json","generation/fallbacks/development-b.json","generation/fallbacks/challenge.json","generation/fallbacks/resolution.json","generation/fallbacks/ending-success.json","generation/fallbacks/ending-partial.json"]
 }

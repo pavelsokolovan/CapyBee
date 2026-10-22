@@ -86,7 +86,7 @@ public final class GenerationCatalogParser {
             return null;
         }
         fields(node, CATALOG_FILE, "PACK_RUN_CONTRACT_INVALID", context,
-                "kind", "contractVersion", "phases", "utilitySceneIds", "length", "completion", "setupResource");
+                "kind", "contractVersion", "phases", "utilitySceneIds", "length", "completion", "setupResource", "qualityResources");
         RunContractKind kind = enumValue(RunContractKind.class, text(node.get("kind")));
         int version = integer(node.get("contractVersion"));
         if (version != 1) error(context, "PACK_RUN_CONTRACT_VERSION_UNSUPPORTED", CATALOG_FILE,
@@ -148,8 +148,23 @@ public final class GenerationCatalogParser {
         if (setupResource != null && !"generation/setup.json".equals(setupResource)) {
             error(context, "PACK_SETUP_REQUIRED", CATALOG_FILE, "/runContract/setupResource", "Setup resource path is invalid");
         }
+        Map<String,String> qualityResources = new LinkedHashMap<>();
+        JsonNode qualityNode = node.get("qualityResources");
+        if (kind == RunContractKind.FULL_GAME && (qualityNode == null || !qualityNode.isObject())) {
+            error(context, "PACK_QUALITY_RESOURCE_MISSING", CATALOG_FILE, "/runContract/qualityResources", "Full games require one quality resource per locale");
+        } else if (qualityNode != null && qualityNode.isObject()) {
+            qualityNode.properties().forEach(entry -> {
+                String path = entry.getValue().isString() ? entry.getValue().asString() : null;
+                if (!localeResource(entry.getKey(), path)) error(context, "PACK_QUALITY_RESOURCE_MISSING", CATALOG_FILE, "/runContract/qualityResources/" + entry.getKey(), "Invalid quality resource");
+                else qualityResources.put(entry.getKey(), path);
+            });
+        }
         return kind == null ? null : new RunContract(kind, version, phases, utility, length,
-                new CompletionContract(endings), setupResource);
+                new CompletionContract(endings), setupResource, qualityResources);
+    }
+
+    private static boolean localeResource(String locale, String path) {
+        return LocaleTag.isValid(locale) && path != null && path.equals("generation/quality/" + locale + ".json");
     }
 
     private static GenerationSetup parseSetup(Pack pack, RunContract contract,

@@ -48,7 +48,7 @@ class SceneSourceTest {
     }
 
     private static GenerationArtifact scene(String sceneId, GenerationArtifact.Outcome outcome) {
-        return new GenerationArtifact(GenerationArtifact.SUPPORTED_SCHEMA_VERSION, new PackId("test-pack"),
+        return new GenerationArtifact(2, new PackId("test-pack"),
                 new PackVersion(1, 0, 0), new LocaleTag("en"), GenerationCatalog.Stage.SCENE, "scene-template",
                 "artifact-" + sceneId, outcome,
                 new GenerationArtifact.ScenePayload(sceneId, "Title", "Narration", List.of(), List.of()));
