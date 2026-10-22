@@ -47,7 +47,9 @@ adapter tests use a local stub server and need no key or external network.
 The normal player entry point is session-backed and saves automatically:
 
 ```powershell
-./dev.ps1 game --pack-dir ./app/engine/fixtures/game-packs/fixture-generated-full-minimal --generated
+./dev.ps1 game `
+  --pack-dir ./app/engine/reference-game-packs/lanterns-of-willow-marsh `
+  --generated
 ```
 
 Or invoke the packaged cross-platform artifact directly:
@@ -56,9 +58,11 @@ Or invoke the packaged cross-platform artifact directly:
 java -jar app/engine/cli/target/engine-cli-0.1.0-SNAPSHOT.jar play --pack-dir <pack-directory> --generated
 ```
 
+The repository launcher requires Java 25 and Maven. Normal play saves automatically in the platform's local application-state directory and offers the saved game when the same command is relaunched. Provider credentials are optional; missing or unusable configuration selects the complete reviewed story automatically. Interactive provider-backed setup discloses what may be sent before collecting answers, and optional free text is checked locally and never stored in the snapshot. Use `--offline` to force reviewed fallback even when credentials exist.
+
 Use `--memory` for explicitly temporary play. Player commands include `/help`, `/look`,
 `/status`, `/objectives`, `/characters`, `/map`, `/save`, `/quit`, and confirmed `/abandon`.
-`/quit` detaches without ending the saved run.
+`/save` reports the already-saved revision, `/quit` detaches without ending the saved run, and `/abandon` irreversibly ends it after confirmation.
 
 Generation is opt-in. Authored packs and the default console path remain
 provider-free. A generation-enabled pack indexes `generation/catalog.json`,

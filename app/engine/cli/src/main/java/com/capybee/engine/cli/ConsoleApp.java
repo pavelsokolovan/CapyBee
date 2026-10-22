@@ -131,6 +131,8 @@ public final class ConsoleApp {
         return "Usage: java -jar engine-cli.jar play --pack-dir <dir> [--locale <tag>] [--generated] [--offline] [options]\n"
                 + "       java -jar engine-cli.jar certify --help\n"
                 + "       Normal play is saved automatically. Use --memory for temporary play.\n"
+                + "       Missing provider configuration uses the complete reviewed fallback; --offline forces it.\n"
+                + "       In play, /save reports the saved revision, /quit pauses, and /abandon ends the run.\n"
                 + "       Legacy: java -jar engine-cli.jar --pack-dir <dir> [--script <file>] [--generated]\n"
                 + "       Add --session for resumable legacy play; without --store-dir session data is in memory only.\n"
                 + "       Session options: --store-dir <dir>, --run <id>, --new, --debug, --prefetch on|off.\n"

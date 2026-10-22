@@ -7,6 +7,7 @@ import com.capybee.engine.api.EndReason;
 import com.capybee.engine.api.ObjectiveState;
 import com.capybee.engine.api.Engine;
 import com.capybee.engine.api.RunRequest;
+import com.capybee.engine.api.json.SnapshotCodec;
 import com.capybee.engine.pack.DirectoryPackSource;
 import com.capybee.engine.pack.LocaleTag;
 import com.capybee.engine.pack.PackId;
@@ -61,7 +62,11 @@ class FullGeneratedRunIntegrationTest {
                 .filteredOn(artifact -> artifact.stage() == GenerationCatalog.Stage.SCENE)
                 .hasSize(5)
                 .allMatch(artifact -> artifact.outcome() == GenerationArtifact.Outcome.FALLBACK);
-        var restored = engine.resume(run.snapshot());
+        var decoded = SnapshotCodec.fromJson(SnapshotCodec.toJson(run.snapshot()));
+        assertThat(decoded.issues()).isEmpty();
+        assertThat(decoded.snapshot().state().generationArtifacts())
+                .containsExactlyElementsOf(run.snapshot().state().generationArtifacts());
+        var restored = engine.resume(decoded.snapshot());
         assertThat(restored.ok()).isTrue();
         assertThat(restored.run().view()).isEqualTo(run.view());
     }

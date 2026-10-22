@@ -1,5 +1,7 @@
 # Session console
 
+Normal `play` uses this host with a durable platform-default save directory. Use `--memory` only for a temporary game. Relaunching the same command offers the current run. Missing provider configuration is normal: generated packs use their reviewed fallback; `--offline` forces that behavior.
+
 Use `--session` to run the engine through the resumable local-session host. Without
 `--store-dir`, data exists only for the life of the console process. With a store
 directory, the current run, command history, outbox events, usage ledger, and
@@ -21,6 +23,8 @@ Inside a session, use `/text <words>`, `/move <placeId>`, `/status`,
 `/help`. Unknown slash commands are never submitted as player text; use `/text` for
 text beginning with a slash. Interactive abandonment asks for confirmation; scripts
 do not.
+
+Player mode also provides `/look`, `/status`, `/objectives`, `/characters`, `/map`, and `/save`. Read-only utilities do not advance the story. `/save` reports the revision already saved automatically, `/quit` keeps the run active, and `/abandon` requires confirmation and ends it.
 
 Recoverable errors are printed as `! CODE: hint` and leave the session open. Startup
 and storage failures print the code and a hint to stderr and exit with code 3.

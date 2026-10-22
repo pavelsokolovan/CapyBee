@@ -496,7 +496,7 @@ public final class SnapshotCodec {
                             textArray(node.get("toneTags")));
                 }
                 case SCENARIO -> {
-                    if (schemaVersion == 2) {
+                    if (node.has("phases")) {
                         if (!exactFields(node, "title", "premise", "setting", "themes", "storyPromises", "phases") || !node.get("phases").isArray()) yield null;
                         List<GenerationArtifact.PhasePlan> phases = new ArrayList<>();
                         for (JsonNode phase : node.get("phases")) {
@@ -531,7 +531,7 @@ public final class SnapshotCodec {
                     yield new GenerationArtifact.QuestPayload(quests);
                 }
                 case SCENE -> {
-                    boolean planned = schemaVersion == 2;
+                    boolean planned = node.has("continuityFacts");
                     if (!(planned ? (exactFields(node, "sceneId", "title", "narration", "dialogue", "choices", "continuityFacts")
                             || exactFields(node, "sceneId", "title", "narration", "dialogue", "choices", "continuityFacts", "ending"))
                             : exactFields(node, "sceneId", "title", "narration", "dialogue", "choices"))

@@ -107,7 +107,23 @@ public final class LocalSessionStore implements SessionPorts.SessionStore, AutoC
     @Override public void execute(Runnable work){lock.lock();try{guard();int depth=transactions.get();transactions.set(depth+1);byte[] before=committed;try{work.run();if(depth==0)commit();}catch(Throwable x){if(depth==0)restore(before);throw x;}finally{transactions.set(depth);}}finally{lock.unlock();}}
 
     private <T>T read(java.util.function.Supplier<T> f){lock.lock();try{guard();return f.get();}finally{lock.unlock();}} private <T>T readWrite(java.util.function.Supplier<T> f){lock.lock();try{guard();T v=f.get();if(transactions.get()==0)commit();return v;}finally{lock.unlock();}}
-    private void commit(){byte[] prior=committed;long priorRevision=storeRevision;byte[] stateBytes=encodeData();if(prior!=null&&Arrays.equals(stateBytes,dataBytes(prior)))return;storeRevision++;byte[] bytes=encodeEnvelope(stateBytes);if(bytes.length>MAX_BYTES){storeRevision=priorRevision;throw new StoreException(StoreException.Code.STORE_LIMIT_REACHED);}try{Files.write(tmp,bytes,StandardOpenOption.CREATE,StandardOpenOption.TRUNCATE_EXISTING,StandardOpenOption.WRITE);try(FileChannel c=FileChannel.open(tmp,StandardOpenOption.WRITE)){c.force(true);}decodeBytes(Files.readAllBytes(tmp));if(Files.exists(file)){Files.copy(file,backup,StandardCopyOption.REPLACE_EXISTING);try(FileChannel c=FileChannel.open(backup,StandardOpenOption.WRITE)){c.force(true);}}try{Files.move(tmp,file,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);}catch(AtomicMoveNotSupportedException e){Files.move(tmp,file,StandardCopyOption.REPLACE_EXISTING);}committed=bytes;}catch(IOException|RuntimeException e){storeRevision=priorRevision;restore(prior);if(e instanceof StoreException se)throw se;throw new StoreException(StoreException.Code.STORE_WRITE_FAILED,e);}}
+    private void commit(){byte[] prior=committed;long priorRevision=storeRevision;byte[] stateBytes=encodeData();if(prior!=null&&Arrays.equals(stateBytes,dataBytes(prior)))return;storeRevision++;byte[] bytes=encodeEnvelope(stateBytes);if(bytes.length>MAX_BYTES){storeRevision=priorRevision;throw new StoreException(StoreException.Code.STORE_LIMIT_REACHED);}try{Files.write(tmp,bytes,StandardOpenOption.CREATE,StandardOpenOption.TRUNCATE_EXISTING,StandardOpenOption.WRITE);try(FileChannel c=FileChannel.open(tmp,StandardOpenOption.WRITE)){c.force(true);}decodeBytes(Files.readAllBytes(tmp));if(Files.exists(file)){Files.copy(file,backup,StandardCopyOption.REPLACE_EXISTING);try(FileChannel c=FileChannel.open(backup,StandardOpenOption.WRITE)){c.force(true);}}moveTempIntoPlace();committed=bytes;}catch(IOException|RuntimeException e){storeRevision=priorRevision;restore(prior);if(e instanceof StoreException se)throw se;throw new StoreException(StoreException.Code.STORE_WRITE_FAILED,e);}}
+    private void moveTempIntoPlace() throws IOException {
+        for (int attempt = 0; ; attempt++) {
+            try {
+                try { Files.move(tmp,file,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING); }
+                catch (AtomicMoveNotSupportedException unsupported) { Files.move(tmp,file,StandardCopyOption.REPLACE_EXISTING); }
+                return;
+            } catch (AccessDeniedException denied) {
+                if (attempt == 7) throw denied;
+                try { Thread.sleep(25L * (attempt + 1)); }
+                catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Interrupted while committing the local store", interrupted);
+                }
+            }
+        }
+    }
     private byte[] encodeData(){List<RunDataV4> rs=new ArrayList<>();for(StoredRun r:state.runs.values())rs.add(new RunDataV4(toWire(r),state.commands.getOrDefault(r.id(),Map.of()),state.events.getOrDefault(r.id(),List.of()),Map.of()));return SessionJson.encode(new DocumentV4("capybee-session-store-data",4,rs,new TreeMap<>(state.reservations),new TreeMap<>(state.runReservations),new TreeMap<>(state.usage),new TreeMap<>(state.runPrefetchCalls))).getBytes(StandardCharsets.UTF_8);}
     private byte[] encodeEnvelope(byte[] data){JsonNode document=SessionJson.tree(new String(data,StandardCharsets.UTF_8));EnvelopeV4 envelope=new EnvelopeV4("capybee-session-store",4,storeId,storeRevision,clock.instant(),"SHA-256",hash(data),document);return SessionJson.encode(envelope).getBytes(StandardCharsets.UTF_8);}
     private byte[] dataBytes(byte[] bytes){try{VersionProbe p=SessionJson.decode(new String(bytes,StandardCharsets.UTF_8),VersionProbe.class);if(p.version()>=3){EnvelopeNode e=SessionJson.decode(new String(bytes,StandardCharsets.UTF_8),EnvelopeNode.class);return SessionJson.encode(e.data()).getBytes(StandardCharsets.UTF_8);}return bytes;}catch(RuntimeException e){return new byte[0];}}

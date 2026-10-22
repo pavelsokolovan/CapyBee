@@ -187,6 +187,7 @@ final class DefaultEngine implements Engine {
                     }
                 }
             } catch (RuntimeException exception) {
+                if (Boolean.getBoolean("capybee.debug.resume")) exception.printStackTrace();
                 issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_ARTIFACT_VERSION_MISMATCH",
                         "Snapshot generated content could not be restored safely"));
                 return new ResumeResult(null, issues);

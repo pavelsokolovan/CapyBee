@@ -388,7 +388,9 @@ public final class GenerationPipeline {
             if (artifact.artifactSchemaVersion() == 3
                     && (!qualityProfile.profileId().equals(artifact.qualityStamp().profileId())
                     || !qualityProfile.fingerprint().equals(artifact.qualityStamp().profileFingerprint())))
-                throw new IllegalArgumentException("GENERATION_ARTIFACT_QUALITY_MISMATCH");
+                throw new IllegalArgumentException("GENERATION_ARTIFACT_QUALITY_MISMATCH expected="
+                        + qualityProfile.profileId() + "/" + qualityProfile.fingerprint() + " actual="
+                        + artifact.qualityStamp().profileId() + "/" + artifact.qualityStamp().profileFingerprint());
         } else if (artifact.artifactSchemaVersion() != 1) throw new IllegalArgumentException("GENERATION_ARTIFACT_VERSION_MISMATCH");
         if (artifact.stage() == GenerationCatalog.Stage.SCENARIO && payload instanceof StoryPlanPayload plan && fullGame()) {
             GenerationOutputParser.Result checked = parsePayload(GenerationCatalog.Stage.SCENARIO,

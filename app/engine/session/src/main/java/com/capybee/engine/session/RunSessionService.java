@@ -606,6 +606,7 @@ public final class RunSessionService {
 
     private ViewAndStatus view(OwnerRef owner, RunSnapshot snapshot) {
         ResumeResult resumed = resume(owner, snapshot, null);
+        if (!resumed.ok() && Boolean.getBoolean("capybee.debug.resume")) System.err.println(resumed.issues());
         if (!resumed.ok()) throw new SessionException(ErrorCode.RUN_UNRECOVERABLE);
         return new ViewAndStatus(resumed.run().view());
     }

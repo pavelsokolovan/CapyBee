@@ -9,6 +9,7 @@ import com.capybee.engine.port.TextGenerator;
 
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.util.random.RandomGenerator;
 
@@ -16,8 +17,14 @@ public final class PlayMain {
     private PlayMain() {}
 
     public static void main(String[] args) {
+        System.setProperty("stdout.encoding", StandardCharsets.UTF_8.name());
+        System.setProperty("stderr.encoding", StandardCharsets.UTF_8.name());
+        System.setProperty("sun.stdout.encoding", StandardCharsets.UTF_8.name());
+        System.setProperty("sun.stderr.encoding", StandardCharsets.UTF_8.name());
+        PrintStream out = new PrintStream(System.out, true, StandardCharsets.UTF_8);
+        PrintStream err = new PrintStream(System.err, true, StandardCharsets.UTF_8);
         if (args != null && args.length > 0 && "certify".equals(args[0])) {
-            int exitCode = new CertificationCommand(System.out, System.err, Clock.systemUTC()).run(args);
+            int exitCode = new CertificationCommand(out, err, Clock.systemUTC()).run(args);
             if (exitCode != 0) System.exit(exitCode);
             return;
         }
@@ -32,7 +39,7 @@ public final class PlayMain {
                 generator = null;
             }
         }
-        int exitCode = new ConsoleApp(System.in, System.out, System.err,
+        int exitCode = new ConsoleApp(System.in, out, err,
                 Clock.systemUTC(), new UuidIdSource(), Randoms.unseeded(), generator).run(args);
         if (exitCode != 0) {
             System.exit(exitCode);

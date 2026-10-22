@@ -70,6 +70,14 @@ final class SessionConsole {
         }
     }
 
+    InteractiveSetup.Result setup(ConsoleOptions options, com.capybee.engine.pack.Pack pack,
+                                  boolean providerAvailable) {
+        BufferedReader input = reader(options);
+        if (input == null) return new InteractiveSetup.Result(true, java.util.Map.of());
+        var locale = options.locale() == null ? pack.manifest().defaultLocale() : options.locale();
+        return new InteractiveSetup(input, out).run(pack, locale, providerAvailable, options.inputs());
+    }
+
     SessionTypes.RunSummary awaitActive(RunSessionService sessions, SessionTypes.OwnerRef owner,
                                         SessionTypes.RunSummary summary) {
         boolean thinking = false;

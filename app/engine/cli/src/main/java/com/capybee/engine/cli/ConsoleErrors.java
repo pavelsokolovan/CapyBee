@@ -33,7 +33,7 @@ final class ConsoleErrors {
             case STORE_CORRUPT -> "The store file is damaged and was left untouched.";
             case STORE_VERSION_UNSUPPORTED -> "The store was written by a newer version.";
             case STORE_LEGACY_LAYOUT -> "Old run files found. Use a new --store-dir.";
-            default -> "Could not read or write the store; nothing was changed.";
+            default -> "This save directory cannot be used. Choose --store-dir <directory>, or use --memory for a temporary game.";
         };
     }
 }

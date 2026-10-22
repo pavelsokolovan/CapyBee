@@ -4,6 +4,14 @@ A cooperative mystery for ages 8–12 about restoring a marsh beacon before an e
 
 Generated presentation may use the configured AI text provider. Trusted choices, consequences, routes, objectives, and outcomes are always authored, and a complete reviewed English version is available offline. Use the normal CLI with this pack directory; forced-fallback mode needs no provider. During play, `/save` and `/quit` preserve the run, which can be selected on the next launch.
 
+```powershell
+./dev.ps1 game `
+  --pack-dir ./app/engine/reference-game-packs/lanterns-of-willow-marsh `
+  --generated
+```
+
+Normal play saves automatically; relaunch that command to continue. Use `/help` for commands, `/save` to see the saved revision, `/quit` to pause safely, and `/abandon` only to end a run permanently. `--memory` is temporary, while `--offline` forces the reviewed provider-free version. When a provider is available, setup explains the optional transfer before asking for consent; setup free text is not persisted.
+
 Content notes: mild time pressure and changing weather; no danger, combat, injury, villains, blame, or frightening failure.
 
 ## Developer guide (spoilers)

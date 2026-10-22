@@ -105,6 +105,24 @@ class ConsoleAppTest {
     }
 
     @Test
+    void mainWritesUtf8PunctuationWithoutBomOrReplacementCharacters() throws Exception {
+        PrintStream previous = System.out;
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try {
+            System.setOut(new PrintStream(bytes, true, StandardCharsets.UTF_8));
+            PlayMain.main(new String[]{"--help"});
+        } finally {
+            System.setOut(previous);
+        }
+        byte[] raw = bytes.toByteArray();
+        String decoded = StandardCharsets.UTF_8.newDecoder().onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT).decode(java.nio.ByteBuffer.wrap(raw)).toString();
+        assertThat(raw.length >= 3 && raw[0] == (byte) 0xef && raw[1] == (byte) 0xbb && raw[2] == (byte) 0xbf)
+                .isFalse();
+        assertThat(decoded).doesNotContain("\ufffd", "Ã", "â€¦", "â€”");
+    }
+
+    @Test
     void generatedCliRunsScriptAndPrintsStageOutcomesWithoutProviderBodies() throws Exception {
         Path script = Files.createTempFile("generated-play", ".txt");
         try {
@@ -147,10 +165,14 @@ class ConsoleAppTest {
                     store.toString(), "--script", quitScript.toString()}, "");
             var second = run(new String[]{"--pack-dir", MINIMAL_PACK, "--session", "--store-dir",
                     store.toString(), "--script", abandonScript.toString()}, "");
+            var completed = run(new String[]{"play", "--pack-dir", MINIMAL_PACK, "--store-dir",
+                    store.toString(), "--continue", "--script", quitScript.toString()}, "");
 
             assertThat(first.exitCode).isZero();
             assertThat(second.exitCode).isZero();
             assertThat(second.output).contains("[abandoned]");
+            assertThat(completed.exitCode).isZero();
+            assertThat(completed.output).contains("[abandoned]").doesNotContain("STARTUP_AMBIGUOUS");
             String firstRun = first.output.lines().filter(line -> line.startsWith("Run "))
                     .findFirst().orElseThrow();
             String secondRun = second.output.lines().filter(line -> line.startsWith("Run "))

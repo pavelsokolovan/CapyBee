@@ -100,6 +100,9 @@ final class SessionWiring {
                 if (!options.play() && !options.newRun() && (options.locale() != null || !options.inputs().isEmpty() || options.seed() != null || options.generated())) {
                     out.println("Note: resuming run " + summary.runId() + "; start options are ignored. Use --new to start over.");
                 }
+            } else if (options.play()) {
+                var recent = store.list(owner, new SessionTypes.RunQuery(false, false), null, 1);
+                if (!recent.runs().isEmpty()) summary = sessions.get(owner, recent.runs().getFirst().runId());
             }
             SessionConsole.StartupChoice choice = console.startup(options, summary);
             if (choice == SessionConsole.StartupChoice.QUIT) return 0;
@@ -116,6 +119,13 @@ final class SessionWiring {
                         err.println("RUN_BUSY: saved game is still being abandoned; try again.");
                         return 3;
                     }
+                }
+                if (options.play() && options.generated() && options.script() == null
+                        && pack.generatedGameProfile().filter(gameProfile -> gameProfile.kind()
+                        == com.capybee.engine.generation.GeneratedGameProfile.Kind.FULL_GAME).isPresent()) {
+                    InteractiveSetup.Result setup = console.setup(options, pack, textGenerator != null);
+                    if (setup.cancelled()) return 0;
+                    options = withInputs(options, setup.inputs());
                 }
                 SessionTypes.StartRequest start = new SessionTypes.StartRequest(UUID.randomUUID(), packId,
                         options.locale() == null ? pack.manifest().defaultLocale() : options.locale(),
@@ -140,6 +150,14 @@ final class SessionWiring {
         } finally {
             if (local != null) local.close();
         }
+    }
+
+    private static ConsoleOptions withInputs(ConsoleOptions value, java.util.Map<String, String> inputs) {
+        return new ConsoleOptions(value.packDir(), value.locale(), inputs, value.seed(), value.script(),
+                value.save(), value.load(), value.generated(), value.liveSmoke(), value.help(), value.session(),
+                value.storeDir(), value.runId(), value.newRun(), value.debug(), value.prefetch(), value.callsPerDay(),
+                value.runCalls(), value.play(), value.memory(), value.classic(), value.continueRun(),
+                value.replaceCurrent(), value.noColor(), value.acceptGenerationDisclosure(), value.offline());
     }
 
     private static void printPackCard(ConsoleOptions options, Pack pack, PrintStream out) {

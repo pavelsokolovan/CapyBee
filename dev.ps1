@@ -7,6 +7,14 @@ param(
   [string[]]$GameArgs
 )
 
+# Keep UTF-8 configuration local to this launcher process. Java is also given
+# explicit stream encodings so redirected output is deterministic on Windows.
+$utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+[Console]::InputEncoding = $utf8NoBom
+[Console]::OutputEncoding = $utf8NoBom
+$OutputEncoding = $utf8NoBom
+$javaUtf8Args = @('-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8', '-Dfile.encoding=UTF-8')
+
 if ($Action -eq 'game-package') {
   & (Join-Path $PSScriptRoot 'scripts\package-engine.ps1')
   exit $LASTEXITCODE
@@ -18,7 +26,7 @@ if ($Action -eq 'game-certify-offline') {
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   }
   $distribution = Join-Path $PSScriptRoot 'app\engine\target\distribution\capybee-engine-cli-0.1.0-SNAPSHOT'
-  & java -jar (Join-Path $distribution 'bin\engine-cli.jar') certify --mode offline `
+  & java @javaUtf8Args -jar (Join-Path $distribution 'bin\engine-cli.jar') certify --mode offline `
     --pack-dir (Join-Path $distribution 'packs\lanterns-of-willow-marsh') `
     --suite (Join-Path $distribution 'certification\willow-marsh-v1\suite.json') `
     --evidence-dir (Join-Path $distribution 'evidence\offline')
@@ -34,7 +42,7 @@ if ($Action -eq 'game-certify-live') {
   if ($GameArgs.Count -gt 0 -and $GameArgs[0] -eq '--') {
     $GameArgs = if ($GameArgs.Count -gt 1) { $GameArgs[1..($GameArgs.Count - 1)] } else { @() }
   }
-  & java -jar (Join-Path $distribution 'bin\engine-cli.jar') certify --mode live @GameArgs
+  & java @javaUtf8Args -jar (Join-Path $distribution 'bin\engine-cli.jar') certify --mode live @GameArgs
   exit $LASTEXITCODE
 }
 
@@ -48,7 +56,7 @@ if ($Action -eq 'game') {
     Write-Error 'The CLI artifact is missing. Run without -SkipBuild first.'
     exit 2
   }
-  & java -jar $engineJar play @GameArgs
+  & java @javaUtf8Args -jar $engineJar play @GameArgs
   exit $LASTEXITCODE
 }
 

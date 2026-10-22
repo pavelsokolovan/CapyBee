@@ -1,5 +1,7 @@
 # Live generation operations
 
+Ordinary CLI play does not require a provider. Missing, partial, disabled, or invalid provider configuration selects reviewed authored fallback; use `--offline` to force it. Durable play uses the platform-local state directory unless `--store-dir` is supplied. If it cannot be used, choose another directory or use `--memory` for a temporary run. Never include private save paths, setup text, credentials, prompts, or provider bodies in support evidence.
+
 ## Disable and fallback
 
 Set `GENERATION_PROVIDER_MODE=disabled`. The player override `play --offline --generated` takes precedence over environment settings and credentials and completes through reviewed authored fallbacks. Do not delete or rewrite existing saves.

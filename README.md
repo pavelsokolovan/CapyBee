@@ -52,6 +52,16 @@ the SDK without PostgreSQL, Spring, OAuth, or the UI. Open `app/engine/` alone i
 an IDE for independent development. See [app/engine/README.md](app/engine/README.md)
 for the pack API and console-first roadmap.
 
+With Java 25 and Maven installed, start the maintained game from PowerShell:
+
+```powershell
+./dev.ps1 game `
+  --pack-dir ./app/engine/reference-game-packs/lanterns-of-willow-marsh `
+  --generated
+```
+
+Progress is saved automatically in the platform's local application-state directory; relaunch the same command to continue. Provider credentials are optional: without them the complete reviewed story is used automatically. Add `--offline` to force that story or `--memory` for a deliberately temporary game.
+
 The Maven aggregator is [`app/pom.xml`](app/pom.xml). Run
 `mvn -f app/pom.xml verify` from the repository root to verify both
 `app/engine` and `app/server`. To build only the backend and its reactor
