@@ -47,6 +47,7 @@ public final class ConsoleArgs {
         boolean replaceCurrent = false;
         boolean noColor = false;
         boolean acceptGenerationDisclosure = false;
+        boolean offline = false;
 
         for (int index = firstArgument; index < args.length; index++) {
             String arg = args[index];
@@ -61,6 +62,7 @@ public final class ConsoleArgs {
                 case "--replace-current" -> replaceCurrent = true;
                 case "--no-color" -> noColor = true;
                 case "--accept-generation-disclosure" -> acceptGenerationDisclosure = true;
+                case "--offline" -> offline = true;
                 case "--new" -> newRun = true;
                 case "--debug" -> debug = true;
                 case "--prefetch" -> {
@@ -140,7 +142,7 @@ public final class ConsoleArgs {
         if (help && (packDir != null || locale != null || !inputs.isEmpty() || seed != null || script != null
                 || save != null || load != null || generated || liveSmoke || session || storeDir != null
                 || runId != null || newRun || debug || prefetch != null || callsPerDay != null || runCalls != null
-                || memory || classic || continueRun || replaceCurrent || acceptGenerationDisclosure)) {
+                || memory || classic || continueRun || replaceCurrent || acceptGenerationDisclosure || offline)) {
             return new ParseResult(null, "--help cannot be combined with other arguments.");
         }
 
@@ -151,6 +153,7 @@ public final class ConsoleArgs {
         if (liveSmoke && (script == null || load != null)) {
             return new ParseResult(null, "--live-smoke requires --script and cannot be combined with --load.");
         }
+        if (liveSmoke && offline) return new ParseResult(null, "--live-smoke cannot be combined with --offline.");
 
         if (play && !classic) session = true;
         if (!session && (storeDir != null || runId != null || newRun || debug || prefetch != null || callsPerDay != null || runCalls != null
@@ -173,6 +176,6 @@ public final class ConsoleArgs {
 
         return new ParseResult(new ConsoleOptions(packDir, locale, inputs, seed, script, save, load,
             generated, liveSmoke, help, session, storeDir, runId, newRun, debug, prefetch, callsPerDay, runCalls,
-            play, memory, classic, continueRun, replaceCurrent, noColor, acceptGenerationDisclosure), null);
+            play, memory, classic, continueRun, replaceCurrent, noColor, acceptGenerationDisclosure, offline), null);
     }
 }

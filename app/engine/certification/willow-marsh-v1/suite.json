@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "suiteId": "willow-marsh-v1",
+  "pack": {"id": "lanterns-of-willow-marsh", "version": "1.0.0"},
+  "locale": "en",
+  "prefetch": false,
+  "freeText": "FORBIDDEN",
+  "routes": [
+    {"id": "success", "script": "routes/success.script", "expectedResult": "SUCCESS"},
+    {"id": "partial", "script": "routes/partial.script", "expectedResult": "PARTIAL_SUCCESS"},
+    {"id": "postponed", "script": "routes/postponed.script", "expectedResult": "FAILURE"}
+  ],
+  "resumeCheckpoint": {"route": "partial", "afterAcceptedChoice": 4},
+  "requiredStages": ["THEME", "SCENARIO", "CAST", "QUEST", "SCENE"]
+}

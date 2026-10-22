@@ -16,8 +16,16 @@ public final class PlayMain {
     private PlayMain() {}
 
     public static void main(String[] args) {
+        if (args != null && args.length > 0 && "certify".equals(args[0])) {
+            int exitCode = new CertificationCommand(System.out, System.err, Clock.systemUTC()).run(args);
+            if (exitCode != 0) System.exit(exitCode);
+            return;
+        }
         TextGenerator generator = null;
-        if (args != null && java.util.Arrays.stream(args).anyMatch(arg -> arg.equals("--generated") || arg.equals("--live-smoke"))) {
+        boolean offline = args != null && java.util.Arrays.asList(args).contains("--offline");
+        ProviderMode providerMode = ProviderMode.fromEnvironment();
+        if (!offline && providerMode == ProviderMode.ENABLED && args != null
+                && java.util.Arrays.stream(args).anyMatch(arg -> arg.equals("--generated") || arg.equals("--live-smoke"))) {
             try {
                 generator = new AnthropicTextGenerator(AnthropicConfig.fromEnvironment());
             } catch (IllegalArgumentException ignored) {
@@ -28,6 +36,20 @@ public final class PlayMain {
                 Clock.systemUTC(), new UuidIdSource(), Randoms.unseeded(), generator).run(args);
         if (exitCode != 0) {
             System.exit(exitCode);
+        }
+    }
+
+    enum ProviderMode {
+        DISABLED, ENABLED, CERTIFICATION;
+
+        static ProviderMode fromEnvironment() {
+            String value = System.getenv("GENERATION_PROVIDER_MODE");
+            if (value == null || value.isBlank()) return ENABLED;
+            return switch (value.trim().toLowerCase(java.util.Locale.ROOT)) {
+                case "enabled" -> ENABLED;
+                case "certification" -> CERTIFICATION;
+                default -> DISABLED;
+            };
         }
     }
 }

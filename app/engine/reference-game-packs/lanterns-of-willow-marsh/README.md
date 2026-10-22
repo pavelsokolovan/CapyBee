@@ -15,3 +15,5 @@ Every route has eight choices and visits nine scenes. The opening branches throu
 - Failure: use either route, then select `postpone-with-plan`.
 
 Change the pack version whenever trusted mechanics, route meaning, generation context, or serialized content changes. Update fallbacks, truth phrases, deterministic corpus, transcripts, and traceability together. Setup and free text may influence presentation only. Add a locale only when all strings, fallbacks, quality resources, and review evidence are complete.
+
+The frozen release workload is certification suite `willow-marsh-v1`. Any pack version or content change invalidates its previous pack digest and requires review of the suite followed by new offline and any claimed live certification.

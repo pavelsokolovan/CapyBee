@@ -26,6 +26,7 @@ public final class ConsoleApp {
     private final TextGenerator textGenerator;
     private final ConsoleTuning consoleTuning;
     private final ConsolePaths consolePaths;
+    private final com.capybee.engine.session.SessionPorts.SessionStore sessionStore;
 
     public ConsoleApp(InputStream in, PrintStream out, PrintStream err, Clock clock, IdSource ids, RandomGenerator random) {
         this(in, out, err, clock, ids, random, null);
@@ -33,17 +34,23 @@ public final class ConsoleApp {
 
     public ConsoleApp(InputStream in, PrintStream out, PrintStream err, Clock clock, IdSource ids,
                       RandomGenerator random, TextGenerator textGenerator) {
-        this(in, out, err, clock, ids, random, textGenerator, ConsoleTuning.defaults(), ConsolePaths.system());
+        this(in, out, err, clock, ids, random, textGenerator, ConsoleTuning.defaults(), ConsolePaths.system(), null);
     }
 
     ConsoleApp(InputStream in, PrintStream out, PrintStream err, Clock clock, IdSource ids,
                RandomGenerator random, TextGenerator textGenerator, ConsoleTuning consoleTuning) {
-        this(in, out, err, clock, ids, random, textGenerator, consoleTuning, ConsolePaths.system());
+        this(in, out, err, clock, ids, random, textGenerator, consoleTuning, ConsolePaths.system(), null);
     }
 
     ConsoleApp(InputStream in, PrintStream out, PrintStream err, Clock clock, IdSource ids,
                RandomGenerator random, TextGenerator textGenerator, ConsoleTuning consoleTuning,
                ConsolePaths consolePaths) {
+        this(in, out, err, clock, ids, random, textGenerator, consoleTuning, consolePaths, null);
+    }
+
+    ConsoleApp(InputStream in, PrintStream out, PrintStream err, Clock clock, IdSource ids,
+               RandomGenerator random, TextGenerator textGenerator, ConsoleTuning consoleTuning,
+               ConsolePaths consolePaths, com.capybee.engine.session.SessionPorts.SessionStore sessionStore) {
         this.in = in;
         this.out = out;
         this.err = err;
@@ -53,6 +60,7 @@ public final class ConsoleApp {
         this.textGenerator = textGenerator;
         this.consoleTuning = consoleTuning;
         this.consolePaths = consolePaths;
+        this.sessionStore = sessionStore;
     }
 
     public int run(String[] args) {
@@ -120,7 +128,8 @@ public final class ConsoleApp {
     }
 
     private String consoleUsage() {
-        return "Usage: java -jar engine-cli.jar play --pack-dir <dir> [--locale <tag>] [--generated] [options]\n"
+        return "Usage: java -jar engine-cli.jar play --pack-dir <dir> [--locale <tag>] [--generated] [--offline] [options]\n"
+                + "       java -jar engine-cli.jar certify --help\n"
                 + "       Normal play is saved automatically. Use --memory for temporary play.\n"
                 + "       Legacy: java -jar engine-cli.jar --pack-dir <dir> [--script <file>] [--generated]\n"
                 + "       Add --session for resumable legacy play; without --store-dir session data is in memory only.\n"
@@ -136,11 +145,11 @@ public final class ConsoleApp {
                 value.save(), value.load(), value.generated(), value.liveSmoke(), value.help(), value.session(),
                 storeDir, value.runId(), value.newRun(), value.debug(), value.prefetch(), value.callsPerDay(),
                 value.runCalls(), value.play(), value.memory(), value.classic(), value.continueRun(),
-                value.replaceCurrent(), value.noColor(), value.acceptGenerationDisclosure());
+                value.replaceCurrent(), value.noColor(), value.acceptGenerationDisclosure(), value.offline());
     }
 
     private int runSessionMode(ConsoleOptions options, PackId packId, com.capybee.engine.pack.Pack pack) {
         return SessionWiring.run(options, packId, pack, in, out, err, clock, ids, random,
-                textGenerator, consoleTuning);
+                textGenerator, consoleTuning, sessionStore);
     }
 }

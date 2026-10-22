@@ -1,0 +1,3 @@
+Copyright (c) CapyBee contributors. All rights reserved.
+
+No license is granted to copy, modify, or distribute this software except by an explicit written agreement with the copyright holder.

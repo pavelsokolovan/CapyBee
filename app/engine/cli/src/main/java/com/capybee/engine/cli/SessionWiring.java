@@ -36,9 +36,16 @@ final class SessionWiring {
     static int run(ConsoleOptions options, PackId packId, Pack pack, InputStream in, PrintStream out,
                    PrintStream err, Clock clock, IdSource ids, RandomGenerator random,
                    TextGenerator textGenerator, ConsoleTuning tuning) {
+        return run(options, packId, pack, in, out, err, clock, ids, random, textGenerator, tuning, null);
+    }
+
+    static int run(ConsoleOptions options, PackId packId, Pack pack, InputStream in, PrintStream out,
+                   PrintStream err, Clock clock, IdSource ids, RandomGenerator random,
+                   TextGenerator textGenerator, ConsoleTuning tuning, SessionPorts.SessionStore suppliedStore) {
         LocalSessionStore local = null;
         SessionPorts.SessionStore store;
-        if (options.storeDir() == null) store = new InMemorySessionStore(clock);
+        if (suppliedStore != null) store = suppliedStore;
+        else if (options.storeDir() == null) store = new InMemorySessionStore(clock);
         else { local = LocalSessionStore.open(options.storeDir(), clock); store = local; }
         byte[] commandKey = local == null ? new byte[32] : local.commandKey();
         SessionLimits defaults = SessionLimits.defaults();

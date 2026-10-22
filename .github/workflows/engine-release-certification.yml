@@ -1,0 +1,105 @@
+name: Engine release certification
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_live:
+        description: Run paid full live certification after offline gates
+        required: true
+        type: boolean
+        default: false
+      model_id:
+        description: Exact pinned provider model ID
+        required: false
+        type: string
+      max_provider_calls:
+        description: Reviewed provider call ceiling
+        required: false
+        type: string
+      max_cost_usd:
+        description: Reviewed estimated cost ceiling
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engine-live-certification
+  cancel-in-progress: false
+
+jobs:
+  offline-package:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: temurin
+          cache: maven
+      - name: Deterministic verification
+        run: mvn -B -f app/engine/pom.xml clean verify
+      - name: Build release bundle
+        shell: pwsh
+        run: ./scripts/package-engine.ps1
+      - name: Certify unpacked bundle offline
+        shell: pwsh
+        run: ./dev.ps1 game-certify-offline -SkipBuild
+      - uses: actions/upload-artifact@v4
+        with:
+          name: engine-offline-${{ matrix.os }}
+          path: |
+            app/engine/target/distribution/*.zip
+            app/engine/target/distribution/*.sha256
+            app/engine/target/distribution/*/evidence/offline/
+          retention-days: 90
+
+  live-full:
+    if: inputs.run_live
+    needs: offline-package
+    runs-on: ubuntu-latest
+    environment: engine-live-certification
+    env:
+      GENERATION_PROVIDER_MODE: certification
+      GENERATION_MODEL_ID: ${{ inputs.model_id }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      PROVIDER_PRICING_JSON: ${{ secrets.PROVIDER_PRICING_JSON }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: temurin
+          cache: maven
+      - name: Mask provider secret
+        shell: bash
+        run: echo "::add-mask::$ANTHROPIC_API_KEY"
+      - name: Build exact candidate once
+        shell: pwsh
+        run: ./scripts/package-engine.ps1
+      - name: Materialize reviewed pricing input
+        shell: pwsh
+        run: Set-Content -LiteralPath app/engine/target/provider-pricing.json -Value $env:PROVIDER_PRICING_JSON -Encoding utf8NoBOM
+      - name: Full paid certification
+        shell: pwsh
+        run: >-
+          ./dev.ps1 game-certify-live --
+          --scope full
+          --pack-dir app/engine/target/distribution/capybee-engine-cli-0.1.0-SNAPSHOT/packs/lanterns-of-willow-marsh
+          --suite app/engine/target/distribution/capybee-engine-cli-0.1.0-SNAPSHOT/certification/willow-marsh-v1/suite.json
+          --pricing-file app/engine/target/provider-pricing.json
+          --max-provider-calls ${{ inputs.max_provider_calls }}
+          --max-cost-usd ${{ inputs.max_cost_usd }}
+          --evidence-dir app/engine/target/live-evidence
+          --confirm-live-provider-cost
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: restricted-live-certification-evidence
+          path: app/engine/target/live-evidence/
+          retention-days: 90

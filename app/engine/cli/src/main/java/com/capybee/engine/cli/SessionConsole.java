@@ -347,7 +347,7 @@ final class SessionConsole {
                 options.help(), options.session(), options.storeDir(), options.runId(), options.newRun(), debug,
                 options.prefetch(), options.callsPerDay(), options.runCalls(), options.play(), options.memory(),
                 options.classic(), options.continueRun(), options.replaceCurrent(), options.noColor(),
-                options.acceptGenerationDisclosure());
+                options.acceptGenerationDisclosure(), options.offline());
     }
 
     private String renderView(ConsoleOptions options, View view) {

@@ -99,6 +99,10 @@ does not regenerate content already shown. Provider summaries contain stage,
 status, call count, timing, usage, and stable error codes only; prompts,
 responses, player text, and credentials are not logged.
 
+Use `--offline --generated` to force reviewed fallbacks even when provider credentials are present. `GENERATION_PROVIDER_MODE=disabled|enabled|certification` is the host kill switch; invalid values fail closed to disabled. Certification is a separate top-level command and is documented in [CERTIFICATION.md](CERTIFICATION.md), with disable, rollback, and incident procedures in [OPERATIONS.md](OPERATIONS.md).
+
+Build the portable development distribution with `./dev.ps1 game-package` and run its deterministic package gate with `./dev.ps1 game-certify-offline`. The archive contains the shaded CLI JAR, frozen Willow Marsh pack and suite, build metadata, CycloneDX SBOM, legal files, and SHA-256 manifests. `--live-smoke` remains diagnostic-only and is not release evidence.
+
 The [app POM](../pom.xml) is an aggregator, not a shared parent.
 `mvn -f app/pom.xml verify` from the repository root verifies both the engine
 and backend; backend tests still need their existing environment. Spec 27 adds the framework-neutral session

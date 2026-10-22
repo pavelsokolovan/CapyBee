@@ -1,0 +1,1 @@
+CapyBee Engine CLI includes third-party Java dependencies. Their license notices remain embedded in the distributed executable JAR and are listed in the CycloneDX SBOM.

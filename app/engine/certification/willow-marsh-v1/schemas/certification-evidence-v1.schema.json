@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","required":["result","routesCompleted","providerAttempts","estimatedCostUsd"],"properties":{"result":{"enum":["PASS","FAIL","INCONCLUSIVE"]},"routesCompleted":{"type":"integer","minimum":0},"providerAttempts":{"type":"integer","minimum":0},"estimatedCostUsd":{"type":"string"}}}
