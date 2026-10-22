@@ -22,6 +22,7 @@ final class SessionConsole {
     private final ConsoleTuning tuning;
     private UUID pendingCommandId;
     private BufferedReader reader;
+    private boolean readFailed;
 
     enum StartupChoice { CONTINUE, NEW, QUIT, ERROR }
 
@@ -118,7 +119,20 @@ final class SessionConsole {
         while (!view.ended()) {
             if (options.script() == null) out.print("> ");
             String line = readLine(reader);
-            if (line == null) return 0;
+            if (line == null) {
+                if (options.script() == null) return 0;
+                if (readFailed) {
+                    err.println("SCRIPT_INVALID");
+                    return 2;
+                }
+                Boundary boundary = finishPending(sessions, owner, summary);
+                if (boundary.exitCode() != null) return boundary.exitCode();
+                summary = boundary.summary();
+                view = summary.view();
+                if (view != null && view.ended()) return 0;
+                err.println("SCRIPT_INCOMPLETE");
+                return 4;
+            }
             if (options.script() != null) out.println(line.trim().startsWith("/text ")
                     ? "> [text submitted]" : "> " + line);
             String trimmed = line.trim();
@@ -126,6 +140,11 @@ final class SessionConsole {
                 try {
                     SessionTypes.CommandStatus pending = sessions.commandStatus(owner, summary.runId(), pendingCommandId);
                     if (pending.processing()) {
+                        if (options.script() != null && (trimmed.equalsIgnoreCase("/quit")
+                                || trimmed.equalsIgnoreCase("/q"))) {
+                            err.println("SCRIPT_COMMAND_PENDING");
+                            return 4;
+                        }
                         if (!isNonMutating(trimmed)) {
                             out.println("! COMMAND_STILL_RUNNING: CapyBee is still working. Wait a moment, then press Enter or type /status.");
                             continue;
@@ -137,6 +156,11 @@ final class SessionConsole {
                         if (view != null) out.println(ConsoleRenderer.render(view));
                         printDebug(options.debug(), sessions, owner, summary);
                         if (pending.outcome() != null && pending.outcome().outcome() == SessionTypes.Outcome.REJECTED) {
+                            if (options.script() != null) {
+                                err.println("SCRIPT_COMMAND_REJECTED");
+                                pending.outcome().issues().forEach(issue -> err.println(issue.code()));
+                                return 4;
+                            }
                             pending.outcome().issues().forEach(issue -> out.println(issue.code()));
                         }
                     }
@@ -234,6 +258,10 @@ final class SessionConsole {
                     out.println(options.play() && trimmed.equalsIgnoreCase("q")
                             ? "! QUIT_REQUIRES_SLASH: Type /quit to leave this game."
                             : "! Choose an option, or press Enter to continue.");
+                    if (options.script() != null) {
+                        err.println("SCRIPT_COMMAND_REJECTED");
+                        return 4;
+                    }
                     continue;
                 }
             }
@@ -274,6 +302,11 @@ final class SessionConsole {
             if (view != null) out.println(renderView(options, view));
             printDebug(options.debug(), sessions, owner, summary);
             if (outcome.outcome() == SessionTypes.Outcome.REJECTED) {
+                if (options.script() != null) {
+                    err.println("SCRIPT_COMMAND_REJECTED");
+                    outcome.issues().forEach(issue -> err.println(issue.code()));
+                    return 4;
+                }
                 outcome.issues().forEach(issue -> out.println(issue.code()));
             }
         }
@@ -296,9 +329,35 @@ final class SessionConsole {
         try {
             return reader.readLine();
         } catch (Exception exception) {
+            readFailed = true;
             return null;
         }
     }
+
+    private Boundary finishPending(RunSessionService sessions, SessionTypes.OwnerRef owner,
+                                   SessionTypes.RunSummary summary) {
+        if (pendingCommandId == null) return new Boundary(summary, null);
+        try {
+            SessionTypes.CommandStatus pending = sessions.commandStatus(owner, summary.runId(), pendingCommandId);
+            if (pending.processing()) {
+                err.println("SCRIPT_COMMAND_PENDING");
+                return new Boundary(summary, 4);
+            }
+            pendingCommandId = null;
+            SessionTypes.RunSummary refreshed = sessions.get(owner, summary.runId());
+            if (pending.outcome() != null && pending.outcome().outcome() == SessionTypes.Outcome.REJECTED) {
+                err.println("SCRIPT_COMMAND_REJECTED");
+                pending.outcome().issues().forEach(issue -> err.println(issue.code()));
+                return new Boundary(refreshed, 4);
+            }
+            return new Boundary(refreshed, null);
+        } catch (SessionException failure) {
+            err.println(failure.code().name());
+            return new Boundary(summary, 3);
+        }
+    }
+
+    private record Boundary(SessionTypes.RunSummary summary, Integer exitCode) { }
 
     private boolean isNonMutating(String input) {
         return input.equalsIgnoreCase("/quit") || input.equalsIgnoreCase("/q")

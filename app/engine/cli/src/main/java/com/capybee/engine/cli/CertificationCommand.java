@@ -37,8 +37,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import com.capybee.engine.session.SessionPorts;
-import com.capybee.engine.session.adapter.InMemorySessionStore;
+import java.util.concurrent.TimeUnit;
+import com.capybee.engine.session.SessionTypes;
+import com.capybee.engine.session.adapter.LocalSessionStore;
 
 /** Release-only certification entry point. It deliberately keeps game prose out of its output and evidence. */
 final class CertificationCommand {
@@ -132,37 +133,52 @@ final class CertificationCommand {
 
     private RouteResult executeRoute(Options options, Suite suite, Route route, TextGenerator provider) throws Exception {
         Path store = Files.createTempDirectory("engine-cert-" + route.id + "-");
-        SessionPorts.SessionStore sharedStore = new InMemorySessionStore(clock);
-        List<String> lines = Files.readAllLines(route.script, StandardCharsets.UTF_8);
-        int quit = indexOfQuit(lines);
-        boolean restart = route.id.equals(suite.resumeRoute);
-        if (restart && quit < 0) fail("SUITE_INVALID", "Resume route must contain /quit.");
-        List<String> before = restart ? lines.subList(0, quit + 1) : lines;
-        List<String> after = restart ? lines.subList(quit + 1, lines.size()) : List.of();
-        int first = invokePlay(options, suite, route, provider, store, before, false, sharedStore);
-        int second = restart && first == 0 ? invokePlay(options, suite, route, provider, store, after, true, sharedStore) : 0;
-        deleteTree(store);
-        boolean passed = first == 0 && second == 0;
-        return new RouteResult(route.id, route.expectedResult, passed, restart && second == 0, countChoices(lines));
+        try {
+            List<String> lines = Files.readAllLines(route.script, StandardCharsets.UTF_8);
+            int quit = indexOfQuit(lines);
+            boolean restart = route.id.equals(suite.resumeRoute);
+            if (restart && quit < 0) fail("SUITE_INVALID", "Resume route must contain /quit.");
+            List<String> before = restart ? lines.subList(0, quit + 1) : lines;
+            List<String> after = restart ? lines.subList(quit + 1, lines.size()) : List.of();
+            int first = invokePlay(options, suite, route, provider, store, before, false);
+            Long checkpointRevision = null;
+            if (restart && first == 0) {
+                ObservedRun checkpoint = inspect(store, options.packDir);
+                checkpointRevision = checkpoint.revision;
+                if (!"ACTIVE".equals(checkpoint.status) || checkpoint.revision != 4
+                        || checkpoint.acceptedChoices != 4 || checkpoint.pendingCommands != 0) {
+                    return checkpoint.result(route.id, false, 1, checkpointRevision);
+                }
+            }
+            int second = restart && first == 0
+                    ? invokePlay(options, suite, route, provider, store, after, true) : 0;
+            ObservedRun observed = inspect(store, options.packDir);
+            boolean passed = first == 0 && second == 0 && "ENDED".equals(observed.status)
+                    && observed.revision == 8 && observed.acceptedChoices == 8
+                    && observed.pendingCommands == 0 && route.expectedResult.equals(observed.resultClass);
+            return observed.result(route.id, passed, restart ? 2 : 1, checkpointRevision);
+        } finally {
+            deleteTree(store);
+        }
     }
 
     private int invokePlay(Options certification, Suite suite, Route route, TextGenerator provider, Path store,
                            List<String> commands, boolean resume) throws Exception {
-        return invokePlay(certification, suite, route, provider, store, commands, resume, null);
-    }
-
-    private int invokePlay(Options certification, Suite suite, Route route, TextGenerator provider, Path store,
-                           List<String> commands, boolean resume, SessionPorts.SessionStore sharedStore) throws Exception {
         Path script = Files.createTempFile("engine-cert-script-", ".txt");
         Files.write(script, commands, StandardCharsets.UTF_8);
         List<String> args = new ArrayList<>(List.of("play", "--pack-dir", certification.packDir.toString(),
                 "--script", script.toString(), "--prefetch", "off", "--no-color"));
-        args.add("--memory");
+        args.addAll(List.of("--store-dir", store.toString()));
         if (resume) args.add("--continue");
         else {
             args.addAll(List.of("--new", "--generated", "--accept-generation-disclosure"));
             if (!certification.live) args.add("--offline");
             preset(route.id).forEach((key, value) -> args.addAll(List.of("--input", key + "=" + value)));
+        }
+        if (!certification.live && provider == null) {
+            int exit = invokeChild(args);
+            Files.deleteIfExists(script);
+            return exit;
         }
         ByteArrayOutputStream discardedOut = new ByteArrayOutputStream();
         ByteArrayOutputStream discardedErr = new ByteArrayOutputStream();
@@ -170,10 +186,69 @@ final class CertificationCommand {
                 Duration.ofSeconds(5), Duration.ofMinutes(10), Sleeper.system());
         int exit = new ConsoleApp(ByteArrayInputStream.nullInputStream(), new PrintStream(discardedOut),
                 new PrintStream(discardedErr), clock, new UuidIdSource(), Randoms.seeded(27_013L), provider,
-                certificationTuning, ConsolePaths.system(), sharedStore)
+                certificationTuning, ConsolePaths.system(), null)
                 .run(args.toArray(String[]::new));
         Files.deleteIfExists(script);
         return exit;
+    }
+
+    private int invokeChild(List<String> args) throws Exception {
+        Path javaHome = Path.of(System.getProperty("java.home"));
+        Path executable = javaHome.resolve("bin").resolve(System.getProperty("os.name").toLowerCase(Locale.ROOT)
+                .contains("win") ? "java.exe" : "java");
+        List<String> command = new ArrayList<>(List.of(executable.toString(), "-Dfile.encoding=UTF-8",
+                "-cp", System.getProperty("java.class.path"), PlayMain.class.getName()));
+        command.addAll(args);
+        Path stdout = Files.createTempFile("engine-cert-child-out-", ".txt");
+        Path stderr = Files.createTempFile("engine-cert-child-err-", ".txt");
+        try {
+            ProcessBuilder builder = new ProcessBuilder(command).redirectOutput(stdout.toFile()).redirectError(stderr.toFile());
+            Map<String, String> environment = builder.environment();
+            environment.keySet().removeIf(key -> key.toUpperCase(Locale.ROOT).contains("ANTHROPIC")
+                    || key.toUpperCase(Locale.ROOT).startsWith("GENERATION_PROVIDER"));
+            environment.put("GENERATION_PROVIDER_MODE", "disabled");
+            Process child = builder.start();
+            if (!child.waitFor(10, TimeUnit.MINUTES)) {
+                child.destroyForcibly();
+                child.waitFor(10, TimeUnit.SECONDS);
+                fail("ROUTE_PROCESS_TIMEOUT", "Route child exceeded its time limit.", 5);
+            }
+            if (Files.size(stdout) > 1_000_000 || Files.size(stderr) > 1_000_000)
+                fail("ROUTE_PROCESS_OUTPUT_LIMIT", "Route child output exceeded its limit.", 5);
+            return child.exitValue();
+        } finally {
+            Files.deleteIfExists(stdout);
+            Files.deleteIfExists(stderr);
+        }
+    }
+
+    private ObservedRun inspect(Path storeDir, Path packDir) throws Exception {
+        SessionTypes.OwnerRef owner = new SessionTypes.OwnerRef("local-console");
+        try (LocalSessionStore store = LocalSessionStore.open(storeDir, clock)) {
+            var page = store.list(owner, new SessionTypes.RunQuery(true, true), null, 10);
+            if (page.runs().size() != 1) fail("ROUTE_STORE_INVALID", "Route store must contain exactly one run.", 5);
+            var run = store.find(page.runs().getFirst().runId(), owner)
+                    .orElseThrow(() -> new IllegalStateException("saved run missing"));
+            var commands = store.list(run.id());
+            int accepted = (int) commands.stream().filter(c -> c.state() == SessionTypes.CommandState.DONE
+                    && Boolean.TRUE.equals(c.accepted())).count();
+            int pending = (int) commands.stream().filter(c -> c.state() == SessionTypes.CommandState.IN_PROGRESS).count();
+            var snapshot = run.snapshot();
+            if (snapshot == null) fail("ROUTE_STORE_INVALID", "Saved run has no snapshot.", 5);
+            String outcome = snapshot.state().outcome();
+            return new ObservedRun(run.status().name(), run.revision(), snapshot.step(), snapshot.state().sceneId(),
+                    outcome, resultClass(packDir, outcome), snapshot.state().objectives().entrySet().stream()
+                    .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, e -> e.getValue().name(),
+                            (a, b) -> a, LinkedHashMap::new)), accepted, pending);
+        }
+    }
+
+    private String resultClass(Path packDir, String outcomeId) throws Exception {
+        if (outcomeId == null) return "UNKNOWN";
+        JsonNode rules = JSON.readTree(Files.readString(packDir.resolve("rules.json"), StandardCharsets.UTF_8));
+        for (JsonNode outcome : rules.path("outcomes"))
+            if (outcomeId.equals(outcome.path("id").asString())) return outcome.path("resultClass").asString("UNKNOWN");
+        return "UNKNOWN";
     }
 
     private Map<String, String> preset(String route) {
@@ -330,11 +405,30 @@ final class CertificationCommand {
     }
 
     private record Route(String id, Path script, String expectedResult) { }
-    private record RouteResult(String id, String expected, boolean passed, boolean resumed, int acceptedChoices) {
+    private record ObservedRun(String status, long revision, long step, String endingSceneId, String outcomeId,
+                               String resultClass, Map<String, String> objectives, int acceptedChoices,
+                               int pendingCommands) {
+        RouteResult result(String routeId, boolean passed, int processes, Long checkpointRevision) {
+            return new RouteResult(routeId, passed, processes, checkpointRevision, status, revision, step,
+                    endingSceneId, outcomeId, resultClass, objectives, acceptedChoices, pendingCommands);
+        }
+    }
+
+    private record RouteResult(String id, boolean passed, int restartProcesses, Long checkpointRevision,
+                               String status, long finalRevision, long step, String endingSceneId,
+                               String outcomeId, String resultClass, Map<String, String> objectives,
+                               int acceptedChoices, int pendingCommands) {
         ObjectNode json() {
-            return JSON.createObjectNode().put("routeId", id).put("expectedResult", expected)
-                    .put("actualResult", passed ? expected : "UNKNOWN").put("acceptedStoryChoices", acceptedChoices)
-                    .put("restartCheckpointResumed", resumed).put("completed", passed).put("terminalReloaded", passed);
+            ObjectNode node = JSON.createObjectNode().put("routeId", id).put("completed", passed)
+                    .put("restartProcesses", restartProcesses).put("finalRevision", finalRevision)
+                    .put("step", step).put("status", status).put("endingSceneId", endingSceneId)
+                    .put("outcomeId", outcomeId).put("resultClass", resultClass)
+                    .put("acceptedStoryChoices", acceptedChoices).put("pendingCommands", pendingCommands)
+                    .put("terminalReloaded", true);
+            if (checkpointRevision != null) node.put("checkpointRevision", checkpointRevision);
+            ObjectNode objectiveNode = node.putObject("objectives");
+            objectives.forEach(objectiveNode::put);
+            return node;
         }
     }
 

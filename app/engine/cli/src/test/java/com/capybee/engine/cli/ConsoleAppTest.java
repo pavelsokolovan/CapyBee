@@ -327,6 +327,84 @@ class ConsoleAppTest {
         }
     }
 
+    @Test
+    void strictScriptEofRequiresACompletedRun() throws Exception {
+        Path script = Files.createTempFile("play-incomplete", ".txt");
+        try {
+            Files.writeString(script, "", StandardCharsets.UTF_8);
+
+            var result = run(new String[]{"play", "--pack-dir", MINIMAL_PACK, "--memory",
+                    "--script", script.toString()}, "");
+
+            assertThat(result.exitCode).isEqualTo(4);
+            assertThat(result.errors).contains("SCRIPT_INCOMPLETE");
+        } finally {
+            Files.deleteIfExists(script);
+        }
+    }
+
+    @Test
+    void strictScriptRejectsAnUnavailableChoiceImmediately() throws Exception {
+        Path script = Files.createTempFile("play-rejected", ".txt");
+        try {
+            Files.writeString(script, "not-an-option\n/quit\n", StandardCharsets.UTF_8);
+
+            var result = run(new String[]{"play", "--pack-dir", MINIMAL_PACK, "--memory",
+                    "--script", script.toString()}, "");
+
+            assertThat(result.exitCode).isEqualTo(4);
+            assertThat(result.errors).contains("SCRIPT_COMMAND_REJECTED");
+            assertThat(result.output).doesNotContain("> /quit");
+        } finally {
+            Files.deleteIfExists(script);
+        }
+    }
+
+    @Test
+    void strictScriptCannotQuitWhileACommandIsPending() throws Exception {
+        Path script = Files.createTempFile("play-pending", ".txt");
+        CountDownLatch release = new CountDownLatch(1);
+        try {
+            Files.writeString(script, "1\n/quit\n", StandardCharsets.UTF_8);
+            TextGenerator generator = request -> {
+                String output;
+                if (request.slotKey() == null) {
+                    output = switch (request.taskId()) {
+                        case "GEN_SCENARIO" -> "{\"title\":\"An Evening\",\"premise\":\"A lantern waits.\",\"setting\":\"Observatory\",\"beats\":[\"opening-slot\",\"meeting-slot\"]}";
+                        case "GEN_CAST" -> "{\"characters\":[]}";
+                        case "GEN_QUEST" -> "{\"objectives\":[]}";
+                        default -> "{}";
+                    };
+                } else if (request.slotKey().equals("opening-slot")) {
+                    output = scene("opening", "A Quiet Start", "explore", "Look around", "rest", "Rest");
+                } else {
+                    awaitGate(release);
+                    output = scene("meeting", "A New Room", "continue", "Continue", "finish", "Finish");
+                }
+                return new TextGenerationResult(output, null, "test-provider",
+                        TextGenerationResult.FinishReason.COMPLETE);
+            };
+            ConsoleTuning tuning = new ConsoleTuning(Duration.ofSeconds(1), Duration.ofMillis(1),
+                    Duration.ofMillis(1), Duration.ZERO, ignored -> { });
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            ByteArrayOutputStream errors = new ByteArrayOutputStream();
+            ConsoleApp app = new ConsoleApp(ByteArrayInputStream.nullInputStream(),
+                    new PrintStream(output, true, StandardCharsets.UTF_8),
+                    new PrintStream(errors, true, StandardCharsets.UTF_8),
+                    Clock.fixed(Instant.parse("2026-10-12T10:00:00Z"), ZoneOffset.UTC),
+                    new SequentialIdSource("pending-script"), Randoms.seeded(42), generator, tuning);
+
+            int exit = app.run(new String[]{"play", "--pack-dir", GENERATED_PACK, "--generated", "--memory",
+                    "--prefetch", "off", "--script", script.toString()});
+
+            assertThat(exit).isEqualTo(4);
+            assertThat(errors.toString(StandardCharsets.UTF_8)).contains("SCRIPT_COMMAND_PENDING");
+        } finally {
+            release.countDown();
+            Files.deleteIfExists(script);
+        }
+    }
+
     private static String scene(String sceneId, String title, String firstId, String firstLabel,
                                 String secondId, String secondLabel) {
         String narration = sceneId.equals("opening") ? "Opening generated." : "Meeting generated.";

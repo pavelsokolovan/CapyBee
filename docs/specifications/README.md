@@ -58,6 +58,8 @@ list. The current implementation boundary is:
 - 27.4 - Versioned full generated-game contract, structural preflight, and capability metadata
 - 27.5 - Generated story planning (implemented)
 - [27.14](27.14-engine-durable-generated-game-saving-and-resume-instruction.md) - Durable generated-game snapshots, automatic accepted-choice saving, and resume
+- [27.15](27.15-engine-reliable-cli-scripts-and-real-process-resume-tests-instruction.md) - Strict CLI scripts, saved-state route evidence, and real second-process resume tests
+- [27.16](27.16-engine-normal-cli-play-readiness-instruction.md) - Windows UTF-8, normal setup and commands, provider-free fallback, and final manual CLI acceptance
 - 28 - Client rendering contract
 - 29 - CapyBee Polish game pack and game-pack integration
 
