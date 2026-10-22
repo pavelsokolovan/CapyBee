@@ -7,6 +7,7 @@ final class ConsoleErrors {
 
     static String sessionHint(String code) {
         return switch (code) {
+            case "START_FAILED" -> "The game could not be prepared. Start a new game or check the saved-game status.";
             case "REVISION_CONFLICT" -> "The run moved on. The current scene is shown again.";
             case "RUN_BUSY" -> "The run is still locked by an earlier session. Wait up to 30 seconds and try again.";
             case "GENERATION_BUSY" -> "Too many generation jobs are running. Try again in a moment.";

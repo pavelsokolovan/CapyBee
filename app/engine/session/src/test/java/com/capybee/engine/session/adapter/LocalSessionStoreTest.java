@@ -3,6 +3,10 @@ package com.capybee.engine.session.adapter;
 import com.capybee.engine.api.PackRef;
 import com.capybee.engine.api.RunSnapshot;
 import com.capybee.engine.api.RunState;
+import com.capybee.engine.api.json.SnapshotCodec;
+import com.capybee.engine.generation.GenerationArtifact;
+import com.capybee.engine.generation.GenerationCatalog;
+import com.capybee.engine.generation.GenerationQualityEvaluator;
 import com.capybee.engine.pack.LocaleTag;
 import com.capybee.engine.pack.PackId;
 import com.capybee.engine.pack.PackVersion;
@@ -76,6 +80,41 @@ class LocalSessionStoreTest {
             assertThat(restored.snapshot()).isEqualTo(new RunSnapshot(1, id.toString(), new PackRef(pack, new PackVersion(1, 0, 0)), locale, 4, Map.of(), clock.instant(), clock.instant(), 0, new RunState("start", List.of("start"), false, null)));
             assertThat(restored.pendingStart()).isNull();
             assertThat(reopened.tryClaim(id, new OwnerRef("different-owner"), Duration.ofSeconds(5))).isEmpty();
+        }
+    }
+
+    @Test
+    void persistsGeneratedSnapshotThroughCanonicalCodecInV4() throws Exception {
+        Clock clock = Clock.fixed(Instant.parse("2026-10-19T10:00:00Z"), ZoneOffset.UTC);
+        OwnerRef owner = new OwnerRef("local-owner"); UUID id = UUID.randomUUID();
+        PackId pack = new PackId("test-pack"); LocaleTag locale = new LocaleTag("en");
+        var quality = new GenerationArtifact.QualityStamp(1, "default", "profile-fingerprint",
+                GenerationQualityEvaluator.QualityDecision.ACCEPT_WITH_ADVISORIES,
+                List.of("STYLE_NOTE"), "report-fingerprint");
+        var artifact = new GenerationArtifact(3, pack, new PackVersion(1, 0, 0), locale,
+                GenerationCatalog.Stage.THEME, "theme-template", "theme-1",
+                GenerationArtifact.Outcome.GENERATED,
+                new GenerationArtifact.ThemePayload("Lantern Night", "Restore the lights.",
+                        List.of("warm", "hopeful")), quality);
+        RunSnapshot snapshot = new RunSnapshot(1, id.toString(),
+                new PackRef(pack, new PackVersion(1, 0, 0)), locale, 4, Map.of(),
+                clock.instant(), clock.instant(), 0,
+                new RunState("start", List.of("start"), false, null, Map.of(), Map.of(), Map.of(),
+                        Map.of(), null, null, List.of(), List.of(artifact)));
+
+        try (LocalSessionStore store = LocalSessionStore.open(directory, clock)) {
+            store.createPreparing(new NewRun(id, owner, pack, "1.0.0", locale, Map.of(), 4L, true,
+                    clock.instant()));
+            Lease lease = store.tryClaim(id, owner, Duration.ofSeconds(10)).orElseThrow();
+            assertThat(store.saveActive(id, lease, 0, snapshot, List.of())).isTrue();
+        }
+        String bytes = java.nio.file.Files.readString(directory.resolve("session-store.json"));
+        assertThat(bytes).contains("\"version\":4").contains("\"snapshot\":{\"snapshotVersion\"")
+                .doesNotContain("GenerationArtifact$ThemePayload");
+        try (LocalSessionStore reopened = LocalSessionStore.open(directory, clock)) {
+            RunSnapshot restored = reopened.find(id, owner).orElseThrow().snapshot();
+            assertThat(restored).isEqualTo(snapshot);
+            assertThat(SnapshotCodec.toJson(restored)).isEqualTo(SnapshotCodec.toJson(snapshot));
         }
     }
 
@@ -205,7 +244,7 @@ class LocalSessionStoreTest {
                     clock.instant()));
         }
 
-        assertThat(java.nio.file.Files.readString(storeFile)).contains("\"version\":3")
+        assertThat(java.nio.file.Files.readString(storeFile)).contains("\"version\":4")
                 .contains("\"storeRevision\":").contains("\"checksum\":");
         assertThat(java.nio.file.Files.readAllBytes(directory.resolve("session-store.json.bak")))
                 .isEqualTo(legacyBytes);
@@ -217,11 +256,11 @@ class LocalSessionStoreTest {
         Path storeFile = directory.resolve("session-store.json");
         String document = "\"format\":\"capybee-session-store\",\"runs\":[],"
                 + "\"reservations\":{},\"runReservations\":{},\"usage\":{}";
-        java.nio.file.Files.writeString(storeFile, "{" + document + ",\"version\":4}");
+        java.nio.file.Files.writeString(storeFile, "{" + document + ",\"version\":5}");
         assertThatThrownBy(() -> LocalSessionStore.open(directory, clock))
                 .isInstanceOfSatisfying(com.capybee.engine.session.StoreException.class, failure -> {
                     assertThat(failure.code()).isEqualTo(com.capybee.engine.session.StoreException.Code.STORE_VERSION_UNSUPPORTED);
-                    assertThat(failure.details()).containsEntry("found", 4).containsEntry("supported", 3);
+                    assertThat(failure.details()).containsEntry("found", 5).containsEntry("supported", 4);
                 });
 
         java.nio.file.Files.writeString(storeFile, "{" + document + ",\"version\":0}");

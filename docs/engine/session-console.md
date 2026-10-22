@@ -3,7 +3,8 @@
 Use `--session` to run the engine through the resumable local-session host. Without
 `--store-dir`, data exists only for the life of the console process. With a store
 directory, the current run, command history, outbox events, usage ledger, and
-prefetched scenes are retained.
+accepted generated content are retained. Each accepted command is committed before
+it is reported as applied; completed runs retain their final result for read-only reopen.
 
 Useful session options are `--run <uuid>`, `--new`, `--debug`, `--prefetch on|off`,
 `--calls-per-day <0..100000>`, and `--run-calls <1..1000>`. Prefetch defaults to on
@@ -23,3 +24,5 @@ do not.
 
 Recoverable errors are printed as `! CODE: hint` and leave the session open. Startup
 and storage failures print the code and a hint to stderr and exit with code 3.
+Unexpected preparation failures are stored as `START_FAILED`, and preparation wait
+timeouts are stored as `START_TIMEOUT`, so reopening does not restart the same failed work.

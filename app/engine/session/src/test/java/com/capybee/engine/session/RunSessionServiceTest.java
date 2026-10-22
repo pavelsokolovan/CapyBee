@@ -208,6 +208,30 @@ class RunSessionServiceTest {
         assertThat(pendingService.get(owner, runId).status()).isEqualTo(RunStatus.ACTIVE);
     }
 
+    @Test
+    void unexpectedStartFailureIsDurableAndIsNotScheduledAgain() {
+        Pack pack = pack();
+        InMemorySessionStore failedStore = new InMemorySessionStore(CLOCK);
+        AtomicInteger attempts = new AtomicInteger();
+        RunSessionService failedService = new RunSessionService(new TestPackCatalog(pack), failedStore,
+                failedStore, failedStore, failedStore,
+                (ignoredOwner, runId, priority) -> {
+                    attempts.incrementAndGet();
+                    throw new IllegalStateException("synthetic start failure");
+                }, CLOCK::instant, SessionLimits.defaults(), failedStore, DIRECT, new byte[32]);
+        UUID runId = UUID.randomUUID();
+
+        assertThatThrownBy(() -> failedService.start(owner,
+                new StartRequest(runId, PACK_ID, LOCALE, Map.of(), null, true)))
+                .isInstanceOf(SessionException.class)
+                .extracting(error -> ((SessionException) error).code())
+                .isEqualTo(ErrorCode.START_FAILED);
+        assertThat(failedStore.find(runId, owner).orElseThrow().status()).isEqualTo(RunStatus.FAILED);
+        assertThat(failedStore.find(runId, owner).orElseThrow().failureCode()).isEqualTo("START_FAILED");
+        assertThat(failedService.get(owner, runId).status()).isEqualTo(RunStatus.FAILED);
+        assertThat(attempts).hasValue(1);
+    }
+
         @Test
         void diagnosticsUsesStoredCountsAndNeverResumesTheSnapshot() {
                 AtomicInteger resumes = new AtomicInteger();

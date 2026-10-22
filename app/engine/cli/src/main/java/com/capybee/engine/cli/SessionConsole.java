@@ -79,9 +79,7 @@ final class SessionConsole {
                 thinking = true;
             } else out.print(".");
             if (waited.compareTo(tuning.maxWait()) >= 0) {
-                summary = new SessionTypes.RunSummary(summary.runId(), SessionTypes.RunStatus.FAILED,
-                        summary.revision(), summary.packId(), summary.packVersion(), summary.locale(),
-                        summary.endReason(), "START_TIMEOUT", null, summary.updatedAt());
+                summary = sessions.timeoutStart(owner, summary.runId());
                 break;
             }
             Duration delay = tuning.minPoll();
@@ -92,7 +90,8 @@ final class SessionConsole {
             summary = sessions.get(owner, summary.runId());
         }
         if (thinking) out.println();
-        if (summary.status() != SessionTypes.RunStatus.ACTIVE) {
+        if (summary.status() != SessionTypes.RunStatus.ACTIVE
+                && summary.status() != SessionTypes.RunStatus.ENDED) {
             String code = summary.failureCode() == null ? "START_REJECTED" : summary.failureCode();
             err.println(code);
             err.println("  " + ConsoleErrors.sessionHint(code));

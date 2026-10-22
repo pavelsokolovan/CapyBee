@@ -195,6 +195,15 @@ public final class RunSessionService {
         return get(owner, stored.id());
     }
 
+    public RunSummary timeoutStart(OwnerRef owner, UUID runId) {
+        StoredRun stored = requireRun(owner, runId);
+        if (stored.status() == RunStatus.PREPARING) {
+            Lease lease = runs.tryClaim(runId, owner, limits.leaseDuration()).orElse(null);
+            if (lease != null) runs.markFailed(runId, lease, "START_TIMEOUT");
+        }
+        return summary(requireRun(owner, runId));
+    }
+
     public List<OutboxEvent> events(OwnerRef owner, UUID runId, long afterSeq, int limit) {
         requireRun(owner, runId);
         if (afterSeq < 0 || limit < 1 || limit > 100) {
@@ -441,10 +450,12 @@ public final class RunSessionService {
                 outbox.append(request.id(), null, 0, result.events());
             });
             ensurePrefetch(owner, request.id());
-        } catch (SessionException exception) {
-            throw exception;
         } catch (RuntimeException exception) {
-            runs.releaseLease(request.id(), lease);
+            try {
+                runs.markFailed(request.id(), lease, "START_FAILED");
+            } catch (RuntimeException storeFailure) {
+                // The durable store error is surfaced by subsequent reads; never claim success here.
+            }
         } finally {
             generationSlots.release();
         }
