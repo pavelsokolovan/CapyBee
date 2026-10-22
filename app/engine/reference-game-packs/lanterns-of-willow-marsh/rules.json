@@ -1,0 +1,27 @@
+{
+  "schemaVersion":2,
+  "counters":[
+    {"id":"teamwork","labelKey":"status.teamwork","min":0,"max":5,"initial":0,"display":true,"maxDelta":1},
+    {"id":"care","labelKey":"status.care","min":0,"max":6,"initial":0,"display":true,"maxDelta":1}
+  ],
+  "flags":[{"id":"took-reed-route","initial":false},{"id":"took-orchard-route","initial":false},{"id":"shared-discovery","initial":false},{"id":"stable-beacon","initial":false},{"id":"temporary-beacon","initial":false},{"id":"everyone-crossed","initial":false},{"id":"festival-ready","initial":false}],
+  "sets":[{"id":"clues","values":["reed-song","orchard-mark","lens-note","wind-pattern"],"initial":[]}],
+  "objectives":[
+    {"id":"find-lens","labelKey":"objective.find-lens","completeWhen":{"type":"VISITED_SCENE","scene":"old-boathouse"}},
+    {"id":"prepare-beacon","labelKey":"objective.prepare-beacon","completeWhen":{"type":"ANY","conditions":[{"type":"FLAG_IS","flag":"stable-beacon","value":true},{"type":"FLAG_IS","flag":"temporary-beacon","value":true}]}},
+    {"id":"bring-neighbors-home","labelKey":"objective.bring-neighbors-home","completeWhen":{"type":"FLAG_IS","flag":"everyone-crossed","value":true}}
+  ],
+  "outcomes":[{"id":"radiant-festival","resultClass":"SUCCESS","labelKey":"result.radiant"},{"id":"gentle-lighting","resultClass":"PARTIAL_SUCCESS","labelKey":"result.gentle"},{"id":"festival-postponed","resultClass":"FAILURE","labelKey":"result.postponed"}],
+  "resultFacts":[
+    {"id":"followed-reed-song","labelKey":"fact.reed","when":{"type":"FLAG_IS","flag":"took-reed-route","value":true}},
+    {"id":"protected-orchard","labelKey":"fact.orchard","when":{"type":"FLAG_IS","flag":"took-orchard-route","value":true}},
+    {"id":"shared-the-lens-plan","labelKey":"fact.shared","when":{"type":"FLAG_IS","flag":"shared-discovery","value":true}},
+    {"id":"decoded-wind-pattern","labelKey":"fact.wind","when":{"type":"SET_CONTAINS","set":"clues","value":"wind-pattern"}},
+    {"id":"made-stable-repair","labelKey":"fact.stable","when":{"type":"FLAG_IS","flag":"stable-beacon","value":true}},
+    {"id":"used-temporary-repair","labelKey":"fact.temporary","when":{"type":"FLAG_IS","flag":"temporary-beacon","value":true}},
+    {"id":"crossed-together","labelKey":"fact.crossed","when":{"type":"FLAG_IS","flag":"everyone-crossed","value":true}},
+    {"id":"kept-everyone-safe","labelKey":"fact.safe","when":{"type":"VISITED_SCENE","scene":"marsh-crossing"}},
+    {"id":"festival-shone","labelKey":"fact.shone","when":{"type":"FLAG_IS","flag":"festival-ready","value":true}},
+    {"id":"plan-saved-for-tomorrow","labelKey":"fact.tomorrow","when":{"type":"VISITED_SCENE","scene":"ending-postponed"}}
+  ]
+}

@@ -1,5 +1,9 @@
 # Game Engine SDK
 
+## Reference generated game
+
+`reference-game-packs/lanterns-of-willow-marsh` is the primary manual full-game example: a 15–25 minute, English, family-friendly adventure with provider-backed presentation and a complete offline fallback. Packs under `fixtures/game-packs` remain focused test assets rather than player recommendations. Its README contains stable success, partial-success, and responsible-postponement scripts.
+
 A standalone Java 25 Maven module. It does not inherit from Spring Boot and
 does not depend on the web application, a database, network services, or API
 keys. Its artifacts are `com.capybee:engine-core`,

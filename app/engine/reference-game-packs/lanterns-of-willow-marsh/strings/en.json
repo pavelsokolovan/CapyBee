@@ -1,0 +1,11 @@
+{
+  "status.teamwork":"Teamwork","status.care":"Care","objective.find-lens":"Find the missing beacon lens","objective.prepare-beacon":"Prepare the beacon safely","objective.bring-neighbors-home":"Help the neighbors return together",
+  "result.radiant":"Radiant Festival","result.gentle":"Gentle Lighting","result.postponed":"Festival Postponed",
+  "fact.reed":"Pip's reed song guided the investigation.","fact.orchard":"The orchard was protected while the trail was followed.","fact.shared":"The lens plan was shared with the whole group.","fact.wind":"The bell garden revealed the wind pattern.","fact.stable":"A careful repair made the beacon stable.","fact.temporary":"A safe temporary repair preserved the progress.","fact.crossed":"The neighbors crossed the marsh together.","fact.safe":"Everyone stayed safe at the marsh crossing.","fact.shone":"The festival lanterns shone across the marsh.","fact.tomorrow":"The group saved a clear plan for tomorrow.",
+  "option.light-together.unmet":"A stable beacon, the whole group, and more teamwork are needed for this choice.",
+  "setup.tone.label":"Story tone","setup.tone.help":"Choose a cozy or adventurous telling.","setup.tone.cozy":"Cozy","setup.tone.adventurous":"Adventurous",
+  "setup.interests.label":"Story interests","setup.interests.help":"Choose up to two details to feature.","setup.interests.animals":"Animals","setup.interests.puzzles":"Puzzles","setup.interests.making-things":"Making things","setup.interests.nature":"Nature",
+  "setup.companion.label":"Companion focus","setup.companion.help":"Choose who receives extra narrative attention.","setup.companion.keeper":"Keeper","setup.companion.inventor":"Inventor","setup.companion.heron":"Heron","setup.companion.balanced":"Balanced",
+  "setup.wish.label":"Story wish","setup.wish.help":"Optionally suggest one safe story detail.","setup.wish.notice":"Do not enter names, contact details, or other personal information.",
+  "place.festival-square":"Festival Square","place.reed-bank":"Reed Bank","place.orchard-path":"Orchard Path","place.old-boathouse":"Old Boathouse","place.bell-garden":"Bell Garden","place.wind-gate":"Wind Gate","place.lantern-workshop":"Lantern Workshop","place.marsh-crossing":"Marsh Crossing","place.beacon-platform":"Beacon Platform"
+}

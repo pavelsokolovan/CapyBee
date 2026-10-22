@@ -1,0 +1,12 @@
+{
+  "schemaVersion":1,"id":"lanterns-of-willow-marsh","version":"1.0.0","name":"Lanterns of Willow Marsh",
+  "locales":["en"],"defaultLocale":"en","features":["GENERATION","PLACES"],
+  "startInputs":[
+    {"id":"story-tone","kind":"ENUM","required":false,"labelKey":"setup.tone.label","values":["cozy","adventurous"]},
+    {"id":"interests","kind":"ENUM_SET","required":false,"labelKey":"setup.interests.label","values":["animals","puzzles","making-things","nature"],"maxItems":2},
+    {"id":"companion-focus","kind":"ENUM","required":false,"labelKey":"setup.companion.label","values":["keeper","inventor","heron","balanced"]},
+    {"id":"story-wish","kind":"FREE_TEXT","required":false,"labelKey":"setup.wish.label","maxChars":240}
+  ],
+  "contentPolicy":{"freeTextAllowed":true,"forbiddenTags":["personal-data"]},
+  "files":["strings/en.json","prompts/en/system.md","scenes/en/story.json","rules.json","places.json","generation/catalog.json","generation/setup.json","generation/templates.json","generation/quality/en.json","generation/fallbacks/en/theme.json","generation/fallbacks/en/scenario.json","generation/fallbacks/en/cast.json","generation/fallbacks/en/quest.json","generation/fallbacks/en/festival-square.json","generation/fallbacks/en/reed-bank.json","generation/fallbacks/en/orchard-path.json","generation/fallbacks/en/old-boathouse.json","generation/fallbacks/en/bell-garden.json","generation/fallbacks/en/wind-gate.json","generation/fallbacks/en/lantern-workshop.json","generation/fallbacks/en/marsh-crossing.json","generation/fallbacks/en/beacon-platform.json","generation/fallbacks/en/ending-radiant.json","generation/fallbacks/en/ending-gentle.json","generation/fallbacks/en/ending-postponed.json"]
+}

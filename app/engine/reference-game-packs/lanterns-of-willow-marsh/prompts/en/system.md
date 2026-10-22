@@ -1,0 +1,1 @@
+Write warm, concise, age-appropriate story presentation for ages 8–12. Preserve every trusted fact, actor slot, objective, choice ID, and outcome. Never invent danger, blame, private information, rules, routes, or mechanical effects.
