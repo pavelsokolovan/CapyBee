@@ -57,14 +57,15 @@ public class GameErrorAdvice {
 
     private static HttpStatus status(ErrorCode code) {
         return switch (code) {
-            case REQUEST_INVALID -> HttpStatus.BAD_REQUEST;
-            case GAME_DISABLED, RUN_NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case REQUEST_INVALID, PURGE_CONFIRMATION_REQUIRED -> HttpStatus.BAD_REQUEST;
+            case GAME_DISABLED, RUN_NOT_FOUND, RUN_ARCHIVED, RUN_TRASHED -> HttpStatus.NOT_FOUND;
             case PAYLOAD_TOO_LARGE -> HttpStatus.PAYLOAD_TOO_LARGE;
             case RUN_ALREADY_ACTIVE, RUN_BUSY, RUN_NOT_ACTIVE, REVISION_CONFLICT,
-                    GENERATION_UNAVAILABLE -> HttpStatus.CONFLICT;
+                    GENERATION_UNAVAILABLE, RUN_SUSPENDED, RUN_QUARANTINED, RUN_NOT_RESUMABLE,
+                    RUN_SWITCH_BUSY, COMMAND_INTERRUPTED, PACK_VERSION_MISMATCH -> HttpStatus.CONFLICT;
             case COMMAND_ID_REUSED, START_REJECTED -> HttpStatus.UNPROCESSABLE_ENTITY;
             case RATE_LIMITED -> HttpStatus.TOO_MANY_REQUESTS;
-            case GENERATION_BUSY, SERVICE_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
+            case GENERATION_BUSY, RECOVERY_IN_PROGRESS, SERVICE_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
             case INTERNAL_ERROR, START_TIMEOUT, RUN_UNRECOVERABLE -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
     }
@@ -72,18 +73,27 @@ public class GameErrorAdvice {
     private static String message(ErrorCode code) {
         return switch (code) {
             case REQUEST_INVALID -> "The request is invalid.";
+            case PURGE_CONFIRMATION_REQUIRED -> "Confirmation is required to permanently delete the run.";
             case GAME_DISABLED -> "Game sessions are unavailable.";
             case PAYLOAD_TOO_LARGE -> "The request is too large.";
             case RUN_NOT_FOUND -> "The run was not found.";
+            case RUN_ARCHIVED -> "The run is archived.";
+            case RUN_TRASHED -> "The run is in the trash.";
             case RUN_ALREADY_ACTIVE -> "A run is already active.";
-            case RUN_BUSY, GENERATION_BUSY -> "The run is busy. Please try again.";
+            case RUN_BUSY, GENERATION_BUSY, RUN_SWITCH_BUSY -> "The run is busy. Please try again.";
             case RUN_NOT_ACTIVE -> "The run is not active.";
+            case RUN_SUSPENDED -> "The run is suspended.";
+            case RUN_QUARANTINED -> "The run is unavailable.";
+            case RUN_NOT_RESUMABLE -> "The run cannot be resumed.";
             case REVISION_CONFLICT -> "The run has changed.";
             case COMMAND_ID_REUSED -> "This command id was already used.";
+            case COMMAND_INTERRUPTED -> "The previous command was interrupted.";
+            case PACK_VERSION_MISMATCH -> "The game pack version has changed.";
             case START_REJECTED -> "The run could not be started.";
             case START_TIMEOUT, RUN_UNRECOVERABLE -> "The run could not be recovered.";
             case GENERATION_UNAVAILABLE -> "Generated play is unavailable.";
             case RATE_LIMITED -> "Please wait before trying again.";
+            case RECOVERY_IN_PROGRESS -> "The service is recovering sessions. Please try again.";
             case SERVICE_UNAVAILABLE -> "The service is temporarily unavailable.";
             case INTERNAL_ERROR -> "Something went wrong.";
         };
