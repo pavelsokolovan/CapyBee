@@ -66,7 +66,7 @@ public class GameErrorAdvice {
             case COMMAND_ID_REUSED, START_REJECTED -> HttpStatus.UNPROCESSABLE_ENTITY;
             case RATE_LIMITED -> HttpStatus.TOO_MANY_REQUESTS;
             case GENERATION_BUSY, RECOVERY_IN_PROGRESS, SERVICE_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
-            case INTERNAL_ERROR, START_TIMEOUT, RUN_UNRECOVERABLE -> HttpStatus.INTERNAL_SERVER_ERROR;
+            case INTERNAL_ERROR, START_FAILED, START_TIMEOUT, RUN_UNRECOVERABLE -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
     }
 
@@ -89,7 +89,7 @@ public class GameErrorAdvice {
             case COMMAND_ID_REUSED -> "This command id was already used.";
             case COMMAND_INTERRUPTED -> "The previous command was interrupted.";
             case PACK_VERSION_MISMATCH -> "The game pack version has changed.";
-            case START_REJECTED -> "The run could not be started.";
+            case START_REJECTED, START_FAILED -> "The run could not be started.";
             case START_TIMEOUT, RUN_UNRECOVERABLE -> "The run could not be recovered.";
             case GENERATION_UNAVAILABLE -> "Generated play is unavailable.";
             case RATE_LIMITED -> "Please wait before trying again.";
