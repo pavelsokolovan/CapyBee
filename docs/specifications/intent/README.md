@@ -45,3 +45,4 @@ touching the safety/privacy rules in `copilot-instructions.md`.
 |---|---|---|
 | `00-example-photo-storage.md` | example only | — |
 | `01-universal-game-engine.md` | → spec 22 (series 22–31) | 22 |
+| `02-dynamic-ai-game-generation.md` | → specs 27.17–27.27 | 27.17–27.27 |

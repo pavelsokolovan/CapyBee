@@ -25,7 +25,7 @@ Owns development commands and final application gates. Reuse the [workflow scrip
 	No Spring, database, frontend, or integrated app startup is needed.
 - `mvn -f app/pom.xml verify` from the repo root aggregates engine and backend checks; the
 	modules have independent parents and can also be developed separately.
-- Backend changes: `mvn -f app/pom.xml -pl server -am verify` from the repo root (JUnit + JaCoCo minimum 70% line coverage on `com.capybee.server.service.*`). Add tests, never lower the gate.
+- Backend changes: run the same command as GitHub Actions from the repo root: `mvn -B -f app/pom.xml -pl server -am verify` (JUnit + JaCoCo minimum 70% line coverage on `com.capybee.server.service.*`). Use this exact command for final backend build verification. Add tests, never lower the gate.
 - Frontend changes: `npm test` (or `npm run test:coverage`) in `app/ui`, then the build-and-sync workflow above.
 - Before shipping application changes, start the integrated app and manually verify affected user flows, not just Vite.
 - Guidance-only edits: validate frontmatter, links, routing, and preserved rules; application builds, static sync, and test suites are not required.

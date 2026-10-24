@@ -60,6 +60,9 @@ list. The current implementation boundary is:
 - [27.14](27.14-engine-durable-generated-game-saving-and-resume-instruction.md) - Durable generated-game snapshots, automatic accepted-choice saving, and resume
 - [27.15](27.15-engine-reliable-cli-scripts-and-real-process-resume-tests-instruction.md) - Strict CLI scripts, saved-state route evidence, and real second-process resume tests
 - [27.16](27.16-engine-normal-cli-play-readiness-instruction.md) - Windows UTF-8, normal setup and commands, provider-free fallback, and final manual CLI acceptance
+- [27.17](27.17-engine-dynamic-game-generation-architecture-instruction.md) - Accepted dynamic-game architecture, preparation wizard, trust/privacy boundaries, and delivery plan
+- [27.18](27.18-engine-generator-profile-and-capability-contract-instruction.md) - Generator-profile schema, capabilities, localized setup metadata, deterministic preset resolution, fingerprints, and reviewed-fallback verification (implemented)
+- 27.19-27.27 - Planned dynamic-game blueprint, generation, validation, mechanics, compilation, runtime, presentation, persistence, and CLI integration; implementation contracts are owned by their individual specs
 - 28 - Client rendering contract
 - 29 - CapyBee Polish game pack and game-pack integration
 

@@ -169,3 +169,26 @@ content-only format and full games use artifact v2. Full-game cast and quest
 artifacts now provide display names, discovered-character metadata, and quest
 presentation while trusted rules remain the sole owner of objective state.
 Spec 27.7 owns richer result and ending behavior.
+
+## Dynamic generator profiles
+
+Spec 27.18 adds a scenario-neutral bootstrap configuration under
+`com.capybee.engine.generation.profile`. A generator profile is not a playable
+pack: it contains bounded capability declarations, localized wizard metadata,
+generation ceilings, prompt/quality resources, and references to reviewed
+fallback packs. `GeneratorProfileLoader` accepts an in-memory UTF-8 resource
+map, strictly validates its allowlisted contents, and returns a
+`ValidatedGeneratorProfile` with a canonical SHA-256 fingerprint.
+
+`PreparationPresetResolver` resolves typed `ABSENT`/`CLEARED`/`SELECTED`
+wizard state into immutable creative preferences and effective hard
+constraints. It rejects `story-wish` values because optional prose remains a
+transient capability for the later confirmed blueprint operation. Loading and
+resolution perform no provider, guard, filesystem, session, or runtime calls.
+`FallbackBindingValidator` exposes only fallback tuples whose real validated
+pack identity, locale, route bounds, state capacity, and used rule vocabulary
+honor the selected profile presets.
+
+This API does not make dynamic games playable and adds no CLI option. Specs
+27.19–27.27 own blueprints, orchestration, validation, compilation, runtime,
+persistence, and the released preparation wizard.
