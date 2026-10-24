@@ -59,4 +59,9 @@ public final class MeteredTextGenerator implements TextGenerator {
         }
         return result;
     }
+
+    @Override
+    public Capabilities capabilities() {
+        return delegate.capabilities();
+    }
 }

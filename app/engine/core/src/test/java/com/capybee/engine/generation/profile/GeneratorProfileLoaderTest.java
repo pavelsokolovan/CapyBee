@@ -82,6 +82,19 @@ class GeneratorProfileLoaderTest {
         assertThat(impossible.issues()).extracting(ProfileIssue::code).contains("PREPARATION_CONSTRAINTS_UNSATISFIABLE");
     }
 
+    @Test void explicitRequestedLocaleWinsOverAbsentWizardDefault() {
+        var profile = loader.load(bundle(profileJson())).profile().orElseThrow();
+        var result = new PreparationPresetResolver().resolve(profile, Map.of(), new LocaleTag("pl"), null);
+        assertThat(result.issues()).isEmpty();
+        assertThat(result.preferences().orElseThrow().gameLocale().value()).isEqualTo("pl");
+    }
+
+    @Test void rejectsEmptyQualityPolicy() {
+        Map<String, byte[]> files = bundle(profileJson());
+        files.put("quality/en.json", bytes("{}"));
+        assertThat(loader.load(files).issues()).extracting(ProfileIssue::code).contains("PROFILE_RESOURCE_INVALID");
+    }
+
     private static Map<String, byte[]> bundle(String profile) {
         Map<String, byte[]> files = new LinkedHashMap<>();
         files.put("profile.json", bytes(profile));
@@ -90,11 +103,14 @@ class GeneratorProfileLoaderTest {
         files.put("strings/pl.json", bytes(stringsJson("Polski")));
         files.put("prompts/en/blueprint.md", bytes("Create a bounded neutral adventure blueprint."));
         files.put("prompts/pl/blueprint.md", bytes("Utwórz neutralny plan przygody."));
-        files.put("quality/en.json", bytes("{}"));
-        files.put("quality/pl.json", bytes("{}"));
+        files.put("quality/en.json", bytes(quality("review-en-v1")));
+        files.put("quality/pl.json", bytes(quality("review-pl-v1")));
         return files;
     }
     private static byte[] bytes(String value) { return value.getBytes(StandardCharsets.UTF_8); }
+    private static String quality(String version) { return """
+        {"schemaVersion":1,"policyVersion":"%s","maxNarrativeCodePoints":24000,"forbiddenPhrases":[]}
+        """.formatted(version); }
 
     private static String profileJson() { return """
         {"schemaVersion":1,"id":"generic-adventure","version":"1.0.0","titleKey":"profile.title","descriptionKey":"profile.description",

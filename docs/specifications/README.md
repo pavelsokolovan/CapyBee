@@ -63,7 +63,8 @@ list. The current implementation boundary is:
 - [27.17](27.17-engine-dynamic-game-generation-architecture-instruction.md) - Accepted dynamic-game architecture, preparation wizard, trust/privacy boundaries, and delivery plan
 - [27.18](27.18-engine-generator-profile-and-capability-contract-instruction.md) - Generator-profile schema, capabilities, localized setup metadata, deterministic preset resolution, fingerprints, and reviewed-fallback verification (implemented)
 - [27.19](27.19-engine-generated-game-blueprint-schema-instruction.md) - Strict immutable generated-game blueprint proposal schema, bounded parser, deterministic writer, and provider-neutral JSON Schema (implemented)
-- 27.20-27.27 - Planned dynamic-game generation, validation, mechanics, compilation, runtime, presentation, persistence, and CLI integration; implementation contracts are owned by their individual specs
+- [27.20](27.20-engine-blueprint-generation-repair-and-fallback-instruction.md) - Confirmed provider-neutral blueprint generation, shared safe-input routing, strict review handoff, one total repair allowance, and explicit whole-game fallback offers (implemented; non-playable)
+- 27.21-27.27 - Planned dynamic-game validation, mechanics, compilation, runtime, presentation, persistence, and CLI integration; implementation contracts are owned by their individual specs
 - 28 - Client rendering contract
 - 29 - CapyBee Polish game pack and game-pack integration
 

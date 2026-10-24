@@ -37,10 +37,15 @@ public final class PreparationPresetResolver {
             values.put(input.id(), canonical(input, chosen));
         }
         String wizardLocale = first(values.get("game-locale"));
-        if (requestedLocale != null && wizardLocale != null && !requestedLocale.value().equals(wizardLocale)) {
+        PreparationAnswer localeAnswer = submitted.get("game-locale");
+        String explicitWizardLocale = localeAnswer instanceof PreparationAnswer.Selected selected
+                ? first(selected.values()) : null;
+        if (requestedLocale != null && explicitWizardLocale != null
+                && !requestedLocale.value().equals(explicitWizardLocale)) {
             issue(issues, "PREPARATION_LOCALE_CONFLICT");
         }
         String localeText = requestedLocale != null ? requestedLocale.value()
+                : explicitWizardLocale != null ? explicitWizardLocale
                 : wizardLocale != null ? wizardLocale : profile.defaultLocale().value();
         if (profile.supportedLocales().stream().noneMatch(it -> it.value().equals(localeText))) issue(issues, "PREPARATION_INPUT_INVALID");
         String lengthId = first(values.get("length"));

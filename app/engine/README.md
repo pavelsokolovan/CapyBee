@@ -189,6 +189,14 @@ resolution perform no provider, guard, filesystem, session, or runtime calls.
 pack identity, locale, route bounds, state capacity, and used rule vocabulary
 honor the selected profile presets.
 
+`BlueprintGenerationService` consumes a confirmed preparation, optionally routes
+the transient story wish through the shared scrubber/guard path, and sends one
+provider-neutral `GAME_BLUEPRINT` request. A parse, output-review, or semantic
+rejection can spend the single remaining replacement allowance. Results are
+explicitly reviewed candidates or internal review-pending/failure variants;
+they are not packs, runs, persisted definitions, or executable games. Provider
+payloads are never emitted by adapter debug logging.
+
 This API does not make dynamic games playable and adds no CLI option. Specs
-27.19–27.27 own blueprints, orchestration, validation, compilation, runtime,
-persistence, and the released preparation wizard.
+27.21–27.27 own semantic proof, mechanics, compilation, runtime, persistence,
+presentation, and the released preparation wizard.

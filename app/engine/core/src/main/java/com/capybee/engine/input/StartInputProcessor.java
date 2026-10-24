@@ -5,6 +5,7 @@ import com.capybee.engine.pack.ContentPolicy;
 import com.capybee.engine.pack.LocaleTag;
 import com.capybee.engine.pack.Pack;
 import com.capybee.engine.pack.StartInputDef;
+import com.capybee.engine.generation.profile.GeneratorProfile;
 import com.capybee.engine.port.InputGuard;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -22,8 +23,24 @@ public final class StartInputProcessor {
 
     public PreparedStartInputs prepare(Pack pack, LocaleTag locale, Map<String, String> submitted,
                                        InputGuard guard) {
+        ContentPolicy content = pack.manifest().contentPolicy();
+        return prepare(pack.manifest().startInputs(), content, submitted, guard);
+    }
+
+    /** Host-neutral profile entry point. Only the declared transient input should be submitted here. */
+    public PreparedStartInputs prepare(List<StartInputDef> definitions, GeneratorProfile.ProfilePolicy profilePolicy,
+                                       Map<String, String> submitted, InputGuard guard) {
+        ContentPolicy.Audience audience = profilePolicy == null ? null
+                : new ContentPolicy.Audience(profilePolicy.minAge(), profilePolicy.maxAge());
+        ContentPolicy policy = profilePolicy == null ? null : new ContentPolicy(profilePolicy.freeTextAllowed(),
+                audience, List.copyOf(profilePolicy.forbiddenTags()));
+        return prepare(definitions, policy, submitted, guard);
+    }
+
+    private PreparedStartInputs prepare(List<StartInputDef> definitions, ContentPolicy content,
+                                        Map<String, String> submitted, InputGuard guard) {
         Map<String, StartInputDef> declared = new LinkedHashMap<>();
-        pack.manifest().startInputs().forEach(input -> declared.put(input.id(), input));
+        definitions.forEach(input -> declared.put(input.id(), input));
         Map<String, String> values = normalize(submitted);
         Map<String, String> persistent = new LinkedHashMap<>();
         Map<String, SafeTextInput> text = new LinkedHashMap<>();
@@ -31,7 +48,7 @@ public final class StartInputProcessor {
 
         values.keySet().stream().filter(key -> !declared.containsKey(key)).forEach(key ->
                 issues.add(error("START_INPUT_UNKNOWN", "Unknown start input: " + key)));
-        for (StartInputDef input : pack.manifest().startInputs()) {
+        for (StartInputDef input : definitions) {
             String value = values.get(input.id());
             if (value == null || value.isBlank()) {
                 if (input.required()) issues.add(error("START_INPUT_MISSING", "Required start input is missing: " + input.id()));
@@ -48,15 +65,14 @@ public final class StartInputProcessor {
                 else persistent.put(input.id(), enumSet.values().stream().filter(selected::contains)
                         .collect(java.util.stream.Collectors.joining(",")));
             } else if (input instanceof StartInputDef.FreeTextInput freeText) {
-                prepareText(pack, freeText, value, guard, text, issues);
+                prepareText(content, freeText, value, guard, text, issues);
             }
         }
         return new PreparedStartInputs(persistent, text, issues);
     }
 
-    private void prepareText(Pack pack, StartInputDef.FreeTextInput input, String value, InputGuard guard,
+    private void prepareText(ContentPolicy content, StartInputDef.FreeTextInput input, String value, InputGuard guard,
                              Map<String, SafeTextInput> output, List<Issue> issues) {
-        ContentPolicy content = pack.manifest().contentPolicy();
         if (content == null || !content.freeTextAllowed()) {
             issues.add(error("FREE_TEXT_DISABLED", "Free-text input is disabled by pack policy")); return;
         }

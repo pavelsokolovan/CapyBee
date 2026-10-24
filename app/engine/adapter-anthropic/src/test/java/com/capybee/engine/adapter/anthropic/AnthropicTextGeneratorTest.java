@@ -62,6 +62,21 @@ class AnthropicTextGeneratorTest {
     }
 
     @Test
+    void blueprintPurposeUsesBoundedDeclarativePolicyAndLargerTokenEnvelope() throws IOException {
+        AtomicReference<JsonNode> sent = new AtomicReference<>();
+        withServer(exchange -> { sent.set(MAPPER.readTree(exchange.getRequestBody().readAllBytes())); respond(exchange, 200, RESPONSE); }, endpoint -> {
+            var request = new StructuredGenerationRequest("request", "GAME_BLUEPRINT", "policy-v1",
+                    "Profile instructions", "{}", "{\"type\":\"object\"}", 6000,
+                    StructuredGenerationRequest.CostClass.STANDARD, null,
+                    StructuredGenerationRequest.Purpose.GAME_BLUEPRINT);
+            new AnthropicTextGenerator(config(endpoint)).generate(request);
+        });
+        assertThat(sent.get().get("max_tokens").intValue()).isEqualTo(6000);
+        assertThat(sent.get().get("system").asString()).contains("bounded declarative game blueprint")
+                .contains("Do not emit executable code").doesNotContain("create actions or game rules");
+    }
+
+    @Test
     void sceneSlotKeyDoesNotChangeProviderPayloadBytes() throws IOException {
         AtomicReference<byte[]> withoutSlotKey = new AtomicReference<>();
         AtomicReference<byte[]> withSlotKey = new AtomicReference<>();

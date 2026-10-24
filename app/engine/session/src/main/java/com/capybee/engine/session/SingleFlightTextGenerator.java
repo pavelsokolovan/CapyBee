@@ -49,6 +49,11 @@ public final class SingleFlightTextGenerator implements TextGenerator {
         }
     }
 
+    @Override
+    public Capabilities capabilities() {
+        return delegate.capabilities();
+    }
+
     private TextGenerationResult retryFailedLeader(String key, StructuredGenerationRequest request) {
         while (true) {
             CompletableFuture<TextGenerationResult> leader = registry.register(key);

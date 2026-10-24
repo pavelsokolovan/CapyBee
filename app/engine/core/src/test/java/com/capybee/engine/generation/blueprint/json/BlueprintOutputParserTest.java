@@ -3,6 +3,7 @@ package com.capybee.engine.generation.blueprint.json;
 import static org.assertj.core.api.Assertions.assertThat;
 import com.capybee.engine.generation.PhaseKind;
 import com.capybee.engine.generation.blueprint.ParsedGameBlueprint;
+import com.capybee.engine.generation.blueprint.BlueprintIssue;
 import com.capybee.engine.generation.blueprint.ParsedGameBlueprint.*;
 import com.capybee.engine.generation.profile.*;
 import com.capybee.engine.pack.*;
@@ -42,7 +43,13 @@ class BlueprintOutputParserTest {
     @Test void publishesBaseAndContextSpecializedSchemas(){
         var schemas=new BlueprintSchemas();
         assertThat(schemas.baseSchema()).contains("draft/2020-12").contains("additionalProperties");
-        assertThat(schemas.specializedSchema(context.profile,context.preferences,context.constraints)).contains("\"locale\":\"en\"").contains("FLAG_IS");
+        String specialized=schemas.specializedSchema(context.profile,context.preferences,context.constraints);
+        assertThat(specialized).contains("\"locale\":\"en\"").contains("FLAG_IS").doesNotContain("COUNTER_ADD").doesNotContain("SET_ADD");
+    }
+    @Test void rejectsDecodedLoneSurrogate(){
+        String json=writer.writeString(proposal()).replace("Signal Path","\\uD800");
+        assertThat(parser.parse(json,context.profile,context.preferences,context.constraints).issues())
+                .extracting(BlueprintIssue::code).contains("BLUEPRINT_TEXT_INVALID");
     }
 
     private static ParsedGameBlueprint proposal(){
@@ -56,13 +63,14 @@ class BlueprintOutputParserTest {
     private static DecisionScene decision(String id,PhaseKind phase,String destination,List<Effect> effects){return new DecisionScene(id,phase,"A careful step","Plan the next action.",List.of("guide"),List.of("finish"),List.of(new Choice("continue","Continue with the plan.",destination,null,effects)));}
     private static Context context(){
         var identity=new ProfileIdentity(new PackId("test-profile"),new PackVersion(1,0,0),"fingerprint");
-        var caps=new ProfileCapabilities(List.of(PhaseKind.values()),"FORWARD_DAG",false,6,12,4,1,4,1,4,2,4,4,12,2,8,-10,10,3,4,32,6,100,Set.of("FLAG_IS"),Set.of("FLAG_SET"));
+        var caps=new ProfileCapabilities(List.of(PhaseKind.values()),"FORWARD_DAG",false,6,12,4,1,4,1,4,2,4,4,12,2,8,0,10,3,4,32,6,100,Set.of("FLAG_IS"),Set.of("FLAG_SET"));
         var length=new LengthPreset("short","length.short",5,7,12);
         var challenge=new ChallengePreset("gentle","challenge.gentle",4,12,2,4,6,Set.of("FLAG_IS"),Set.of("FLAG_SET"));
-        var raw=new GeneratorProfile(1,identity.id(),identity.version(),"title","description",List.of(new LocaleTag("en")),new LocaleTag("en"),null,caps,List.of(length),List.of(challenge),new ProfileGenerationBudget(20,2,2000,2,1000,300),null,Map.of(),Map.of(),Map.of(),List.of(),List.of());
+        var policy=new GeneratorProfile.ProfilePolicy(10,14,true,300,Set.of());
+        var raw=new GeneratorProfile(1,identity.id(),identity.version(),"title","description",List.of(new LocaleTag("en")),new LocaleTag("en"),policy,caps,List.of(length),List.of(challenge),new ProfileGenerationBudget(20,2,2000,2,1000,1200),null,Map.of(),Map.of(),Map.of(),List.of(),List.of());
         var validated=ProfileValidationFactory.validated(raw,identity);
         var prefs=new ResolvedGamePreferences(identity,new LocaleTag("en"),"short","gentle",Optional.empty(),Optional.empty(),Optional.empty(),List.of());
-        var limits=new EffectiveGenerationConstraints(5,7,6,12,4,12,2,4,6,Set.of("FLAG_IS"),Set.of("FLAG_SET"),20,2000,1000,300);
+        var limits=new EffectiveGenerationConstraints(5,7,6,12,4,12,2,4,6,Set.of("FLAG_IS"),Set.of("FLAG_SET"),20,2000,1000,1200);
         return new Context(validated,prefs,limits);
     }
     private record Context(ValidatedGeneratorProfile profile,ResolvedGamePreferences preferences,EffectiveGenerationConstraints constraints){}
