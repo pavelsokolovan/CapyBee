@@ -205,6 +205,13 @@ ceiling is explicitly inconclusive, never accepted. Generation keeps semantic
 rejection/inconclusive repairable while validator absence and invalid host
 context do not spend the model-repair allowance.
 
+Generated mechanics now use the closed `generated-rules-v1` registry: exactly
+ten condition and five state-effect operators bind once to the authored rule
+DSL. Semantic exploration and `RunImpl` share the same pure condition evaluator
+and state-effect semantics, while generated counter overflow is rejected and
+historical authored counter clamping remains compatible. The validated wrapper
+retains an immutable, redacted mechanics plan for the later compiler.
+
 This API still does not make dynamic games playable and adds no CLI option.
-Specs 27.22–27.27 own mechanics parity, compilation, runtime, persistence,
-presentation, and the released preparation wizard.
+Specs 27.23–27.27 own compilation, runtime, persistence, presentation, and the
+released preparation wizard.

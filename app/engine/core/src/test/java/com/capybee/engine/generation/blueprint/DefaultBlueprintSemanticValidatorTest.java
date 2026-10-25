@@ -26,6 +26,10 @@ class DefaultBlueprintSemanticValidatorTest {
         assertThat(accepted.evidence().maximumTransitions()).isEqualTo(5);
         assertThat(accepted.evidence().witnessedEndingIds()).containsExactly("success", "partial");
         assertThat(accepted.evidence().witnessedObjectiveIds()).containsExactly("finish");
+        assertThat(accepted.evidence().semanticContractVersion()).isEqualTo("generated-rules-v1");
+        assertThat(accepted.mechanicsPlan().contractVersion()).isEqualTo("generated-rules-v1");
+        assertThat(accepted.mechanicsPlan().objectiveConditions()).containsExactly(new com.capybee.engine.rules.Condition.FlagIs("ready", true));
+        assertThat(accepted.mechanicsPlan().toString()).contains("redacted").doesNotContain("ready");
         assertThat(accepted.toString()).doesNotContain("Signal Path");
         assertThat(accepted.evidence().toString()).contains("witnesses=redacted").doesNotContain("finish");
         org.junit.jupiter.api.Assertions.assertThrows(UnsupportedOperationException.class,

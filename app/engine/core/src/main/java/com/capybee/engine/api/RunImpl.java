@@ -25,8 +25,12 @@ import com.capybee.engine.pack.StartInputDef;
 import com.capybee.engine.port.InputGuard;
 import com.capybee.engine.port.InputInterpreter;
 import com.capybee.engine.rules.Condition;
+import com.capybee.engine.rules.ConditionEvaluator;
 import com.capybee.engine.rules.CounterDef;
 import com.capybee.engine.rules.Effect;
+import com.capybee.engine.rules.GeneratedMechanicsV1;
+import com.capybee.engine.rules.RuleStateView;
+import com.capybee.engine.rules.StateEffectSemantics;
 import com.capybee.engine.rules.FlagDef;
 import com.capybee.engine.rules.ObjectiveDef;
 import com.capybee.engine.rules.Rules;
@@ -328,37 +332,13 @@ final class RunImpl implements Run {
     }
 
     private boolean evaluate(Condition condition) {
-        if (condition instanceof Condition.CounterAtLeast item) return counters.getOrDefault(item.counter(), 0) >= item.value();
-        if (condition instanceof Condition.CounterAtMost item) return counters.getOrDefault(item.counter(), 0) <= item.value();
-        if (condition instanceof Condition.CounterEquals item) return counters.getOrDefault(item.counter(), 0) == item.value();
-        if (condition instanceof Condition.FlagIs item) return flags.getOrDefault(item.flag(), false) == item.value();
-        if (condition instanceof Condition.SetContains item) return sets.getOrDefault(item.set(), new LinkedHashSet<>()).contains(item.value());
-        if (condition instanceof Condition.SetSizeAtLeast item) return sets.getOrDefault(item.set(), new LinkedHashSet<>()).size() >= item.size();
-        if (condition instanceof Condition.VisitedScene item) return visited.contains(item.scene());
-        if (condition instanceof Condition.AtPlace item) return item.place().equals(currentPlaceId);
-        if (condition instanceof Condition.VisitedPlace item) return visitedPlaces.contains(item.place());
-        if (condition instanceof Condition.StepAtLeast item) return step >= item.step();
-        if (condition instanceof Condition.All item) return item.conditions().stream().allMatch(this::evaluate);
-        if (condition instanceof Condition.Any item) return item.conditions().stream().anyMatch(this::evaluate);
-        if (condition instanceof Condition.Not item) return !evaluate(item.condition());
-        return false;
+        return ConditionEvaluator.evaluate(condition, ruleStateView());
     }
 
     private void applyEffects(List<Effect> effects, List<Event> events) {
         for (Effect effect : effects) {
-            if (effect instanceof Effect.CounterAdd item) {
-                CounterDef def = counterDefs.get(item.counter());
-                if (def != null) setCounter(def, (long) counters.getOrDefault(item.counter(), def.initial()) + item.delta());
-            } else if (effect instanceof Effect.CounterSet item) {
-                CounterDef def = counterDefs.get(item.counter());
-                if (def != null) setCounter(def, item.value());
-            } else if (effect instanceof Effect.FlagSet item) {
-                if (flagDefs.containsKey(item.flag())) flags.put(item.flag(), item.value());
-            } else if (effect instanceof Effect.SetAdd item) {
-                SetDef def = setDefs.get(item.set());
-                if (def != null && def.values().contains(item.value())) sets.computeIfAbsent(item.set(), key -> new LinkedHashSet<>()).add(item.value());
-            } else if (effect instanceof Effect.SetRemove item) {
-                sets.computeIfAbsent(item.set(), key -> new LinkedHashSet<>()).remove(item.value());
+            if (GeneratedMechanicsV1.nameOf(effect) != null) {
+                StateEffectSemantics.apply(effect, stateMutation(), StateEffectSemantics.CounterPolicy.CLAMP_TO_DECLARATION);
             } else if (effect instanceof Effect.EmitEvent item) {
                 events.add(toEvent(item));
             } else if (effect instanceof Effect.EndRun item) {
@@ -369,6 +349,33 @@ final class RunImpl implements Run {
                 if (!visitedPlaces.contains(item.place())) visitedPlaces.add(item.place());
             }
         }
+    }
+
+    private RuleStateView ruleStateView() {
+        return new RuleStateView() {
+            public int counter(String id) { return counters.getOrDefault(id, 0); }
+            public boolean flag(String id) { return flags.getOrDefault(id, false); }
+            public Set<String> set(String id) { return sets.getOrDefault(id, new LinkedHashSet<>()); }
+            public boolean visitedScene(String id) { return visited.contains(id); }
+            public long step() { return step; }
+            public boolean atPlace(String id) { return id.equals(currentPlaceId); }
+            public boolean visitedPlace(String id) { return visitedPlaces.contains(id); }
+        };
+    }
+
+    private StateEffectSemantics.StateMutation stateMutation() {
+        return new StateEffectSemantics.StateMutation() {
+            public Integer counterValue(String id) { CounterDef def=counterDefs.get(id); return def==null?null:counters.getOrDefault(id,def.initial()); }
+            public Integer counterMin(String id) { CounterDef def=counterDefs.get(id); return def==null?null:def.min(); }
+            public Integer counterMax(String id) { CounterDef def=counterDefs.get(id); return def==null?null:def.max(); }
+            public Boolean flagValue(String id) { return flagDefs.containsKey(id)?flags.getOrDefault(id,false):null; }
+            public boolean hasSet(String id) { return setDefs.containsKey(id); }
+            public boolean isSetMember(String id,String value) { SetDef def=setDefs.get(id); return def!=null&&def.values().contains(value); }
+            public void setCounter(String id,int value) { counters.put(id,value); }
+            public void setFlag(String id,boolean value) { flags.put(id,value); }
+            public void addSetValue(String id,String value) { sets.computeIfAbsent(id,key->new LinkedHashSet<>()).add(value); }
+            public void removeSetValue(String id,String value) { sets.computeIfAbsent(id,key->new LinkedHashSet<>()).remove(value); }
+        };
     }
 
     private Event toEvent(Effect.EmitEvent effect) {
@@ -383,10 +390,6 @@ final class RunImpl implements Run {
             else if (value instanceof Effect.PayloadValue.CounterRef reference) payload.put(field.name(), Integer.toString(counters.getOrDefault(reference.counter(), 0)));
         }
         return new Event(effect.event(), payload);
-    }
-
-    private void setCounter(CounterDef def, long value) {
-        counters.put(def.id(), (int) Math.max(def.min(), Math.min((long) def.max(), value)));
     }
 
     private boolean isEnabled(SceneOption option) {

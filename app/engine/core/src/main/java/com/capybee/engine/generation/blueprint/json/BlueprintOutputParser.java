@@ -5,6 +5,7 @@ import com.capybee.engine.generation.blueprint.*;
 import com.capybee.engine.generation.blueprint.ParsedGameBlueprint.*;
 import com.capybee.engine.generation.profile.*;
 import com.capybee.engine.rules.ResultClass;
+import com.capybee.engine.rules.GeneratedMechanicsV1;
 import java.nio.ByteBuffer;
 import java.nio.charset.*;
 import java.util.*;
@@ -18,8 +19,8 @@ public final class BlueprintOutputParser {
     private static final int MAX_BYTES=262_144,MAX_CHARS=131_072,MAX_NODES=12_000,MAX_DEPTH=32;
     private static final Pattern SYMBOL=Pattern.compile("[a-z][a-z0-9-]{0,47}");
     private static final Pattern ACTIVE=Pattern.compile("(?is)<\\s*/?\\s*(script|html|iframe|img|svg)\\b|javascript:|\\$\\{[^}]*}|\\{\\{[^}]*}}");
-    private static final Set<String> CONDITION_TYPES=Set.of("COUNTER_AT_LEAST","COUNTER_AT_MOST","COUNTER_EQUALS","FLAG_IS","SET_CONTAINS","SET_SIZE_AT_LEAST","VISITED_SCENE","ALL","ANY","NOT");
-    private static final Set<String> EFFECT_TYPES=Set.of("COUNTER_ADD","COUNTER_SET","FLAG_SET","SET_ADD","SET_REMOVE");
+    private static final Set<String> CONDITION_TYPES=GeneratedMechanicsV1.conditionNames();
+    private static final Set<String> EFFECT_TYPES=GeneratedMechanicsV1.effectNames();
     private static final JsonMapper JSON=JsonMapper.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();
 

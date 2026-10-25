@@ -7,6 +7,7 @@ import com.capybee.engine.pack.LocaleTag;
 import com.capybee.engine.pack.PackId;
 import com.capybee.engine.pack.PackVersion;
 import com.capybee.engine.pack.StartInputDef;
+import com.capybee.engine.rules.GeneratedMechanicsV1;
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
@@ -23,9 +24,8 @@ import tools.jackson.databind.json.JsonMapper;
 /** Strict, bounded loader for scenario-neutral generator profile bundles. */
 public final class GeneratorProfileLoader {
     private static final int MAX_FILES = 64, MAX_TOTAL = 1_048_576, MAX_JSON = 65_536, MAX_PROMPT = 16_384;
-    private static final Set<String> CONDITIONS = Set.of("COUNTER_AT_LEAST", "COUNTER_AT_MOST", "COUNTER_EQUALS",
-            "FLAG_IS", "SET_CONTAINS", "SET_SIZE_AT_LEAST", "VISITED_SCENE", "ALL", "ANY", "NOT");
-    private static final Set<String> EFFECTS = Set.of("COUNTER_ADD", "COUNTER_SET", "FLAG_SET", "SET_ADD", "SET_REMOVE");
+    private static final Set<String> CONDITIONS = GeneratedMechanicsV1.conditionNames();
+    private static final Set<String> EFFECTS = GeneratedMechanicsV1.effectNames();
     private static final Set<String> INPUT_IDS = Set.of("genre", "setting", "tone", "interests", "length", "challenge", "game-locale", "story-wish");
     private static final JsonMapper JSON = JsonMapper.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();

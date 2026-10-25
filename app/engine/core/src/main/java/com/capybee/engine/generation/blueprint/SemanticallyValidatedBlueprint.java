@@ -13,16 +13,20 @@ public final class SemanticallyValidatedBlueprint {
     private final String lengthPresetId;
     private final String challengePresetId;
     private final Evidence evidence;
+    private final ValidatedMechanicsPlan mechanicsPlan;
 
     SemanticallyValidatedBlueprint(ParsedGameBlueprint blueprint, ProfileIdentity profileIdentity,
                                    LocaleTag locale, String lengthPresetId, String challengePresetId,
-                                   Evidence evidence) {
+                                   Evidence evidence, ValidatedMechanicsPlan mechanicsPlan) {
         this.blueprint = Objects.requireNonNull(blueprint);
         this.profileIdentity = Objects.requireNonNull(profileIdentity);
         this.locale = Objects.requireNonNull(locale);
         this.lengthPresetId = Objects.requireNonNull(lengthPresetId);
         this.challengePresetId = Objects.requireNonNull(challengePresetId);
         this.evidence = Objects.requireNonNull(evidence);
+        this.mechanicsPlan = Objects.requireNonNull(mechanicsPlan);
+        if (!evidence.semanticContractVersion().equals(mechanicsPlan.contractVersion()))
+            throw new IllegalArgumentException("Generated mechanics contract mismatch");
     }
 
     public ParsedGameBlueprint blueprint() { return blueprint; }
@@ -31,6 +35,7 @@ public final class SemanticallyValidatedBlueprint {
     public String lengthPresetId() { return lengthPresetId; }
     public String challengePresetId() { return challengePresetId; }
     public Evidence evidence() { return evidence; }
+    public ValidatedMechanicsPlan mechanicsPlan() { return mechanicsPlan; }
 
     @Override public String toString() { return "SemanticallyValidatedBlueprint[redacted]"; }
 

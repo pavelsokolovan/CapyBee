@@ -65,7 +65,7 @@ list. The current implementation boundary is:
 - [27.19](27.19-engine-generated-game-blueprint-schema-instruction.md) - Strict immutable generated-game blueprint proposal schema, bounded parser, deterministic writer, and provider-neutral JSON Schema (implemented)
 - [27.20](27.20-engine-blueprint-generation-repair-and-fallback-instruction.md) - Confirmed provider-neutral blueprint generation, shared safe-input routing, strict review handoff, one total repair allowance, and explicit whole-game fallback offers (implemented; non-playable)
 - [27.21](27.21-engine-blueprint-semantic-validation-instruction.md) - Deterministic semantic validation, bounded reachable-state playability proof, and trusted validation evidence (implemented; non-playable)
-- [27.22](27.22-engine-generated-mechanics-and-rule-dsl-instruction.md) - Versioned closed generated-rule vocabulary, strict binding to the existing DSL, shared condition/state semantics, and runtime parity requirements (specified; not yet implemented)
+- [27.22](27.22-engine-generated-mechanics-and-rule-dsl-instruction.md) - Versioned closed generated-rule vocabulary, strict binding to the existing DSL, shared condition/state semantics, and runtime parity requirements (implemented; non-playable)
 - 27.23-27.27 - Planned dynamic-game compilation, runtime, presentation, persistence, and CLI integration; implementation contracts are owned by their individual specs
 - 28 - Client rendering contract
 - 29 - CapyBee Polish game pack and game-pack integration

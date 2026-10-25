@@ -94,10 +94,11 @@ class BlueprintGenerationServiceTest {
     }
     private static BlueprintSemanticValidator.Validation fakePass(ParsedGameBlueprint blueprint,
             ValidatedGeneratorProfile profile,ResolvedGamePreferences preferences){
-        var evidence=new SemanticallyValidatedBlueprint.Evidence("test-contract","semantic-v1",
+        var evidence=new SemanticallyValidatedBlueprint.Evidence("generated-rules-v1","semantic-v1",
                 blueprint.scenes().size(),0,1,0,0,List.of(),List.of());
         var validated=new SemanticallyValidatedBlueprint(blueprint,profile.identity(),preferences.gameLocale(),
-                preferences.lengthPresetId(),preferences.challengePresetId(),evidence);
+                preferences.lengthPresetId(),preferences.challengePresetId(),evidence,
+                new GeneratedMechanicsBinder().bind(blueprint));
         return new BlueprintSemanticValidator.Validation(BlueprintSemanticValidator.Status.PASS,"semantic-v1",List.of(),validated);
     }
     private static TextGenerationResult complete(String json){return new TextGenerationResult(json,new TextGenerationResult.TokenUsage(10,20,0,0),"test-model",TextGenerationResult.FinishReason.COMPLETE);}

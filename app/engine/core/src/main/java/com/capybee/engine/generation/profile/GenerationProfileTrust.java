@@ -1,15 +1,15 @@
 package com.capybee.engine.generation.profile;
 
 import com.capybee.engine.generation.PhaseKind;
+import com.capybee.engine.rules.GeneratedMechanicsV1;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.Set;
 
 /** Independently re-establishes the profile/context invariants at live generation boundaries. */
 public final class GenerationProfileTrust {
-    private static final Set<String> CONDITIONS = Set.of("COUNTER_AT_LEAST", "COUNTER_AT_MOST", "COUNTER_EQUALS",
-            "FLAG_IS", "SET_CONTAINS", "SET_SIZE_AT_LEAST", "VISITED_SCENE", "ALL", "ANY", "NOT");
-    private static final Set<String> EFFECTS = Set.of("COUNTER_ADD", "COUNTER_SET", "FLAG_SET", "SET_ADD", "SET_REMOVE");
+    private static final Set<String> CONDITIONS = GeneratedMechanicsV1.conditionNames();
+    private static final Set<String> EFFECTS = GeneratedMechanicsV1.effectNames();
 
     private GenerationProfileTrust() {}
 

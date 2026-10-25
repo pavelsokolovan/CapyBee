@@ -4,11 +4,15 @@ import com.capybee.engine.generation.PhaseKind;
 import com.capybee.engine.generation.blueprint.ParsedGameBlueprint.*;
 import com.capybee.engine.generation.profile.*;
 import com.capybee.engine.rules.ResultClass;
+import com.capybee.engine.rules.ConditionEvaluator;
+import com.capybee.engine.rules.GeneratedMechanicsV1;
+import com.capybee.engine.rules.RuleStateView;
+import com.capybee.engine.rules.StateEffectSemantics;
 import java.util.*;
 
 /** Deterministic, content-safe semantic validator for the closed blueprint v1 contract. */
 public final class DefaultBlueprintSemanticValidator implements BlueprintSemanticValidator {
-    public static final String CONTRACT_VERSION = "blueprint-semantics-v1";
+    public static final String CONTRACT_VERSION = GeneratedMechanicsV1.CONTRACT_VERSION;
     public static final String VALIDATOR_VERSION = "semantic-validator-v1";
 
     @Override
@@ -50,6 +54,7 @@ public final class DefaultBlueprintSemanticValidator implements BlueprintSemanti
         private final Set<String> endingIds = new LinkedHashSet<>();
         private Set<String> structurallyReachable = Set.of();
         private int edgeCount;
+        private ValidatedMechanicsPlan mechanicsPlan;
 
         Checker(ParsedGameBlueprint blueprint, ValidatedGeneratorProfile profile,
                 ResolvedGamePreferences preferences, EffectiveGenerationConstraints limits) {
@@ -66,6 +71,11 @@ public final class DefaultBlueprintSemanticValidator implements BlueprintSemanti
             envelopeAndIndexes();
             referencesAndMechanics();
             if (!issues.empty()) return reject();
+            try { mechanicsPlan = new GeneratedMechanicsBinder().bind(blueprint); }
+            catch (IllegalStateException ex) {
+                issues.add("BLUEPRINT_MECHANICS_CONTRACT_MISMATCH", "");
+                return reject();
+            }
             staticGraph();
             coverage();
             if (!issues.empty()) return reject();
@@ -349,12 +359,18 @@ public final class DefaultBlueprintSemanticValidator implements BlueprintSemanti
                     continue;
                 }
                 DecisionScene decision = (DecisionScene) scene;
-                List<Choice> enabled = decision.choices().stream().filter(choice -> evaluate(choice.requires(), current, bindings)).toList();
+                int sceneIndex = sceneIndexes.get(decision.id());
+                List<Choice> enabled = new ArrayList<>();
+                for (int i = 0; i < decision.choices().size(); i++) {
+                    var mechanic = mechanicsPlan.sceneChoices().get(sceneIndex).get(i);
+                    if (evaluate(mechanic.requires(), current, bindings)) enabled.add(decision.choices().get(i));
+                }
                 if (enabled.isEmpty()) issues.add("BLUEPRINT_ROUTE_DEAD_END", "/scenes/" + sceneIndexes.get(decision.id()));
                 if (decision.phase().ordinal() < PhaseKind.RESOLUTION.ordinal()
                         && enabled.stream().map(TransitionSignature::new).distinct().count() >= 2) meaningful = true;
                 for (Choice choice : enabled) {
-                    Config target = apply(choice, current, bindings);
+                    int choiceIndex = decision.choices().indexOf(choice);
+                    Config target = apply(choice, mechanicsPlan.sceneChoices().get(sceneIndex).get(choiceIndex), current, bindings);
                     if (target == null) continue;
                     Integer targetIndex = indexes.get(target);
                     if (targetIndex == null) {
@@ -386,7 +402,7 @@ public final class DefaultBlueprintSemanticValidator implements BlueprintSemanti
                     orderedEndings, witnessedObjectives);
             SemanticallyValidatedBlueprint accepted = new SemanticallyValidatedBlueprint(blueprint,
                     validatedProfile.identity(), preferences.gameLocale(), preferences.lengthPresetId(),
-                    preferences.challengePresetId(), evidence);
+                    preferences.challengePresetId(), evidence, mechanicsPlan);
             return new Validation(Status.PASS, VALIDATOR_VERSION, List.of(), accepted);
         }
 
@@ -400,23 +416,22 @@ public final class DefaultBlueprintSemanticValidator implements BlueprintSemanti
             return result;
         }
 
-        private Config apply(Choice choice, Config source, StateBindings bindings) {
+        private Config apply(Choice choice, ValidatedMechanicsPlan.ChoiceMechanics mechanics,
+                             Config source, StateBindings bindings) {
             List<Integer> counterValues = new ArrayList<>(source.counters());
             List<Boolean> flagValues = new ArrayList<>(source.flags());
             List<Set<String>> setValues = new ArrayList<>(); source.sets().forEach(value -> setValues.add(new LinkedHashSet<>(value)));
-            for (Effect effect : choice.effects()) {
-                if (effect instanceof CounterEffect value) {
-                    int index = bindings.counterIndex.get(value.counter()); Counter declaration = counters.get(value.counter());
-                    long changed = "COUNTER_ADD".equals(value.type()) ? (long) counterValues.get(index) + value.value() : value.value();
-                    if (changed < declaration.min() || changed > declaration.max()) {
-                        issues.add("BLUEPRINT_STATE_BOUNDS_VIOLATED", "/scenes/" + sceneIndexes.get(source.sceneId())); return null;
-                    }
-                    counterValues.set(index, (int) changed);
-                } else if (effect instanceof FlagEffect value) {
-                    flagValues.set(bindings.flagIndex.get(value.flag()), value.value());
-                } else if (effect instanceof SetEffect value) {
-                    Set<String> target = setValues.get(bindings.setIndex.get(value.set()));
-                    if ("SET_ADD".equals(value.type())) target.add(value.value()); else target.remove(value.value());
+            StateEffectSemantics.StateMutation mutation = bindings.mutation(counterValues, flagValues, setValues);
+            for (com.capybee.engine.rules.Effect effect : mechanics.effects()) {
+                StateEffectSemantics.Failure failure = StateEffectSemantics.apply(effect, mutation,
+                        StateEffectSemantics.CounterPolicy.REJECT_OUT_OF_RANGE);
+                if (failure == StateEffectSemantics.Failure.COUNTER_OUT_OF_RANGE) {
+                    issues.add("BLUEPRINT_STATE_BOUNDS_VIOLATED", "/scenes/" + sceneIndexes.get(source.sceneId()));
+                    return null;
+                }
+                if (failure != StateEffectSemantics.Failure.NONE) {
+                    issues.add("BLUEPRINT_MECHANICS_CONTRACT_MISMATCH", "");
+                    return null;
                 }
             }
             Set<String> visited = new LinkedHashSet<>(source.visitedScenes()); visited.add(choice.destinationSceneId());
@@ -428,24 +443,15 @@ public final class DefaultBlueprintSemanticValidator implements BlueprintSemanti
 
         private Set<String> completedObjectives(Config config) {
             Set<String> completed = new LinkedHashSet<>(); StateBindings bindings = new StateBindings();
-            for (Objective objective : blueprint.objectives()) if (evaluate(objective.completeWhen(), config, bindings)) completed.add(objective.id());
+            for (int i = 0; i < blueprint.objectives().size(); i++)
+                if (evaluate(mechanicsPlan.objectiveConditions().get(i), config, bindings))
+                    completed.add(blueprint.objectives().get(i).id());
             return completed;
         }
 
-        private boolean evaluate(Condition condition, Config state, StateBindings bindings) {
+        private boolean evaluate(com.capybee.engine.rules.Condition condition, Config state, StateBindings bindings) {
             if (condition == null) return true;
-            if (condition instanceof CounterCondition value) {
-                int actual = state.counters().get(bindings.counterIndex.get(value.counter()));
-                return switch (value.type()) { case "COUNTER_AT_LEAST" -> actual >= value.value(); case "COUNTER_AT_MOST" -> actual <= value.value(); default -> actual == value.value(); };
-            }
-            if (condition instanceof FlagCondition value) return state.flags().get(bindings.flagIndex.get(value.flag())) == value.value();
-            if (condition instanceof SetContainsCondition value) return state.sets().get(bindings.setIndex.get(value.set())).contains(value.value());
-            if (condition instanceof SetSizeCondition value) return state.sets().get(bindings.setIndex.get(value.set())).size() >= value.size();
-            if (condition instanceof VisitedSceneCondition value) return state.visitedScenes().contains(value.scene());
-            if (condition instanceof NotCondition value) return !evaluate(value.condition(), state, bindings);
-            CompositeCondition value = (CompositeCondition) condition;
-            return "ALL".equals(value.type()) ? value.conditions().stream().allMatch(v -> evaluate(v, state, bindings))
-                    : value.conditions().stream().anyMatch(v -> evaluate(v, state, bindings));
+            return ConditionEvaluator.evaluate(condition, bindings.view(state));
         }
 
         private Set<String> reachable(String start) {
@@ -491,12 +497,45 @@ public final class DefaultBlueprintSemanticValidator implements BlueprintSemanti
                         sets.values().stream().map(v -> Set.copyOf(v.initial())).toList(),
                         Set.of(blueprint.startSceneId()), Set.of(), 0);
             }
+
+            RuleStateView view(Config state) {
+                return new RuleStateView() {
+                    public int counter(String id) { return state.counters().get(required(counterIndex, id)); }
+                    public boolean flag(String id) { return state.flags().get(required(flagIndex, id)); }
+                    public Set<String> set(String id) { return state.sets().get(required(setIndex, id)); }
+                    public boolean visitedScene(String id) { return state.visitedScenes().contains(id); }
+                    public long step() { return state.transitions(); }
+                    public boolean atPlace(String id) { return false; }
+                    public boolean visitedPlace(String id) { return false; }
+                };
+            }
+
+            StateEffectSemantics.StateMutation mutation(List<Integer> counterValues, List<Boolean> flagValues,
+                                                         List<Set<String>> setValues) {
+                return new StateEffectSemantics.StateMutation() {
+                    public Integer counterValue(String id) { Integer i=counterIndex.get(id); return i==null?null:counterValues.get(i); }
+                    public Integer counterMin(String id) { Counter v=counters.get(id); return v==null?null:v.min(); }
+                    public Integer counterMax(String id) { Counter v=counters.get(id); return v==null?null:v.max(); }
+                    public Boolean flagValue(String id) { Integer i=flagIndex.get(id); return i==null?null:flagValues.get(i); }
+                    public boolean hasSet(String id) { return setIndex.containsKey(id); }
+                    public boolean isSetMember(String id,String value) { FiniteSet v=sets.get(id); return v!=null&&v.values().contains(value); }
+                    public void setCounter(String id,int value) { counterValues.set(required(counterIndex,id),value); }
+                    public void setFlag(String id,boolean value) { flagValues.set(required(flagIndex,id),value); }
+                    public void addSetValue(String id,String value) { setValues.get(required(setIndex,id)).add(value); }
+                    public void removeSetValue(String id,String value) { setValues.get(required(setIndex,id)).remove(value); }
+                };
+            }
         }
     }
 
     private static Map<String, Integer> indexes(Collection<String> values) {
         Map<String, Integer> result = new LinkedHashMap<>(); int index = 0;
         for (String value : values) result.put(value, index++); return result;
+    }
+    private static int required(Map<String, Integer> values, String id) {
+        Integer result = values.get(id);
+        if (result == null) throw new IllegalStateException("Generated mechanics binding invariant failed");
+        return result;
     }
     private static List<Set<String>> immutableSets(List<Set<String>> values) { return values.stream().map(Set::copyOf).toList(); }
     private static Config withCompleted(Config value, Set<String> completed) {
@@ -508,19 +547,27 @@ public final class DefaultBlueprintSemanticValidator implements BlueprintSemanti
     private static List<String> sceneActors(Scene scene) { return scene instanceof DecisionScene value ? value.actorIds() : ((EndingScene) scene).actorIds(); }
     private static List<String> sceneObjectives(Scene scene) { return scene instanceof DecisionScene value ? value.objectiveIds() : ((EndingScene) scene).objectiveIds(); }
     private static String conditionType(Condition value) {
-        if (value instanceof CounterCondition v) return Set.of("COUNTER_AT_LEAST", "COUNTER_AT_MOST", "COUNTER_EQUALS").contains(v.type()) ? v.type() : null;
+        if (value instanceof CounterCondition v) return conditionName(v.type());
         if (value instanceof FlagCondition) return "FLAG_IS";
         if (value instanceof SetContainsCondition) return "SET_CONTAINS";
         if (value instanceof SetSizeCondition) return "SET_SIZE_AT_LEAST";
         if (value instanceof VisitedSceneCondition) return "VISITED_SCENE";
-        if (value instanceof CompositeCondition v) return Set.of("ALL", "ANY").contains(v.type()) ? v.type() : null;
+        if (value instanceof CompositeCondition v) return conditionName(v.type());
         return value instanceof NotCondition ? "NOT" : null;
     }
     private static String effectType(Effect value) {
-        if (value instanceof CounterEffect v) return Set.of("COUNTER_ADD", "COUNTER_SET").contains(v.type()) ? v.type() : null;
+        if (value instanceof CounterEffect v) return effectName(v.type());
         if (value instanceof FlagEffect) return "FLAG_SET";
-        if (value instanceof SetEffect v) return Set.of("SET_ADD", "SET_REMOVE").contains(v.type()) ? v.type() : null;
+        if (value instanceof SetEffect v) return effectName(v.type());
         return null;
+    }
+    private static String conditionName(String value) {
+        GeneratedMechanicsV1.Operator operator=GeneratedMechanicsV1.operator(value);
+        return operator!=null&&operator.category()==GeneratedMechanicsV1.Category.CONDITION?operator.name():null;
+    }
+    private static String effectName(String value) {
+        GeneratedMechanicsV1.Operator operator=GeneratedMechanicsV1.operator(value);
+        return operator!=null&&operator.category()==GeneratedMechanicsV1.Category.EFFECT?operator.name():null;
     }
 
     private record Config(String sceneId, List<Integer> counters, List<Boolean> flags, List<Set<String>> sets,
