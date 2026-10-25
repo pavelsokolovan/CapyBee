@@ -125,17 +125,20 @@ public final class BlueprintGenerationService {
             }
             if(cancelled(request))return new Cancelled("BLUEPRINT_CANCELLED");
             if(validator==null)return pending(request,blueprint,attempt,review.policyVersion(),null,"BLUEPRINT_VALIDATOR_UNAVAILABLE");
-            BlueprintSemanticValidator.Validation validation;
-            try{validation=validator.validate(blueprint,request.constraints());}
-            catch(RuntimeException unavailable){return pending(request,blueprint,attempt,review.policyVersion(),null,"BLUEPRINT_VALIDATOR_UNAVAILABLE");}
+            BlueprintSemanticValidator.Validation validation=validator.validate(blueprint,request.profile(),request.preferences(),request.constraints());
             if(validation==null||validation.status()==BlueprintSemanticValidator.Status.UNAVAILABLE)
                 return pending(request,blueprint,attempt,review.policyVersion(),null,"BLUEPRINT_VALIDATOR_UNAVAILABLE");
-            if(validation.status()!=BlueprintSemanticValidator.Status.PASS){
+            if(validation.status()==BlueprintSemanticValidator.Status.INVALID_CONTEXT)
+                return failure(request,"BLUEPRINT_CONFIGURATION_INVALID");
+            if(validation.status()==BlueprintSemanticValidator.Status.REJECT
+                    || validation.status()==BlueprintSemanticValidator.Status.INCONCLUSIVE){
                 if(attempt<maximumAttempts){feedback=safeFeedback(validation.issues());continue;}
                 return failure(request,"BLUEPRINT_REPAIR_EXHAUSTED");
             }
+            if(validation.status()!=BlueprintSemanticValidator.Status.PASS||validation.validatedBlueprint()==null)
+                return failure(request,"BLUEPRINT_INTERNAL_FAILURE");
             Evidence evidence=new Evidence(request.profile().identity(),request.preparationId(),attempt,review.policyVersion(),validation.validatorVersion());
-            return new CandidateReviewed(blueprint,evidence);
+            return new CandidateReviewed(validation.validatedBlueprint(),evidence);
         }
         return failure(request,"BLUEPRINT_REPAIR_EXHAUSTED");
     }

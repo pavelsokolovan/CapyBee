@@ -51,9 +51,55 @@ class BlueprintGenerationServiceTest {
         assertThat(sent.get().taskInstructions()).doesNotContain("Ignore limits");
     }
 
+    @Test void semanticRejectionUsesOnlyTheSharedSingleRepair(){
+        Context c=context();AtomicInteger providerCalls=new AtomicInteger();AtomicInteger validationCalls=new AtomicInteger();
+        TextGenerator generator=request->{providerCalls.incrementAndGet();return complete(c.json);};
+        BlueprintSemanticValidator validator=(blueprint,profile,prefs,limits)->validationCalls.incrementAndGet()==1
+                ? new BlueprintSemanticValidator.Validation(BlueprintSemanticValidator.Status.REJECT,"semantic-v1",
+                    List.of(new BlueprintIssue("BLUEPRINT_ENDING_UNREACHABLE","blueprint","/scenes/5","")),null)
+                : fakePass(blueprint,profile,prefs);
+        var result=service(generator,validator).generate(c.request("op-semantic-repair",null,null));
+        assertThat(result).isInstanceOf(BlueprintGenerationResult.CandidateReviewed.class);
+        assertThat(providerCalls).hasValue(2);assertThat(validationCalls).hasValue(2);
+    }
+
+    @Test void unavailableAndInvalidContextNeverAskTheProviderForARepair(){
+        Context c=context();AtomicInteger calls=new AtomicInteger();TextGenerator generator=request->{calls.incrementAndGet();return complete(c.json);};
+        var unavailable=service(generator,(blueprint,profile,prefs,limits)->BlueprintSemanticValidator.Validation.unavailable())
+                .generate(c.request("op-unavailable",null,null));
+        assertThat(unavailable).isInstanceOf(BlueprintGenerationResult.ReviewPending.class);
+        var invalid=service(generator,(blueprint,profile,prefs,limits)->new BlueprintSemanticValidator.Validation(
+                BlueprintSemanticValidator.Status.INVALID_CONTEXT,"semantic-v1",List.of(),null))
+                .generate(c.request("op-invalid-context",null,null));
+        assertThat(invalid).isInstanceOfSatisfying(BlueprintGenerationResult.GenerationFailed.class,
+                value->assertThat(value.code()).isEqualTo("BLUEPRINT_CONFIGURATION_INVALID"));
+        assertThat(calls).hasValue(2);
+    }
+
+    @Test void validatorBugFailsClosedAsInternalFailureWithoutRepair(){
+        Context c=context();AtomicInteger calls=new AtomicInteger();TextGenerator generator=request->{calls.incrementAndGet();return complete(c.json);};
+        var result=service(generator,(blueprint,profile,prefs,limits)->{throw new IllegalStateException("private-secret");})
+                .generate(c.request("op-validator-bug",null,null));
+        assertThat(result).isInstanceOfSatisfying(BlueprintGenerationResult.GenerationFailed.class,
+                value->assertThat(value.code()).isEqualTo("BLUEPRINT_INTERNAL_FAILURE"));
+        assertThat(result.toString()).doesNotContain("private-secret");assertThat(calls).hasValue(1);
+    }
+
     private static BlueprintGenerationService service(TextGenerator generator){return new BlueprintGenerationService(generator,
             (blueprint,prefs,policy)->BlueprintOutputReviewer.Review.pass("review-v1"),
-            (blueprint,limits)->BlueprintSemanticValidator.Validation.pass("semantic-v1"),()->"request-id");}
+            (blueprint,profile,prefs,limits)->fakePass(blueprint,profile,prefs),()->"request-id");}
+    private static BlueprintGenerationService service(TextGenerator generator,BlueprintSemanticValidator validator){
+        return new BlueprintGenerationService(generator,(blueprint,prefs,policy)->BlueprintOutputReviewer.Review.pass("review-v1"),
+                validator,()->"request-id");
+    }
+    private static BlueprintSemanticValidator.Validation fakePass(ParsedGameBlueprint blueprint,
+            ValidatedGeneratorProfile profile,ResolvedGamePreferences preferences){
+        var evidence=new SemanticallyValidatedBlueprint.Evidence("test-contract","semantic-v1",
+                blueprint.scenes().size(),0,1,0,0,List.of(),List.of());
+        var validated=new SemanticallyValidatedBlueprint(blueprint,profile.identity(),preferences.gameLocale(),
+                preferences.lengthPresetId(),preferences.challengePresetId(),evidence);
+        return new BlueprintSemanticValidator.Validation(BlueprintSemanticValidator.Status.PASS,"semantic-v1",List.of(),validated);
+    }
     private static TextGenerationResult complete(String json){return new TextGenerationResult(json,new TextGenerationResult.TokenUsage(10,20,0,0),"test-model",TextGenerationResult.FinishReason.COMPLETE);}
 
     private static Context context(){

@@ -197,6 +197,14 @@ explicitly reviewed candidates or internal review-pending/failure variants;
 they are not packs, runs, persisted definitions, or executable games. Provider
 payloads are never emitted by adapter debug logging.
 
-This API does not make dynamic games playable and adds no CLI option. Specs
-27.21–27.27 own semantic proof, mechanics, compilation, runtime, persistence,
+`DefaultBlueprintSemanticValidator` re-establishes the exact profile context,
+binds every symbol, validates the forward five-phase DAG, and exhaustively
+explores the bounded v1 state space. Only complete proof returns a
+`SemanticallyValidatedBlueprint` with redacted structural evidence; a state
+ceiling is explicitly inconclusive, never accepted. Generation keeps semantic
+rejection/inconclusive repairable while validator absence and invalid host
+context do not spend the model-repair allowance.
+
+This API still does not make dynamic games playable and adds no CLI option.
+Specs 27.22–27.27 own mechanics parity, compilation, runtime, persistence,
 presentation, and the released preparation wizard.

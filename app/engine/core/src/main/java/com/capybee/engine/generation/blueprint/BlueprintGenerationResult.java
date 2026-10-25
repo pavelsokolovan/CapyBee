@@ -9,7 +9,7 @@ public sealed interface BlueprintGenerationResult permits BlueprintGenerationRes
         BlueprintGenerationResult.InProgress {
     record Evidence(ProfileIdentity profile, String preparationId, int attempts, String reviewerVersion,
                     String validatorVersion) {}
-    record CandidateReviewed(ParsedGameBlueprint blueprint, Evidence evidence) implements BlueprintGenerationResult {
+    record CandidateReviewed(SemanticallyValidatedBlueprint blueprint, Evidence evidence) implements BlueprintGenerationResult {
         @Override public String toString(){return "CandidateReviewed[blueprint=redacted, evidence="+evidence+"]";}
     }
     record ReviewPending(ParsedGameBlueprint blueprint, Evidence evidence, String code) implements BlueprintGenerationResult {
