@@ -210,8 +210,16 @@ ten condition and five state-effect operators bind once to the authored rule
 DSL. Semantic exploration and `RunImpl` share the same pure condition evaluator
 and state-effect semantics, while generated counter overflow is rejected and
 historical authored counter clamping remains compatible. The validated wrapper
-retains an immutable, redacted mechanics plan for the later compiler.
+retains an immutable, redacted mechanics plan for deterministic compilation.
+
+`MaterializedGameCompiler` accepts only a reviewed semantic candidate and
+rewrites every blueprint symbol to definition-local engine IDs. Its immutable
+v1 definition contains canonical mechanical scenes, rules, planning content,
+selected-locale strings, redacted bindings, and structural evidence. An
+independent verifier rejects incomplete or inconsistent definitions before
+they can leave the compiler. Compilation is pure and creates no Pack, run,
+snapshot, file, registration, or provider call.
 
 This API still does not make dynamic games playable and adds no CLI option.
-Specs 27.23–27.27 own compilation, runtime, persistence, presentation, and the
+Specs 27.24–27.27 own runtime startup, persistence, presentation, and the
 released preparation wizard.
