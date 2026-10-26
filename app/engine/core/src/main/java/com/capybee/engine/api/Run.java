@@ -24,4 +24,7 @@ public interface Run {
 
     /** Resolve a reachable generated scene without advancing the run. */
     default Optional<GenerationArtifact> prefetch(String sceneId) { return Optional.empty(); }
+
+    /** Resolve presentation without exposing Pack- or definition-specific artifacts. */
+    default Optional<PresentationPrefetchResult> prefetchPresentation(String sceneId) { return Optional.empty(); }
 }

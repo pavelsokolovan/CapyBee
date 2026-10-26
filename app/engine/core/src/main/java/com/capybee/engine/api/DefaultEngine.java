@@ -16,6 +16,7 @@ import com.capybee.engine.generation.blueprint.MaterializedGameCompilationResult
 import com.capybee.engine.generation.blueprint.MaterializedGameCompiler;
 import com.capybee.engine.generation.blueprint.MaterializedGameDefinition;
 import com.capybee.engine.generation.blueprint.MaterializedGameDefinitionVerifier;
+import com.capybee.engine.generation.blueprint.DynamicPresentationPipeline;
 import com.capybee.engine.input.InputPolicy;
 import com.capybee.engine.input.InputSafetyAction;
 import com.capybee.engine.input.InputSafetyDecision;
@@ -95,10 +96,15 @@ final class DefaultEngine implements Engine {
         if (!(compiled instanceof MaterializedGameCompilationResult.Compiled success)) {
             return dynamicFailure("DYNAMIC_COMPILATION_FAILED");
         }
-        return startMaterialized(success.definition(), request.seed());
+        return startMaterialized(success.definition(), request.seed(), request.preparation(), reviewed.evidence().attempts());
     }
 
     DynamicGameBootstrapResult startMaterialized(MaterializedGameDefinition materialized, Long requestedSeed) {
+        return dynamicFailure("DYNAMIC_PRESENTATION_CONFIGURATION_INVALID");
+    }
+
+    private DynamicGameBootstrapResult startMaterialized(MaterializedGameDefinition materialized, Long requestedSeed,
+            com.capybee.engine.generation.blueprint.BlueprintGenerationRequest preparation, int blueprintCalls) {
         MaterializedGameDefinitionVerifier.Verification verification;
         try {
             verification = new MaterializedGameDefinitionVerifier().verify(materialized);
@@ -108,19 +114,31 @@ final class DefaultEngine implements Engine {
         if (!verification.valid()) return dynamicFailure("DYNAMIC_DEFINITION_INVALID");
 
         try {
+            DynamicPresentationPipeline presentation;
+            try {
+                presentation = new DynamicPresentationPipeline(materialized, preparation, blueprintCalls,
+                        textGenerator, ids, clock);
+            } catch (DynamicPresentationPipeline.ConfigurationException exception) {
+                return dynamicFailure("DYNAMIC_PRESENTATION_CONFIGURATION_INVALID");
+            } catch (DynamicPresentationPipeline.FallbackException exception) {
+                return dynamicFailure("DYNAMIC_PRESENTATION_FALLBACK_INVALID");
+            }
             RuntimeGameDefinition definition = new DynamicRuntimeGameDefinition(materialized);
+            String startId = definition.scenes().startId();
+            presentation.resolveScene(startId, List.of(startId));
             long seed = requestedSeed != null ? requestedSeed : random.nextLong();
             String runId = ids.nextId();
             Instant now = clock.instant();
-            String startId = definition.scenes().startId();
             RunImpl run = new RunImpl(runId, definition, seed, Map.of(), now, now, 0L, startId,
                     new ArrayList<>(List.of(startId)), false, null, clock, null,
-                    null, null, piiScrubber, null);
+                    null, null, piiScrubber, null, presentation);
             if (run.startupIssues().stream().anyMatch(issue -> issue.severity() == Issue.Severity.ERROR)) {
                 return dynamicFailure("DYNAMIC_START_FAILED");
             }
             List<Issue> issues = new ArrayList<>(run.startupIssues());
-            issues.add(dynamicIssue(Issue.Severity.WARNING, "DYNAMIC_PRESENTATION_PENDING"));
+            if (presentation.artifact(startId).outcome() == com.capybee.engine.generation.GenerationArtifact.Outcome.FALLBACK) {
+                issues.add(dynamicIssue(Issue.Severity.WARNING, "DYNAMIC_PRESENTATION_FALLBACK"));
+            }
             return new DynamicGameBootstrapResult.Started(run, materialized, issues, run.startupEvents());
         } catch (RuntimeException exception) {
             return dynamicFailure("DYNAMIC_START_FAILED");

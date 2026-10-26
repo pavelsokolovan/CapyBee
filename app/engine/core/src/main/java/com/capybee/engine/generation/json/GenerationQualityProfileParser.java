@@ -22,8 +22,13 @@ public final class GenerationQualityProfileParser {
 
     public static GenerationQualityProfile parse(Pack pack, LocaleTag locale, String path) {
         if (path == null || !path.startsWith("generation/quality/") || !pack.manifest().files().contains(path)) fail("PACK_QUALITY_RESOURCE_MISSING");
+        return parse(locale, pack.requireFile(path));
+    }
+
+    /** Parse an already trust-bound profile resource without requiring a Pack container. */
+    public static GenerationQualityProfile parse(LocaleTag locale, String json) {
         JsonNode root;
-        try { root = MAPPER.readTree(pack.requireFile(path)); } catch (RuntimeException e) { throw new IllegalArgumentException("PACK_QUALITY_PROFILE_INVALID", e); }
+        try { root = MAPPER.readTree(json); } catch (RuntimeException e) { throw new IllegalArgumentException("PACK_QUALITY_PROFILE_INVALID", e); }
         exact(root, Set.of("schemaVersion","profileId","locale","readability","repetition","phraseSets","toneProfiles","truthPhrases"));
         if (integer(root,"schemaVersion") != 1) fail("PACK_QUALITY_SCHEMA_UNSUPPORTED");
         String id=text(root,"profileId"), localeText=text(root,"locale");

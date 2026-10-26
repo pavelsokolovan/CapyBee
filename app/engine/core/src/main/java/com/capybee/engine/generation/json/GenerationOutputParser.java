@@ -17,6 +17,7 @@ public final class GenerationOutputParser {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final Pattern MARKUP = Pattern.compile("(?is)<\\s*/?\\s*(script|html|iframe|img|svg)|javascript:");
     private static final Pattern CONTROL = Pattern.compile("(?i)\\b(set|increment|decrement|complete|unlock|route|next|flag|counter|outcome|objective)\\b\\s*[:=]");
+    private static final Pattern PLACEHOLDER = Pattern.compile("\\{\\{[^}]+}}|\\$\\{[^}]+}|<slot>", Pattern.CASE_INSENSITIVE);
     private final PiiScrubber piiScrubber = new PiiScrubber();
 
     public Result parse(GenerationCatalog.Stage stage, String json, int maxCharacters,
@@ -79,6 +80,86 @@ public final class GenerationOutputParser {
                 "choices", arraySchema(objectSchema(Map.of("id", text, "label", text)))));
         };
         return MAPPER.writeValueAsString(document);
+    }
+
+    /** Pack-neutral scene boundary used by materialized dynamic definitions. */
+    public Result parsePlannedScene(String json, int maxCharacters, DynamicSceneContext context) {
+        if (context == null || json == null || json.length() > maxCharacters) return Result.invalid("OUTPUT_SIZE_LIMIT");
+        JsonNode root;
+        try { root = MAPPER.readTree(json); }
+        catch (RuntimeException exception) { return Result.invalid("OUTPUT_JSON_INVALID"); }
+        if (root == null || !root.isObject()) return Result.invalid("OUTPUT_SCHEMA_INVALID");
+        try {
+            boolean ending = context.ending();
+            if (ending) exactFields(root, "sceneId", "title", "narration", "dialogue", "choices", "continuityFacts", "ending");
+            else exactFields(root, "sceneId", "title", "narration", "dialogue", "choices", "continuityFacts");
+            if (!context.sceneId().equals(requiredText(root, "sceneId"))) throw invalid("OUTPUT_REFERENCE_INVALID");
+            String title = safeText(root, "title", 80), narration = safeText(root, "narration", 500);
+            List<GenerationArtifact.PlannedDialogue> dialogue = new ArrayList<>();
+            for (JsonNode line : array(root, "dialogue", 8)) {
+                exactFields(line, "actorId", "text");
+                String actor = requiredText(line, "actorId");
+                if (!context.actorIds().contains(actor)) throw invalid("GENERATION_DIALOGUE_ACTOR_INVALID");
+                dialogue.add(new GenerationArtifact.PlannedDialogue(actor, safeText(line, "text", 300)));
+            }
+            List<GenerationArtifact.ChoiceLabel> choices = dynamicChoices(root, context.choiceIds());
+            List<String> facts = uniqueStrings(root, "continuityFacts", 4, 140, "GENERATION_SCENE_FACT_INVALID");
+            if (facts.stream().mapToInt(v -> v.codePointCount(0, v.length())).sum() > 400
+                    || facts.stream().anyMatch(v -> CONTROL.matcher(v).find())) throw invalid("GENERATION_SCENE_FACT_INVALID");
+            GenerationArtifact.EndingNarrative endingValue = ending ? dynamicEnding(root.get("ending"), context.objectiveIds()) : null;
+            return Result.valid(new GenerationArtifact.PlannedScenePayload(context.sceneId(), title, narration,
+                    dialogue, choices, facts, endingValue));
+        } catch (ValidationException exception) { return Result.invalid(exception.code); }
+    }
+
+    public String dynamicSceneSchema(boolean ending) {
+        Map<String, Object> text = Map.of("type", "string");
+        Map<String, Object> fields = new java.util.LinkedHashMap<>();
+        fields.put("sceneId", text); fields.put("title", text); fields.put("narration", text);
+        fields.put("dialogue", arraySchema(objectSchema(Map.of("actorId", text, "text", text))));
+        fields.put("choices", arraySchema(objectSchema(Map.of("id", text, "label", text))));
+        fields.put("continuityFacts", arraySchema(text));
+        if (ending) fields.put("ending", objectSchema(Map.of("headline", text, "summary", text,
+                "objectiveNotes", arraySchema(objectSchema(Map.of("objectiveId", text, "text", text))),
+                "reflection", text)));
+        return MAPPER.writeValueAsString(objectSchema(fields));
+    }
+
+    private List<GenerationArtifact.ChoiceLabel> dynamicChoices(JsonNode root, List<String> expected) {
+        List<GenerationArtifact.ChoiceLabel> result = new ArrayList<>(); Set<String> seen = new HashSet<>();
+        for (JsonNode choice : array(root, "choices", 8)) {
+            exactFields(choice, "id", "label"); String id = requiredText(choice, "id");
+            if (!expected.contains(id) || !seen.add(id)) throw invalid("OUTPUT_REFERENCE_INVALID");
+            result.add(new GenerationArtifact.ChoiceLabel(id, safeText(choice, "label", 80)));
+        }
+        if (!seen.equals(new HashSet<>(expected))) throw invalid("OUTPUT_REFERENCE_INVALID");
+        return expected.stream().map(id -> result.stream().filter(v -> v.id().equals(id)).findFirst().orElseThrow()).toList();
+    }
+
+    private GenerationArtifact.EndingNarrative dynamicEnding(JsonNode node, List<String> expected) {
+        if (node == null || !node.isObject()) throw invalid("GENERATION_ENDING_INVALID");
+        exactFields(node, "headline", "summary", "objectiveNotes", "reflection");
+        String reflection = requiredText(node, "reflection");
+        if (reflection.codePointCount(0, reflection.length()) > 280 || MARKUP.matcher(reflection).find()
+                || piiScrubber.scrub(reflection).changed()) throw invalid("GENERATION_ENDING_INVALID");
+        List<GenerationArtifact.ObjectiveNote> notes = new ArrayList<>(); Set<String> seen = new HashSet<>();
+        for (JsonNode note : array(node, "objectiveNotes", 8)) {
+            exactFields(note, "objectiveId", "text"); String id = requiredText(note, "objectiveId");
+            if (!expected.contains(id) || !seen.add(id)) throw invalid("GENERATION_ENDING_OBJECTIVE_MISMATCH");
+            notes.add(new GenerationArtifact.ObjectiveNote(id, safeText(note, "text", 240)));
+        }
+        if (!seen.equals(new HashSet<>(expected))) throw invalid("GENERATION_ENDING_OBJECTIVE_MISMATCH");
+        List<GenerationArtifact.ObjectiveNote> ordered = expected.stream()
+                .map(id -> notes.stream().filter(v -> v.objectiveId().equals(id)).findFirst().orElseThrow()).toList();
+        return new GenerationArtifact.EndingNarrative(safeText(node, "headline", 100), safeText(node, "summary", 700),
+                ordered, reflection);
+    }
+
+    public record DynamicSceneContext(String sceneId, List<String> actorIds, List<String> choiceIds,
+                                      List<String> objectiveIds, boolean ending) {
+        public DynamicSceneContext {
+            actorIds = List.copyOf(actorIds); choiceIds = List.copyOf(choiceIds); objectiveIds = List.copyOf(objectiveIds);
+        }
     }
 
     private boolean fullGame(GenerationCatalog catalog) {
@@ -334,7 +415,8 @@ public final class GenerationOutputParser {
     private String safeText(JsonNode node, String field, int maxCodePoints) {
         String value = requiredText(node, field);
         if (value.codePointCount(0, value.length()) > maxCodePoints || value.isBlank()
-                || MARKUP.matcher(value).find() || piiScrubber.scrub(value).changed()) throw invalid("OUTPUT_SAFETY_REJECTED");
+                || MARKUP.matcher(value).find() || PLACEHOLDER.matcher(value).find()
+                || piiScrubber.scrub(value).changed()) throw invalid("OUTPUT_SAFETY_REJECTED");
         return value;
     }
 
@@ -350,7 +432,8 @@ public final class GenerationOutputParser {
         for (JsonNode value : values) {
             if (!value.isString() || value.asString().codePointCount(0, value.asString().length()) > maxCodePoints
                     || value.asString().isBlank()) throw invalid("OUTPUT_SCHEMA_INVALID");
-            if (MARKUP.matcher(value.asString()).find() || piiScrubber.scrub(value.asString()).changed()) {
+            if (MARKUP.matcher(value.asString()).find() || PLACEHOLDER.matcher(value.asString()).find()
+                    || piiScrubber.scrub(value.asString()).changed()) {
                 throw invalid("OUTPUT_SAFETY_REJECTED");
             }
             result.add(value.asString());

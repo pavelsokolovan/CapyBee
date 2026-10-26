@@ -9,6 +9,7 @@ import com.capybee.engine.content.BlockKind;
 import com.capybee.engine.generation.GenerationPipeline;
 import com.capybee.engine.generation.GenerationExecutionSummary;
 import com.capybee.engine.generation.GenerationArtifact;
+import com.capybee.engine.generation.blueprint.DynamicPresentationPipeline;
 import com.capybee.engine.input.InputContext;
 import com.capybee.engine.input.InputPolicy;
 import com.capybee.engine.input.InputResolution;
@@ -61,6 +62,7 @@ final class RunImpl implements Run {
     private final Clock clock;
     private final SceneSet sceneSet;
     private final GenerationPipeline generationPipeline;
+    private final DynamicPresentationPipeline dynamicPresentation;
     private final Rules rules;
     private final PlaceMap placeMap;
     private final InputGuard inputGuard;
@@ -130,6 +132,15 @@ final class RunImpl implements Run {
             boolean ended, EndReason endReason, Clock clock, RunState savedState,
             InputGuard inputGuard, InputInterpreter inputInterpreter, PiiScrubber piiScrubber,
             GenerationPipeline generationPipeline) {
+        this(id, definition, seed, startInputs, createdAt, updatedAt, step, sceneId, visited, ended, endReason,
+                clock, savedState, inputGuard, inputInterpreter, piiScrubber, generationPipeline, null);
+    }
+
+    RunImpl(String id, RuntimeGameDefinition definition, long seed, Map<String, String> startInputs,
+            Instant createdAt, Instant updatedAt, long step, String sceneId, List<String> visited,
+            boolean ended, EndReason endReason, Clock clock, RunState savedState,
+            InputGuard inputGuard, InputInterpreter inputInterpreter, PiiScrubber piiScrubber,
+            GenerationPipeline generationPipeline, DynamicPresentationPipeline dynamicPresentation) {
         this.id = id;
         this.definition = definition;
         this.locale = definition.locale();
@@ -144,6 +155,7 @@ final class RunImpl implements Run {
         this.endReason = endReason;
         this.sceneSet = definition.scenes();
         this.generationPipeline = generationPipeline;
+        this.dynamicPresentation = dynamicPresentation;
         this.clock = clock;
         this.rules = definition.rules();
         this.placeMap = definition.places();
@@ -179,6 +191,9 @@ final class RunImpl implements Run {
     List<Issue> startupIssues() { return List.copyOf(startupIssues); }
 
     private Scene scene(String id) {
+        if (dynamicPresentation != null && dynamicPresentation.hasScene(id)) {
+            return dynamicPresentation.resolveScene(id, visited);
+        }
         if (generationPipeline != null && generationPipeline.hasSceneSlot(id)) {
             generationPipeline.setVisitedSceneIds(visited);
             Scene generated = generationPipeline.resolveGeneratedScene(id);
@@ -197,12 +212,13 @@ final class RunImpl implements Run {
 
     @Override
     public Optional<GenerationExecutionSummary> generationSummary() {
+        if (dynamicPresentation != null) return Optional.of(dynamicPresentation.summary());
         return generationPipeline == null ? Optional.empty() : Optional.of(generationPipeline.summary());
     }
 
     @Override
     public List<String> prefetchCandidates() {
-        if (ended || generationPipeline == null) return List.of();
+        if (ended || generationPipeline == null && dynamicPresentation == null) return List.of();
         Scene current = scene(sceneId);
         if (current == null) return List.of();
         LinkedHashSet<String> candidates = new LinkedHashSet<>();
@@ -220,7 +236,20 @@ final class RunImpl implements Run {
         return resolution == null ? Optional.empty() : Optional.of(resolution.artifact());
     }
 
+    @Override
+    public Optional<PresentationPrefetchResult> prefetchPresentation(String candidateId) {
+        if (candidateId == null || dynamicPresentation == null || !prefetchCandidates().contains(candidateId)) return Optional.empty();
+        var artifact = dynamicPresentation.prefetch(candidateId, visited);
+        return Optional.of(new PresentationPrefetchResult(candidateId, artifact.outcome(),
+                artifact.evidence().providerCalls(), artifact.evidence().failureCode()));
+    }
+
     private void addPrefetchCandidate(Set<String> candidates, String targetId) {
+        if (targetId != null && dynamicPresentation != null && dynamicPresentation.hasScene(targetId)) {
+            if (!visited.contains(targetId) && !dynamicPresentation.isResolved(targetId)) candidates.add(targetId);
+            return;
+        }
+        if (generationPipeline == null) return;
         if (targetId != null && generationPipeline.hasSceneSlot(targetId)
                 && generationPipeline.catalog().sceneSlots().stream()
                     .filter(slot -> slot.sceneId().equals(targetId))
@@ -585,8 +614,9 @@ final class RunImpl implements Run {
         if (generationPipeline != null) generationPipeline.quests().forEach(quest -> quests.put(quest.objectiveId(), quest));
         for (ObjectiveDef def : rules.objectives()) {
             GenerationArtifact.Quest quest = quests.get(def.id());
+            String dynamicDescription = dynamicPresentation == null ? null : dynamicPresentation.objectiveDescription(def.id());
             objectiveItems.add(new ObjectiveItem(def.id(), quest == null ? resolve(def.labelKey()) : quest.title(),
-                    quest == null ? null : quest.description(),
+                    quest == null ? dynamicDescription : quest.description(),
                     objectives.getOrDefault(def.id(), ObjectiveState.ACTIVE)));
         }
         List<Option> options = new ArrayList<>();
@@ -606,18 +636,22 @@ final class RunImpl implements Run {
     }
 
     private RunResult buildRunResult(List<ObjectiveItem> objectiveItems) {
-        if (!ended || endReason != EndReason.COMPLETED || outcome == null || generationPipeline == null) return null;
+        if (!ended || endReason != EndReason.COMPLETED || outcome == null
+                || generationPipeline == null && dynamicPresentation == null) return null;
         com.capybee.engine.rules.OutcomeDef definition = rules.outcomes().stream()
                 .filter(item -> item.id().equals(outcome) && item.labelKey() != null).findFirst().orElse(null);
         if (definition == null) return null;
-        GenerationArtifact.EndingNarrative ending = generationPipeline.resolvedScenes().stream()
+        GenerationArtifact.EndingNarrative ending = dynamicPresentation == null ? generationPipeline.resolvedScenes().stream()
                 .filter(item -> item.slot().sceneId().equals(sceneId))
                 .map(GenerationPipeline.SceneResolution::artifact)
                 .map(GenerationArtifact::payload)
                 .filter(GenerationArtifact.PlannedScenePayload.class::isInstance)
                 .map(GenerationArtifact.PlannedScenePayload.class::cast)
                 .map(GenerationArtifact.PlannedScenePayload::ending)
-                .filter(java.util.Objects::nonNull).findFirst().orElse(null);
+                .filter(java.util.Objects::nonNull).findFirst().orElse(null)
+                : java.util.Optional.ofNullable(dynamicPresentation.artifact(sceneId))
+                    .map(com.capybee.engine.generation.blueprint.DynamicPresentationArtifact::payload)
+                    .map(GenerationArtifact.PlannedScenePayload::ending).orElse(null);
         if (ending == null) return null;
         Map<String, String> notes = new LinkedHashMap<>();
         ending.objectiveNotes().forEach(note -> notes.put(note.objectiveId(), note.text()));
@@ -631,12 +665,14 @@ final class RunImpl implements Run {
     }
 
     private StoryInfo storyInfo() {
+        if (dynamicPresentation != null) return dynamicPresentation.story();
         if (generationPipeline == null) return null;
         GenerationArtifact.StoryPlanPayload plan = generationPipeline.storyPlan();
         return plan == null ? null : new StoryInfo(plan.title(), plan.premise(), plan.setting());
     }
 
     private List<CharacterItem> discoveredCharacters() {
+        if (dynamicPresentation != null) return dynamicPresentation.characters(visited, sceneId);
         if (generationPipeline == null || generationPipeline.storyPlan() == null) return List.of();
         Map<String, GenerationArtifact.CastMember> cast = new LinkedHashMap<>();
         generationPipeline.cast().forEach(member -> cast.put(member.slotId(), member));

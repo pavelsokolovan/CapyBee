@@ -225,9 +225,13 @@ and a second execution-boundary verification before allocating a run identity.
 The trusted materialized scenes and rules execute through the same `RunImpl`
 state machine as packs; no synthetic pack or registry entry is created.
 
-Dynamic runs are intentionally an in-memory mechanical capability only. Their
-views omit unresolved selectable labels and report `DYNAMIC_PRESENTATION_PENDING`;
-their snapshot capability is `PENDING_DYNAMIC_DEFINITION_PERSISTENCE`, and a
-legacy snapshot request fails with `DYNAMIC_SNAPSHOT_UNAVAILABLE`. Normal CLI,
-session, and web hosts therefore remain pack-only. Specs 27.25–27.27 own lazy
-presentation, durable definition snapshots/resume, and host exposure.
+Dynamic runs now resolve the start scene before publication and lazily resolve
+later scenes through a strict definition-bound presentation schema. Reviewed
+blueprint story, cast, objectives, scene intents, and choice intents provide a
+complete provider-free fallback; generated prose can replace only blocks and
+labels, never trusted routes or mechanics. Presentation calls share the
+blueprint budget, cache per run, and expose a redacted source-neutral prefetch
+result. Their snapshot capability remains
+`PENDING_DYNAMIC_DEFINITION_PERSISTENCE`, and a legacy snapshot request fails
+with `DYNAMIC_SNAPSHOT_UNAVAILABLE`. Normal CLI, session, and web hosts remain
+pack-only until Specs 27.26–27.27 add persistence and host exposure.

@@ -26,5 +26,5 @@ record DynamicRuntimeGameDefinition(MaterializedGameDefinition materialized) imp
     @Override public List<StartInputDef> startInputs() { return List.of(); }
     @Override public PlaceMap places() { return null; }
     @Override public PackRef snapshotPack() { return null; }
-    @Override public boolean presentationReady() { return false; }
+    @Override public boolean presentationReady() { return true; }
 }
