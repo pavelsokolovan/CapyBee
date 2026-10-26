@@ -24,7 +24,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /** Confirmed, non-executable complete-blueprint generation with one shared repair allowance. */
-public final class BlueprintGenerationService {
+public final class BlueprintGenerationService implements BlueprintGenerator {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final String POLICY_VERSION = "game-blueprint-v1";
     private final TextGenerator generator;

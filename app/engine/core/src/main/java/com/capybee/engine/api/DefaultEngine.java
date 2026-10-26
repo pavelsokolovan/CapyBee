@@ -10,6 +10,12 @@ import com.capybee.engine.port.InputGuard;
 import com.capybee.engine.port.InputInterpreter;
 import com.capybee.engine.port.TextGenerator;
 import com.capybee.engine.generation.GenerationPipeline;
+import com.capybee.engine.generation.blueprint.BlueprintGenerationResult;
+import com.capybee.engine.generation.blueprint.BlueprintGenerator;
+import com.capybee.engine.generation.blueprint.MaterializedGameCompilationResult;
+import com.capybee.engine.generation.blueprint.MaterializedGameCompiler;
+import com.capybee.engine.generation.blueprint.MaterializedGameDefinition;
+import com.capybee.engine.generation.blueprint.MaterializedGameDefinitionVerifier;
 import com.capybee.engine.input.InputPolicy;
 import com.capybee.engine.input.InputSafetyAction;
 import com.capybee.engine.input.InputSafetyDecision;
@@ -42,11 +48,13 @@ final class DefaultEngine implements Engine {
     private final InputGuard inputGuard;
     private final InputInterpreter inputInterpreter;
     private final TextGenerator textGenerator;
+    private final BlueprintGenerator blueprintGenerationService;
     private final PiiScrubber piiScrubber = new PiiScrubber();
     private final Map<PackId, PlaceMap> placeMaps = new ConcurrentHashMap<>();
 
     DefaultEngine(PackRegistry packs, Clock clock, RandomGenerator random, IdSource ids,
-                  InputGuard inputGuard, InputInterpreter inputInterpreter, TextGenerator textGenerator) {
+                  InputGuard inputGuard, InputInterpreter inputInterpreter, TextGenerator textGenerator,
+                  BlueprintGenerator blueprintGenerationService) {
         this.packs = packs;
         this.clock = clock;
         this.random = random;
@@ -54,6 +62,78 @@ final class DefaultEngine implements Engine {
         this.inputGuard = inputGuard;
         this.inputInterpreter = inputInterpreter;
         this.textGenerator = textGenerator;
+        this.blueprintGenerationService = blueprintGenerationService;
+    }
+
+    @Override
+    public DynamicGameBootstrapResult startDynamic(DynamicGameBootstrapRequest request) {
+        if (request == null || request.preparation() == null) {
+            return dynamicFailure("DYNAMIC_PREPARATION_INVALID");
+        }
+        if (blueprintGenerationService == null) return dynamicFailure("DYNAMIC_BLUEPRINT_FAILED");
+
+        BlueprintGenerationResult generated;
+        try {
+            generated = blueprintGenerationService.generate(request.preparation());
+        } catch (RuntimeException exception) {
+            return dynamicFailure("DYNAMIC_BLUEPRINT_FAILED");
+        }
+        if (generated instanceof BlueprintGenerationResult.GenerationFailed failed && failed.fallback() != null) {
+            return new DynamicGameBootstrapResult.FallbackOffered(failed.fallback(),
+                    List.of(dynamicIssue(Issue.Severity.WARNING, "DYNAMIC_BLUEPRINT_FAILED")));
+        }
+        if (!(generated instanceof BlueprintGenerationResult.CandidateReviewed reviewed)) {
+            return dynamicFailure("DYNAMIC_BLUEPRINT_FAILED");
+        }
+
+        MaterializedGameCompilationResult compiled;
+        try {
+            compiled = new MaterializedGameCompiler().compile(reviewed);
+        } catch (RuntimeException exception) {
+            return dynamicFailure("DYNAMIC_COMPILATION_FAILED");
+        }
+        if (!(compiled instanceof MaterializedGameCompilationResult.Compiled success)) {
+            return dynamicFailure("DYNAMIC_COMPILATION_FAILED");
+        }
+        return startMaterialized(success.definition(), request.seed());
+    }
+
+    DynamicGameBootstrapResult startMaterialized(MaterializedGameDefinition materialized, Long requestedSeed) {
+        MaterializedGameDefinitionVerifier.Verification verification;
+        try {
+            verification = new MaterializedGameDefinitionVerifier().verify(materialized);
+        } catch (RuntimeException exception) {
+            return dynamicFailure("DYNAMIC_DEFINITION_INVALID");
+        }
+        if (!verification.valid()) return dynamicFailure("DYNAMIC_DEFINITION_INVALID");
+
+        try {
+            RuntimeGameDefinition definition = new DynamicRuntimeGameDefinition(materialized);
+            long seed = requestedSeed != null ? requestedSeed : random.nextLong();
+            String runId = ids.nextId();
+            Instant now = clock.instant();
+            String startId = definition.scenes().startId();
+            RunImpl run = new RunImpl(runId, definition, seed, Map.of(), now, now, 0L, startId,
+                    new ArrayList<>(List.of(startId)), false, null, clock, null,
+                    null, null, piiScrubber, null);
+            if (run.startupIssues().stream().anyMatch(issue -> issue.severity() == Issue.Severity.ERROR)) {
+                return dynamicFailure("DYNAMIC_START_FAILED");
+            }
+            List<Issue> issues = new ArrayList<>(run.startupIssues());
+            issues.add(dynamicIssue(Issue.Severity.WARNING, "DYNAMIC_PRESENTATION_PENDING"));
+            return new DynamicGameBootstrapResult.Started(run, materialized, issues, run.startupEvents());
+        } catch (RuntimeException exception) {
+            return dynamicFailure("DYNAMIC_START_FAILED");
+        }
+    }
+
+    private static DynamicGameBootstrapResult.Failed dynamicFailure(String code) {
+        return new DynamicGameBootstrapResult.Failed(code,
+                List.of(dynamicIssue(Issue.Severity.ERROR, code)));
+    }
+
+    private static Issue dynamicIssue(Issue.Severity severity, String code) {
+        return new Issue(severity, code, "Dynamic game startup could not complete at this stage");
     }
 
     @Override

@@ -75,7 +75,7 @@ class MaterializedGameCompilerTest {
                 .isEqualTo(new MaterializedGameDefinitionVerifier.Verification(false, "MATERIALIZED_DEFINITION_EVIDENCE_MISMATCH"));
     }
 
-    private static BlueprintGenerationResult.CandidateReviewed reviewed(Fixture fixture) {
+    static BlueprintGenerationResult.CandidateReviewed reviewed(Fixture fixture) {
         var validation = new DefaultBlueprintSemanticValidator().validate(fixture.blueprint, fixture.profile,
                 fixture.preferences, fixture.constraints);
         assertThat(validation.status()).isEqualTo(BlueprintSemanticValidator.Status.PASS);
@@ -83,7 +83,7 @@ class MaterializedGameCompilerTest {
                 new BlueprintGenerationResult.Evidence(fixture.profile.identity(), "prep", 1, "review-v1", validation.validatorVersion()));
     }
 
-    private static Fixture fixture() {
+    static Fixture fixture() {
         ProfileIdentity identity = new ProfileIdentity(new PackId("test-profile"), new PackVersion(1, 0, 0), "fingerprint");
         Set<String> conditions = Set.of("COUNTER_AT_LEAST", "COUNTER_AT_MOST", "COUNTER_EQUALS", "FLAG_IS", "SET_CONTAINS",
                 "SET_SIZE_AT_LEAST", "VISITED_SCENE", "ALL", "ANY", "NOT");
@@ -131,6 +131,6 @@ class MaterializedGameCompilerTest {
     private static Choice choice(String id, String destination, ParsedGameBlueprint.Condition requires, List<ParsedGameBlueprint.Effect> effects) {
         return new Choice(id, "Continue with the plan.", destination, requires, effects);
     }
-    private record Fixture(ParsedGameBlueprint blueprint, ValidatedGeneratorProfile profile,
+    record Fixture(ParsedGameBlueprint blueprint, ValidatedGeneratorProfile profile,
                            ResolvedGamePreferences preferences, EffectiveGenerationConstraints constraints) {}
 }

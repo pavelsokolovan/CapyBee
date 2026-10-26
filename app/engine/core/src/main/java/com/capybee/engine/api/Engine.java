@@ -22,6 +22,12 @@ public interface Engine {
 
     StartResult start(RunRequest request);
 
+    default DynamicGameBootstrapResult startDynamic(DynamicGameBootstrapRequest request) {
+        return new DynamicGameBootstrapResult.Failed("DYNAMIC_BLUEPRINT_FAILED",
+                List.of(new Issue(Issue.Severity.ERROR, "DYNAMIC_BLUEPRINT_FAILED",
+                        "Dynamic game startup is not configured")));
+    }
+
     default StartResult start(RunRequest request, PreparedStartInputs preparedInputs) {
         return start(request);
     }

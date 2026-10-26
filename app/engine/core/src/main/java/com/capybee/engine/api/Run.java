@@ -15,6 +15,8 @@ public interface Run {
 
     RunSnapshot snapshot();
 
+    default SnapshotCapability snapshotCapability() { return SnapshotCapability.SUPPORTED; }
+
     default Optional<GenerationExecutionSummary> generationSummary() { return Optional.empty(); }
 
     /** Generated scenes reachable in one step that have not been resolved yet. */

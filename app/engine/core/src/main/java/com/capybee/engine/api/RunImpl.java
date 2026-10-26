@@ -35,7 +35,6 @@ import com.capybee.engine.rules.FlagDef;
 import com.capybee.engine.rules.ObjectiveDef;
 import com.capybee.engine.rules.Rules;
 import com.capybee.engine.rules.SetDef;
-import com.capybee.engine.rules.json.RuleStrings;
 import com.capybee.engine.places.PlaceDef;
 import com.capybee.engine.places.PlaceLinkDef;
 import com.capybee.engine.places.PlaceMap;
@@ -53,7 +52,7 @@ import java.util.Optional;
 
 final class RunImpl implements Run {
     private final String id;
-    private final Pack pack;
+    private final RuntimeGameDefinition definition;
     private final LocaleTag locale;
     private final long seed;
     private final Map<String, String> startInputs;
@@ -121,9 +120,19 @@ final class RunImpl implements Run {
                 RunState savedState, PlaceMap placeMap, InputGuard inputGuard,
                 InputInterpreter inputInterpreter, PiiScrubber piiScrubber,
                 GenerationPipeline generationPipeline) {
+        this(id, new PackRuntimeGameDefinition(pack, locale, sceneSet, rules, placeMap), seed, startInputs,
+                createdAt, updatedAt, step, sceneId, visited, ended, endReason, clock, savedState,
+                inputGuard, inputInterpreter, piiScrubber, generationPipeline);
+    }
+
+    RunImpl(String id, RuntimeGameDefinition definition, long seed, Map<String, String> startInputs,
+            Instant createdAt, Instant updatedAt, long step, String sceneId, List<String> visited,
+            boolean ended, EndReason endReason, Clock clock, RunState savedState,
+            InputGuard inputGuard, InputInterpreter inputInterpreter, PiiScrubber piiScrubber,
+            GenerationPipeline generationPipeline) {
         this.id = id;
-        this.pack = pack;
-        this.locale = locale;
+        this.definition = definition;
+        this.locale = definition.locale();
         this.seed = seed;
         this.startInputs = Map.copyOf(startInputs);
         this.createdAt = createdAt;
@@ -133,15 +142,15 @@ final class RunImpl implements Run {
         this.visited = new ArrayList<>(visited);
         this.ended = ended;
         this.endReason = endReason;
-        this.sceneSet = sceneSet;
+        this.sceneSet = definition.scenes();
         this.generationPipeline = generationPipeline;
         this.clock = clock;
-        this.rules = rules;
-        this.placeMap = placeMap;
+        this.rules = definition.rules();
+        this.placeMap = definition.places();
         this.inputGuard = inputGuard;
         this.inputInterpreter = inputInterpreter;
         this.piiScrubber = piiScrubber;
-        this.strings = RuleStrings.load(pack, locale);
+        this.strings = definition.strings();
         rules.counters().forEach(def -> counterDefs.put(def.id(), def));
         rules.flags().forEach(def -> flagDefs.put(def.id(), def));
         rules.sets().forEach(def -> setDefs.put(def.id(), def));
@@ -273,14 +282,21 @@ final class RunImpl implements Run {
 
     @Override
     public RunSnapshot snapshot() {
+        if (snapshotCapability() != SnapshotCapability.SUPPORTED) {
+            throw new EngineCapabilityException("DYNAMIC_SNAPSHOT_UNAVAILABLE",
+                    "Dynamic snapshots require definition persistence");
+        }
         Map<String, List<String>> savedSets = new LinkedHashMap<>();
         sets.forEach((setId, members) -> savedSets.put(setId, members.stream().sorted().toList()));
-        return new RunSnapshot(1, id, new PackRef(pack.manifest().id(), pack.manifest().version()),
+        return new RunSnapshot(1, id, definition.snapshotPack(),
                 locale, seed, persistentStartInputs(), createdAt, updatedAt, step,
                 new RunState(sceneId, List.copyOf(visited), ended, endReason,
                     counters, flags, savedSets, objectives, outcome, currentPlaceId, visitedPlaces,
                     generationPipeline == null ? List.of() : generationPipeline.artifacts()));
     }
+
+    @Override
+    public SnapshotCapability snapshotCapability() { return definition.snapshotCapability(); }
 
     private void initializeAtStart() {
         Scene start = scene(sceneId);
@@ -380,7 +396,7 @@ final class RunImpl implements Run {
 
     private Event toEvent(Effect.EmitEvent effect) {
         Map<String, String> payload = new LinkedHashMap<>();
-        EventDef eventDef = pack.manifest().events().stream().filter(item -> item.id().equals(effect.event())).findFirst().orElse(null);
+        EventDef eventDef = definition.events().stream().filter(item -> item.id().equals(effect.event())).findFirst().orElse(null);
         if (eventDef == null) return new Event(effect.event(), Map.of());
         for (EventDef.PayloadField field : eventDef.payload()) {
             Effect.PayloadValue value = effect.payload().get(field.name());
@@ -417,7 +433,7 @@ final class RunImpl implements Run {
         if (mode != InputMode.TEXT && mode != InputMode.CHOICE_OR_TEXT) {
             return reject("INPUT_NOT_EXPECTED", "Text input is not expected in this scene");
         }
-        ContentPolicy contentPolicy = pack.manifest().contentPolicy();
+        ContentPolicy contentPolicy = definition.contentPolicy();
         if (contentPolicy == null || !contentPolicy.freeTextAllowed()) {
             return reject("FREE_TEXT_DISABLED", "Free-text input is disabled by pack policy");
         }
@@ -522,7 +538,7 @@ final class RunImpl implements Run {
         View currentView = view();
         List<InputContext.InputOption> options = currentView.options().stream()
                 .map(option -> new InputContext.InputOption(option.id(), option.label(), option.enabled())).toList();
-        ContentPolicy contentPolicy = pack.manifest().contentPolicy();
+        ContentPolicy contentPolicy = definition.contentPolicy();
         String audience = contentPolicy.audience() == null ? null
                 : contentPolicy.audience().minAge() + "-" + contentPolicy.audience().maxAge();
         return new InputContext(locale.value(), mode, current.maxChars(), options, audience,
@@ -538,7 +554,7 @@ final class RunImpl implements Run {
 
     private Map<String, String> persistentStartInputs() {
         Map<String, String> persistent = new LinkedHashMap<>(startInputs);
-        for (StartInputDef input : pack.manifest().startInputs()) {
+        for (StartInputDef input : definition.startInputs()) {
             if (input instanceof StartInputDef.FreeTextInput) persistent.remove(input.id());
         }
         return persistent;
@@ -579,7 +595,10 @@ final class RunImpl implements Run {
                 boolean enabled = isEnabled(option);
                 if (!enabled && option.hideWhenUnmet()) continue;
                 String hint = !enabled && option.unmetHint() != null ? resolve(option.unmetHint()) : null;
-                options.add(new Option(option.id(), option.label(), enabled, hint));
+                if (definition.presentationReady()
+                        && !com.capybee.engine.generation.blueprint.MaterializedGameCompiler.UNRESOLVED_LABEL.equals(option.label())) {
+                    options.add(new Option(option.id(), option.label(), enabled, hint));
+                }
             }
         }
         return ViewBuilder.build(scene, ended, endReason, options, status, objectiveItems, outcome,

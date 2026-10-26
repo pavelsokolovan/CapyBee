@@ -220,6 +220,14 @@ independent verifier rejects incomplete or inconsistent definitions before
 they can leave the compiler. Compilation is pure and creates no Pack, run,
 snapshot, file, registration, or provider call.
 
-This API still does not make dynamic games playable and adds no CLI option.
-Specs 27.24–27.27 own runtime startup, persistence, presentation, and the
-released preparation wizard.
+`Engine.startDynamic` now composes reviewed blueprint generation, compilation,
+and a second execution-boundary verification before allocating a run identity.
+The trusted materialized scenes and rules execute through the same `RunImpl`
+state machine as packs; no synthetic pack or registry entry is created.
+
+Dynamic runs are intentionally an in-memory mechanical capability only. Their
+views omit unresolved selectable labels and report `DYNAMIC_PRESENTATION_PENDING`;
+their snapshot capability is `PENDING_DYNAMIC_DEFINITION_PERSISTENCE`, and a
+legacy snapshot request fails with `DYNAMIC_SNAPSHOT_UNAVAILABLE`. Normal CLI,
+session, and web hosts therefore remain pack-only. Specs 27.25–27.27 own lazy
+presentation, durable definition snapshots/resume, and host exposure.

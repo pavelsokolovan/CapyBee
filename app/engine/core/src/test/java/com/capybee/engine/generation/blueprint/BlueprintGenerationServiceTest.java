@@ -85,7 +85,7 @@ class BlueprintGenerationServiceTest {
         assertThat(result.toString()).doesNotContain("private-secret");assertThat(calls).hasValue(1);
     }
 
-    private static BlueprintGenerationService service(TextGenerator generator){return new BlueprintGenerationService(generator,
+    static BlueprintGenerationService service(TextGenerator generator){return new BlueprintGenerationService(generator,
             (blueprint,prefs,policy)->BlueprintOutputReviewer.Review.pass("review-v1"),
             (blueprint,profile,prefs,limits)->fakePass(blueprint,profile,prefs),()->"request-id");}
     private static BlueprintGenerationService service(TextGenerator generator,BlueprintSemanticValidator validator){
@@ -101,9 +101,9 @@ class BlueprintGenerationServiceTest {
                 new GeneratedMechanicsBinder().bind(blueprint));
         return new BlueprintSemanticValidator.Validation(BlueprintSemanticValidator.Status.PASS,"semantic-v1",List.of(),validated);
     }
-    private static TextGenerationResult complete(String json){return new TextGenerationResult(json,new TextGenerationResult.TokenUsage(10,20,0,0),"test-model",TextGenerationResult.FinishReason.COMPLETE);}
+    static TextGenerationResult complete(String json){return new TextGenerationResult(json,new TextGenerationResult.TokenUsage(10,20,0,0),"test-model",TextGenerationResult.FinishReason.COMPLETE);}
 
-    private static Context context(){
+    static Context context(){
         ProfileIdentity identity=new ProfileIdentity(new PackId("test-profile"),new PackVersion(1,0,0),"fingerprint");
         ProfileCapabilities caps=new ProfileCapabilities(List.of(PhaseKind.values()),"FORWARD_DAG",false,6,12,3,1,4,1,4,2,3,0,4,0,1,0,6,1,2,12,2,1000,Set.of("FLAG_IS","VISITED_SCENE","ALL","ANY"),Set.of("FLAG_SET"));
         LengthPreset length=new LengthPreset("short","length.short",5,7,12);ChallengePreset challenge=new ChallengePreset("gentle","challenge.gentle",0,4,0,2,2,Set.of("FLAG_IS","VISITED_SCENE","ALL","ANY"),Set.of("FLAG_SET"));
@@ -117,5 +117,5 @@ class BlueprintGenerationServiceTest {
     }
     private static ParsedGameBlueprint proposal(){var actors=List.of(new Actor("guide","Mika","Guide","A careful guide."));var state=new State(List.of(),List.of(new Flag("ready",false)),List.of());var objectives=List.of(new Objective("finish","Finish","Prepare the signal.",new FlagCondition("ready",true)));var phases=Arrays.stream(PhaseKind.values()).map(k->new Phase(k,"Follow the goal.","Develop the plan.","Move onward.",List.of("guide"),List.of("finish"))).toList();List<Scene> scenes=List.of(decision("start",PhaseKind.OPENING,"middle",List.of()),decision("middle",PhaseKind.DEVELOPMENT,"challenge",List.of()),decision("challenge",PhaseKind.CHALLENGE,"resolve",List.of(new FlagEffect("ready",true))),decision("resolve",PhaseKind.RESOLUTION,"success",List.of()),new EndingScene("success",PhaseKind.ENDING,"Success","Recognize success.",List.of("guide"),List.of("finish"),"won"),new EndingScene("partial",PhaseKind.ENDING,"Progress","Recognize progress.",List.of("guide"),List.of("finish"),"helped"));return new ParsedGameBlueprint(1,"en","Signal Path","A team prepares a signal.","A quiet workshop.",List.of("gentle"),List.of("Make a thoughtful choice"),actors,state,objectives,phases,"start",scenes,List.of(new Outcome("won",ResultClass.SUCCESS,"Ready","The signal is ready."),new Outcome("helped",ResultClass.PARTIAL_SUCCESS,"Progress","The team made progress.")));}
     private static DecisionScene decision(String id,PhaseKind phase,String destination,List<Effect> effects){return new DecisionScene(id,phase,"A step","Plan the next step.",List.of("guide"),List.of("finish"),List.of(new Choice("continue","Continue.",destination,null,effects)));}
-    private record Context(ValidatedGeneratorProfile profile,ResolvedGamePreferences preferences,EffectiveGenerationConstraints constraints,String json){BlueprintGenerationRequest request(String id,String suggestion,BlueprintCancellation cancellation){return request(id,suggestion,cancellation,null);}BlueprintGenerationRequest request(String id,String suggestion,BlueprintCancellation cancellation,InputGuard guard){return new BlueprintGenerationRequest(id,1,1,profile,preferences,constraints,suggestion,guard,cancellation,Instant.now().plusSeconds(60));}}
+    record Context(ValidatedGeneratorProfile profile,ResolvedGamePreferences preferences,EffectiveGenerationConstraints constraints,String json){BlueprintGenerationRequest request(String id,String suggestion,BlueprintCancellation cancellation){return request(id,suggestion,cancellation,null);}BlueprintGenerationRequest request(String id,String suggestion,BlueprintCancellation cancellation,InputGuard guard){return new BlueprintGenerationRequest(id,1,1,profile,preferences,constraints,suggestion,guard,cancellation,Instant.now().plusSeconds(60));}}
 }
