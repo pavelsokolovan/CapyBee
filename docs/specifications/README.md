@@ -68,7 +68,8 @@ list. The current implementation boundary is:
 - [27.22](27.22-engine-generated-mechanics-and-rule-dsl-instruction.md) - Versioned closed generated-rule vocabulary, strict binding to the existing DSL, shared condition/state semantics, and runtime parity requirements (implemented; non-playable)
 - [27.23](27.23-engine-blueprint-compilation-and-materialized-game-definition-instruction.md) - Deterministic trusted-ID compilation, immutable materialized definition, final definition verification, and compiler handoff (implemented; not yet playable or durable)
 - [27.24](27.24-engine-dynamic-game-bootstrap-and-runtime-integration-instruction.md) - Verified dynamic bootstrap, shared `RunImpl` mechanical execution, and explicit presentation/snapshot capability barriers (implemented; in-memory and host-ineligible)
-- 27.25-27.27 - Planned dynamic-game presentation, persistence, and CLI integration; implementation contracts are owned by their individual specs
+- [27.25](27.25-engine-blueprint-driven-lazy-scene-generation-instruction.md) - Blueprint-driven story/cast/objective presentation, lazy validated scenes, continuity, prefetch, generated endings, and definition-specific fallback (specified; not yet implemented)
+- 27.26-27.27 - Planned dynamic-game persistence and CLI integration; implementation contracts are owned by their individual specs
 - 28 - Client rendering contract
 - 29 - CapyBee Polish game pack and game-pack integration
 
