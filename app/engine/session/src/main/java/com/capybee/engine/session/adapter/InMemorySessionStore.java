@@ -3,6 +3,7 @@ package com.capybee.engine.session.adapter;
 import com.capybee.engine.api.Event;
 import com.capybee.engine.api.RunSnapshot;
 import com.capybee.engine.generation.GenerationArtifact;
+import com.capybee.engine.generation.blueprint.DynamicGamePersistence;
 import com.capybee.engine.port.TextGenerationResult;
 import com.capybee.engine.session.SessionPorts;
 import com.capybee.engine.session.SessionTypes;
@@ -69,6 +70,25 @@ public final class InMemorySessionStore implements SessionPorts.SessionStore {
                 RunStatus.PREPARING, 0, null, pending, null, null, 0, newRun.createdAt(), newRun.createdAt(),
                 newRun.packVersion(), newRun.createdAt(), null, null));
         return new CreateOutcome(CreateKind.CREATED, newRun.id());
+    }
+
+    @Override
+    public synchronized CreateOutcome activateDynamic(OwnerRef owner, UUID runId, RunSnapshot snapshot, Instant createdAt) {
+        if (snapshot == null || !snapshot.dynamicGame() || snapshot.snapshotVersion() != 2
+                || !runId.toString().equals(snapshot.runId())
+                || !DynamicGamePersistence.verify(snapshot.dynamic().bundle()).valid())
+            throw new IllegalArgumentException("invalid dynamic snapshot");
+        StoredRun existing = runs.get(runId);
+        if (existing != null) return new CreateOutcome(existing.owner().equals(owner)
+                ? CreateKind.EXISTS_SAME_OWNER : CreateKind.EXISTS_OTHER_OWNER, existing.id());
+        Optional<StoredRun> active = runs.values().stream().filter(r -> r.owner().equals(owner))
+                .filter(r -> r.status() == RunStatus.PREPARING || r.status() == RunStatus.ACTIVE).findFirst();
+        if (active.isPresent()) return new CreateOutcome(CreateKind.OWNER_HAS_ACTIVE, active.get().id());
+        Instant now = createdAt == null ? clock.instant() : createdAt;
+        runs.put(runId, new StoredRun(runId, owner, null, snapshot.locale(),
+                snapshot.state().ended() ? RunStatus.ENDED : RunStatus.ACTIVE, 0, snapshot, null, null, null,
+                snapshot.dynamic().totalProviderCalls(), now, now, null, now, null, null));
+        return new CreateOutcome(CreateKind.CREATED, runId);
     }
 
     @Override

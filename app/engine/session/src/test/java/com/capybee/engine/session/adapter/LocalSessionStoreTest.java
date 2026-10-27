@@ -84,7 +84,7 @@ class LocalSessionStoreTest {
     }
 
     @Test
-    void persistsGeneratedSnapshotThroughCanonicalCodecInV4() throws Exception {
+    void persistsGeneratedSnapshotThroughCanonicalCodecInV5() throws Exception {
         Clock clock = Clock.fixed(Instant.parse("2026-10-19T10:00:00Z"), ZoneOffset.UTC);
         OwnerRef owner = new OwnerRef("local-owner"); UUID id = UUID.randomUUID();
         PackId pack = new PackId("test-pack"); LocaleTag locale = new LocaleTag("en");
@@ -109,7 +109,7 @@ class LocalSessionStoreTest {
             assertThat(store.saveActive(id, lease, 0, snapshot, List.of())).isTrue();
         }
         String bytes = java.nio.file.Files.readString(directory.resolve("session-store.json"));
-        assertThat(bytes).contains("\"version\":4").contains("\"snapshot\":{\"snapshotVersion\"")
+        assertThat(bytes).contains("\"version\":5").contains("\"snapshot\":{\"snapshotVersion\"")
                 .doesNotContain("GenerationArtifact$ThemePayload");
         try (LocalSessionStore reopened = LocalSessionStore.open(directory, clock)) {
             RunSnapshot restored = reopened.find(id, owner).orElseThrow().snapshot();
@@ -198,7 +198,7 @@ class LocalSessionStoreTest {
     }
 
     @Test
-    void migratesV1InMemoryAndWritesV3OnlyOnFirstChange() throws Exception {
+    void migratesV1InMemoryAndWritesV5OnlyOnFirstChange() throws Exception {
         Clock clock = Clock.fixed(Instant.parse("2026-10-19T10:00:00Z"), ZoneOffset.UTC);
         Path storeFile = directory.resolve("session-store.json");
         try (var golden = getClass().getResourceAsStream("/session-store-v1.json")) {
@@ -244,7 +244,7 @@ class LocalSessionStoreTest {
                     clock.instant()));
         }
 
-        assertThat(java.nio.file.Files.readString(storeFile)).contains("\"version\":4")
+        assertThat(java.nio.file.Files.readString(storeFile)).contains("\"version\":5")
                 .contains("\"storeRevision\":").contains("\"checksum\":");
         assertThat(java.nio.file.Files.readAllBytes(directory.resolve("session-store.json.bak")))
                 .isEqualTo(legacyBytes);
@@ -256,11 +256,11 @@ class LocalSessionStoreTest {
         Path storeFile = directory.resolve("session-store.json");
         String document = "\"format\":\"capybee-session-store\",\"runs\":[],"
                 + "\"reservations\":{},\"runReservations\":{},\"usage\":{}";
-        java.nio.file.Files.writeString(storeFile, "{" + document + ",\"version\":5}");
+        java.nio.file.Files.writeString(storeFile, "{" + document + ",\"version\":6}");
         assertThatThrownBy(() -> LocalSessionStore.open(directory, clock))
                 .isInstanceOfSatisfying(com.capybee.engine.session.StoreException.class, failure -> {
                     assertThat(failure.code()).isEqualTo(com.capybee.engine.session.StoreException.Code.STORE_VERSION_UNSUPPORTED);
-                    assertThat(failure.details()).containsEntry("found", 5).containsEntry("supported", 4);
+                    assertThat(failure.details()).containsEntry("found", 6).containsEntry("supported", 5);
                 });
 
         java.nio.file.Files.writeString(storeFile, "{" + document + ",\"version\":0}");

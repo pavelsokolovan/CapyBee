@@ -8,6 +8,8 @@ import com.capybee.engine.api.View;
 import com.capybee.engine.generation.GenerationArtifact;
 import com.capybee.engine.pack.LocaleTag;
 import com.capybee.engine.pack.PackId;
+import com.capybee.engine.pack.PackVersion;
+import com.capybee.engine.generation.profile.ProfileIdentity;
 import com.capybee.engine.port.TextGenerationResult;
 
 import java.time.Instant;
@@ -38,6 +40,10 @@ public final class SessionTypes {
             if (value == null || value.isBlank()) throw new IllegalArgumentException("owner required");
         }
     }
+
+    public sealed interface StoredGameRef permits PackGameRef, DynamicGameRef {}
+    public record PackGameRef(PackId packId, PackVersion packVersion) implements StoredGameRef {}
+    public record DynamicGameRef(ProfileIdentity profile, String gameFingerprint) implements StoredGameRef {}
 
     public record StartRequest(UUID id, PackId packId, LocaleTag locale,
                                Map<String, String> startInputs, Long seed, boolean generated) {
@@ -71,6 +77,14 @@ public final class SessionTypes {
                          int generationCalls, Instant createdAt, Instant updatedAt) {
             this(id, owner, packId, locale, status, revision, snapshot, pendingStart, lease,
                     failureCode, generationCalls, createdAt, updatedAt, null, updatedAt, null, null);
+        }
+        public StoredGameRef gameRef() {
+            if (snapshot != null && snapshot.dynamicGame()) return new DynamicGameRef(
+                    snapshot.dynamic().bundle().definition().profileIdentity(),
+                    snapshot.dynamic().bundle().gameFingerprint());
+            PackVersion version = packVersion == null ? snapshot == null || snapshot.pack() == null ? null
+                    : snapshot.pack().version() : PackVersion.tryParse(packVersion).orElse(null);
+            return packId == null || version == null ? null : new PackGameRef(packId, version);
         }
     }
 
@@ -110,7 +124,9 @@ public final class SessionTypes {
 
     public record RunSummary(UUID runId, RunStatus status, long revision, PackId packId,
                              String packVersion, LocaleTag locale, String endReason,
-                             String failureCode, View view, Instant updatedAt) {}
+                             String failureCode, View view, Instant updatedAt) {
+        public boolean dynamicGame() { return packId == null; }
+    }
 
     public record StartAccepted(UUID runId, RunStatus status, long revision, long retryAfterMs) {}
 

@@ -76,6 +76,19 @@ public final class RunSessionService {
     private final Map<String, CompletableFuture<CommandOutcome>> commandJobs = new ConcurrentHashMap<>();
     private final Map<UUID, List<StageDiagnostics>> lastStages = new ConcurrentHashMap<>();
 
+    /** Verifies and atomically publishes a complete dynamic snapshot without a transient PREPARING row. */
+    public RunSummary activateDynamic(OwnerRef owner, UUID runId, RunSnapshot snapshot) {
+        if (owner == null || runId == null || snapshot == null || !snapshot.dynamicGame())
+            throw new SessionException(ErrorCode.REQUEST_INVALID);
+        RunSnapshot owned = withRunId(snapshot, runId);
+        ResumeResult verified = resume(owner, owned, runId);
+        if (!verified.ok()) throw new SessionException(ErrorCode.RUN_UNRECOVERABLE);
+        var created = runs.activateDynamic(owner, runId, owned, clock.now());
+        if (created.kind() == CreateKind.OWNER_HAS_ACTIVE) throw new SessionException(ErrorCode.RUN_ALREADY_ACTIVE);
+        if (created.kind() == CreateKind.EXISTS_OTHER_OWNER) throw new SessionException(ErrorCode.RUN_NOT_FOUND);
+        return summary(requireRun(owner, runId));
+    }
+
     public RunSessionService(PackCatalog packs, RunRepository runs, CommandLog commands,
                              EventOutbox outbox, PrefetchStore prefetch, EngineFactory engines,
                              SessionClock clock, SessionLimits limits, Transaction transaction,
@@ -598,7 +611,7 @@ public final class RunSessionService {
         }
         ViewAndStatus view = view(stored.owner(), stored.snapshot());
         return new RunSummary(stored.id(), stored.status(), stored.revision(), stored.packId(),
-                stored.snapshot().pack().version().toString(), stored.locale(),
+                stored.snapshot().dynamicGame() ? null : stored.snapshot().pack().version().toString(), stored.locale(),
                 stored.snapshot().state().endReason() == null ? null
                         : stored.snapshot().state().endReason().name(),
                 stored.failureCode(), view.view(), stored.updatedAt());
@@ -622,13 +635,13 @@ public final class RunSessionService {
     }
 
     private RunSnapshot withRunId(RunSnapshot snapshot, UUID runId) {
-        return new RunSnapshot(snapshot.snapshotVersion(), runId.toString(), snapshot.pack(), snapshot.locale(),
-                snapshot.seed(), snapshot.startInputs(), snapshot.createdAt(), snapshot.updatedAt(),
-                snapshot.step(), snapshot.state());
+        return new RunSnapshot(snapshot.snapshotVersion(), runId.toString(), snapshot.pack(), snapshot.dynamic(),
+                snapshot.locale(), snapshot.seed(), snapshot.startInputs(), snapshot.createdAt(),
+                snapshot.updatedAt(), snapshot.step(), snapshot.state());
     }
 
     private RunSnapshot mergePrefetched(RunSnapshot snapshot, List<PrefetchedArtifact> artifacts) {
-        if (snapshot == null || artifacts.isEmpty()) return snapshot;
+        if (snapshot == null || snapshot.dynamicGame() || artifacts.isEmpty()) return snapshot;
         Map<String, GenerationArtifact> bySlot = new HashMap<>();
         snapshot.state().generationArtifacts().forEach(item -> bySlot.put(slot(item), item));
         artifacts.forEach(item -> bySlot.putIfAbsent(slot(item.artifact()), item.artifact()));
@@ -636,7 +649,7 @@ public final class RunSessionService {
         RunState merged = new RunState(old.sceneId(), old.visited(), old.ended(), old.endReason(),
                 old.counters(), old.flags(), old.sets(), old.objectives(), old.outcome(),
                 old.currentPlaceId(), old.visitedPlaces(), new ArrayList<>(bySlot.values()));
-        return new RunSnapshot(snapshot.snapshotVersion(), snapshot.runId(), snapshot.pack(),
+        return new RunSnapshot(snapshot.snapshotVersion(), snapshot.runId(), snapshot.pack(), snapshot.dynamic(),
                 snapshot.locale(), snapshot.seed(), snapshot.startInputs(), snapshot.createdAt(),
                 snapshot.updatedAt(), snapshot.step(), merged);
     }

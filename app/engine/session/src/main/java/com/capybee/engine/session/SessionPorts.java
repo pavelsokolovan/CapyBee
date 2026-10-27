@@ -26,6 +26,8 @@ public final class SessionPorts {
 
     public interface RunRepository {
         CreateOutcome createPreparing(NewRun run);
+        /** Atomically publishes a complete dynamic snapshot; no PREPARING row is created. */
+        CreateOutcome activateDynamic(OwnerRef owner, UUID runId, RunSnapshot snapshot, Instant createdAt);
         Optional<StoredRun> find(UUID runId, OwnerRef owner);
         Optional<StoredRun> findCurrent(OwnerRef owner);
         Optional<Lease> tryClaim(UUID runId, OwnerRef owner, Duration ttl);

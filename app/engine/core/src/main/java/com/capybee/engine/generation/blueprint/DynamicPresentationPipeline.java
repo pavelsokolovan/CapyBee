@@ -50,6 +50,7 @@ public final class DynamicPresentationPipeline {
     private final GenerationOutputParser parser = new GenerationOutputParser();
     private final GenerationQualityEvaluator qualityEvaluator = new GenerationQualityEvaluator();
     private final GenerationQualityProfile qualityProfile;
+    private final DynamicPresentationContinuation continuation;
     private final Map<String, GenerationArtifact.PlannedScenePayload> fallbacks = new LinkedHashMap<>();
     private final Map<String, DynamicPresentationArtifact> cache = new LinkedHashMap<>();
     private final List<GenerationExecutionSummary.StageExecution> executions = new ArrayList<>();
@@ -70,7 +71,68 @@ public final class DynamicPresentationPipeline {
             catch (RuntimeException invalid) { throw new ConfigurationException(); }
         }
         this.qualityProfile = parsedQuality;
+        this.continuation = new DynamicPresentationContinuation(DynamicPresentationContinuation.FORMAT_VERSION,
+                definition.profileIdentity(), definition.locale(), POLICY_VERSION, constraints,
+                Math.min(2, profile.profile().generationBudget().sceneMaxAttempts()), qualityResource, blueprintCalls);
         definition.scenePlans().forEach(plan -> fallbacks.put(plan.id(), validateFallback(plan)));
+    }
+
+    /** Restores accepted artifacts and accounting without making a provider call. */
+    public DynamicPresentationPipeline(MaterializedGameDefinition definition,
+            DynamicPresentationContinuation continuation, int totalCalls,
+            List<DynamicPresentationArtifact> restoredArtifacts, TextGenerator generator,
+            IdSource ids, Clock clock) {
+        this.definition = Objects.requireNonNull(definition); this.continuation = Objects.requireNonNull(continuation);
+        this.profile = null; this.preferences = null; this.constraints = continuation.constraints();
+        this.generator = generator; this.ids = Objects.requireNonNull(ids); this.clock = Objects.requireNonNull(clock);
+        this.cancellation = BlueprintCancellation.NEVER; this.deadline = null; this.totalCalls = totalCalls;
+        if (!definition.profileIdentity().equals(continuation.profileIdentity())
+                || !definition.locale().equals(continuation.locale()) || !POLICY_VERSION.equals(continuation.policyVersion())
+                || totalCalls < continuation.blueprintProviderCalls()
+                || totalCalls > constraints.totalCallsPerRun()) throw new ConfigurationException();
+        GenerationQualityProfile parsedQuality = null;
+        if (continuation.qualityResource().contains("\"readability\"")) {
+            try { parsedQuality = GenerationQualityProfileParser.parse(definition.locale(), continuation.qualityResource()); }
+            catch (RuntimeException invalid) { throw new ConfigurationException(); }
+        }
+        this.qualityProfile = parsedQuality;
+        definition.scenePlans().forEach(plan -> fallbacks.put(plan.id(), validateFallback(plan)));
+        int artifactCalls = 0;
+        for (DynamicPresentationArtifact artifact : restoredArtifacts) {
+            if (!artifact.locale().equals(definition.locale()) || !POLICY_VERSION.equals(artifact.policyVersion())
+                    || !fallbacks.containsKey(artifact.sceneId()) || cache.putIfAbsent(artifact.sceneId(), artifact) != null)
+                throw new ConfigurationException();
+            validateRestored(artifact);
+            artifactCalls += artifact.evidence().providerCalls();
+            compose(canonical(artifact.sceneId()), artifact.payload());
+        }
+        if (continuation.blueprintProviderCalls() + artifactCalls != totalCalls) throw new ConfigurationException();
+    }
+
+    public synchronized DynamicPresentationContinuation continuation() { return continuation; }
+    public synchronized int totalCalls() { return totalCalls; }
+
+    private void validateRestored(DynamicPresentationArtifact artifact) {
+        MaterializedGameDefinition.ScenePlan plan = plan(artifact.sceneId());
+        if (!artifact.artifactId().equals("presentation:" + artifact.sceneId())
+                || !artifact.payload().sceneId().equals(artifact.sceneId())
+                || artifact.evidence().providerCalls() < 0
+                || artifact.continuityBasisSceneIds().stream().anyMatch(id -> !fallbacks.containsKey(id)))
+            throw new ConfigurationException();
+        List<String> expectedChoices = plan.choices().stream().map(MaterializedGameDefinition.ChoicePlan::id).toList();
+        List<String> actualChoices = artifact.payload().choices().stream().map(GenerationArtifact.ChoiceLabel::id).toList();
+        if (!expectedChoices.equals(actualChoices)) throw new ConfigurationException();
+        Set<String> actors = Set.copyOf(plan.actorIds());
+        if (artifact.payload().dialogue().stream().anyMatch(line -> !actors.contains(line.actorSlot())))
+            throw new ConfigurationException();
+        boolean ending = canonical(artifact.sceneId()).end();
+        if (ending != (artifact.payload().ending() != null)) throw new ConfigurationException();
+        if (artifact.payload().ending() != null) {
+            List<String> expectedObjectives = plan.objectiveIds();
+            List<String> actualObjectives = artifact.payload().ending().objectiveNotes().stream()
+                    .map(GenerationArtifact.ObjectiveNote::objectiveId).toList();
+            if (!expectedObjectives.equals(actualObjectives)) throw new ConfigurationException();
+        }
     }
 
     private void validateConfiguration() {
@@ -123,7 +185,10 @@ public final class DynamicPresentationPipeline {
     public synchronized boolean hasScene(String id) { return fallbacks.containsKey(id); }
     public synchronized boolean isResolved(String id) { return cache.containsKey(id); }
     public synchronized DynamicPresentationArtifact artifact(String id) { return cache.get(id); }
-    public synchronized List<DynamicPresentationArtifact> artifacts() { return List.copyOf(cache.values()); }
+    public synchronized List<DynamicPresentationArtifact> artifacts() {
+        return definition.scenePlans().stream().map(MaterializedGameDefinition.ScenePlan::id)
+                .map(cache::get).filter(Objects::nonNull).toList();
+    }
     public StoryInfo story() { var p=definition.storyPlan(); return new StoryInfo(p.title(),p.premise(),p.setting()); }
     public List<CharacterItem> characters(List<String> visited, String current) {
         LinkedHashSet<String> found = new LinkedHashSet<>();
@@ -143,7 +208,7 @@ public final class DynamicPresentationPipeline {
         List<String> basis = continuityBasis(sceneId, visited);
         int calls = 0; String failure = null; TextGenerationResult.TokenUsage usage = null;
         List<String> findings = List.of();
-        int maximum = Math.min(2, profile.profile().generationBudget().sceneMaxAttempts());
+        int maximum = continuation.sceneMaxAttempts();
         if (generator != null && !cancelled()) {
             for (int attempt=1; attempt<=maximum && totalCalls<constraints.totalCallsPerRun(); attempt++) {
                 StructuredGenerationRequest request;

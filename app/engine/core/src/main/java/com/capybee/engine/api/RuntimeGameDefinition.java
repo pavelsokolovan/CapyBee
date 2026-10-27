@@ -25,7 +25,6 @@ interface RuntimeGameDefinition {
     boolean presentationReady();
 
     default SnapshotCapability snapshotCapability() {
-        return snapshotPack() == null ? SnapshotCapability.PENDING_DYNAMIC_DEFINITION_PERSISTENCE
-                : SnapshotCapability.SUPPORTED;
+        return SnapshotCapability.SUPPORTED;
     }
 }

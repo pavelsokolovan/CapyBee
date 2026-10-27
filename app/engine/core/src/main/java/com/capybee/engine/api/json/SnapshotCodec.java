@@ -6,8 +6,11 @@ import com.capybee.engine.api.PackRef;
 import com.capybee.engine.api.RunSnapshot;
 import com.capybee.engine.api.RunState;
 import com.capybee.engine.api.ObjectiveState;
+import com.capybee.engine.api.DynamicSnapshotSource;
 import com.capybee.engine.generation.GenerationArtifact;
 import com.capybee.engine.generation.GenerationCatalog;
+import com.capybee.engine.generation.blueprint.*;
+import com.capybee.engine.generation.profile.ProfileIdentity;
 import com.capybee.engine.pack.LocaleTag;
 import com.capybee.engine.pack.PackId;
 import com.capybee.engine.pack.PackVersion;
@@ -31,15 +34,20 @@ public final class SnapshotCodec {
         ObjectNode root = MAPPER.createObjectNode();
         root.put("snapshotVersion", snapshot.snapshotVersion());
         root.put("runId", snapshot.runId());
-        ObjectNode packNode = MAPPER.createObjectNode();
-        packNode.put("id", snapshot.pack().id().value());
-        packNode.put("version", snapshot.pack().version().toString());
-        root.set("pack", packNode);
+        if (snapshot.dynamicGame()) root.set("source", writeDynamicSource(snapshot.dynamic()));
+        else {
+            ObjectNode packNode = MAPPER.createObjectNode();
+            packNode.put("id", snapshot.pack().id().value());
+            packNode.put("version", snapshot.pack().version().toString());
+            root.set("pack", packNode);
+        }
         root.put("locale", snapshot.locale().value());
         root.put("seed", snapshot.seed());
-        ObjectNode inputs = MAPPER.createObjectNode();
-        snapshot.startInputs().forEach(inputs::put);
-        root.set("startInputs", inputs);
+        if (!snapshot.dynamicGame()) {
+            ObjectNode inputs = MAPPER.createObjectNode();
+            snapshot.startInputs().forEach(inputs::put);
+            root.set("startInputs", inputs);
+        }
         root.put("createdAt", snapshot.createdAt().toString());
         root.put("updatedAt", snapshot.updatedAt().toString());
         root.put("step", snapshot.step());
@@ -90,6 +98,7 @@ public final class SnapshotCodec {
                 return new SnapshotParse(null, issues);
             }
             int version = parseInt(root.get("snapshotVersion"), issues, "SNAPSHOT_VERSION_UNSUPPORTED");
+            if (version == 2) return parseDynamic(root, issues);
             if (version != 1) {
                 issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_VERSION_UNSUPPORTED", "Unsupported snapshot version: " + version));
                 return new SnapshotParse(null, issues);
@@ -230,6 +239,54 @@ public final class SnapshotCodec {
             return new SnapshotParse(null, issues);
         }
     }
+
+    private static SnapshotParse parseDynamic(JsonNode root, List<Issue> issues) {
+        try {
+            if (!root.isObject() || root.get("pack") != null || root.get("startInputs") != null) throw new IllegalArgumentException();
+            ObjectNode packShape = ((ObjectNode) root).deepCopy();
+            packShape.put("snapshotVersion", 1);
+            ObjectNode fakePack = packShape.putObject("pack"); fakePack.put("id", "dynamic-codec-placeholder"); fakePack.put("version", "1.0.0");
+            packShape.putObject("startInputs"); packShape.remove("source");
+            SnapshotParse common = fromJson(packShape.toString());
+            if (common.snapshot() == null) return new SnapshotParse(null, common.issues());
+            DynamicSnapshotSource source = readDynamicSource(root.required("source"));
+            RunSnapshot p = common.snapshot();
+            RunSnapshot dynamic = new RunSnapshot(2, p.runId(), null, source, p.locale(), p.seed(), Map.of(),
+                    p.createdAt(), p.updatedAt(), p.step(), p.state());
+            DynamicGamePersistence.Verification verified = DynamicGamePersistence.verify(source.bundle());
+            if (!verified.valid()) return new SnapshotParse(null, List.of(new Issue(Issue.Severity.ERROR,
+                    verified.code(), "Dynamic snapshot could not be verified")));
+            return new SnapshotParse(dynamic, List.of());
+        } catch (RuntimeException ex) {
+            issues.add(new Issue(Issue.Severity.ERROR, "DYNAMIC_SNAPSHOT_INVALID", "Dynamic snapshot is malformed"));
+            return new SnapshotParse(null, issues);
+        }
+    }
+
+    private static ObjectNode writeDynamicSource(DynamicSnapshotSource source) {
+        ObjectNode n=MAPPER.createObjectNode();n.put("kind","DYNAMIC");n.put("gameFingerprint",source.bundle().gameFingerprint());
+        n.set("bundle",writeBundle(source.bundle()));ObjectNode p=n.putObject("presentation");ArrayNode a=p.putArray("artifacts");source.artifacts().forEach(v->a.add(DynamicPersistenceCodec.writeArtifact(v)));p.put("blueprintProviderCalls",source.bundle().continuation().blueprintProviderCalls());p.put("totalProviderCalls",source.totalProviderCalls());return n;
+    }
+
+    private static DynamicSnapshotSource readDynamicSource(JsonNode n) {
+        if (!"DYNAMIC".equals(text(n.get("kind")))) throw new IllegalArgumentException();
+        DynamicGameBundle bundle=readBundle(n.required("bundle"));
+        if (!bundle.gameFingerprint().equals(text(n.get("gameFingerprint")))) throw new IllegalArgumentException();
+        JsonNode p=n.required("presentation");List<DynamicPresentationArtifact> artifacts=new ArrayList<>();p.required("artifacts").forEach(v->artifacts.add(DynamicPersistenceCodec.readArtifact(v)));
+        if(p.required("blueprintProviderCalls").asInt()!=bundle.continuation().blueprintProviderCalls())throw new IllegalArgumentException();
+        return new DynamicSnapshotSource(bundle,artifacts,p.required("totalProviderCalls").asInt());
+    }
+
+    private static ObjectNode writeBundle(DynamicGameBundle b) {
+        ObjectNode n=MAPPER.createObjectNode();n.put("bundleFormatVersion",b.bundleFormatVersion());AcceptedBlueprintArchive a=b.acceptedBlueprint();ObjectNode x=n.putObject("acceptedBlueprint");x.put("archiveFormatVersion",a.archiveFormatVersion());x.put("canonicalBlueprint",a.canonicalBlueprint());x.set("profileIdentity",profile(a.profileIdentity()));x.put("locale",a.locale().value());x.put("lengthPresetId",a.lengthPresetId());x.put("challengePresetId",a.challengePresetId());x.put("semanticContractVersion",a.semanticContractVersion());x.put("validatorVersion",a.validatorVersion());x.put("reviewerVersion",a.reviewerVersion());x.put("providerAttempts",a.providerAttempts());x.put("blueprintFingerprint",a.blueprintFingerprint());n.set("definition",DynamicPersistenceCodec.writeDefinition(b.definition()));n.set("continuation",DynamicPersistenceCodec.writeContinuation(b.continuation()));n.put("definitionFingerprint",b.definitionFingerprint());n.put("continuationFingerprint",b.continuationFingerprint());n.put("gameFingerprint",b.gameFingerprint());return n;
+    }
+
+    private static DynamicGameBundle readBundle(JsonNode n) {
+        JsonNode x=n.required("acceptedBlueprint");ProfileIdentity profile=readProfile(x.required("profileIdentity"));AcceptedBlueprintArchive a=new AcceptedBlueprintArchive(x.required("archiveFormatVersion").asInt(),x.required("canonicalBlueprint").asString(),profile,new LocaleTag(x.required("locale").asString()),x.required("lengthPresetId").asString(),x.required("challengePresetId").asString(),x.required("semanticContractVersion").asString(),x.required("validatorVersion").asString(),x.required("reviewerVersion").asString(),x.required("providerAttempts").asInt(),x.required("blueprintFingerprint").asString());return new DynamicGameBundle(n.required("bundleFormatVersion").asInt(),a,DynamicPersistenceCodec.readDefinition(n.required("definition")),DynamicPersistenceCodec.readContinuation(n.required("continuation")),n.required("definitionFingerprint").asString(),n.required("continuationFingerprint").asString(),n.required("gameFingerprint").asString());
+    }
+
+    private static ObjectNode profile(ProfileIdentity p){ObjectNode n=MAPPER.createObjectNode();n.put("id",p.id().value());n.put("version",p.version().toString());n.put("fingerprint",p.fingerprint());return n;}
+    private static ProfileIdentity readProfile(JsonNode n){return new ProfileIdentity(new PackId(n.required("id").asString()),PackVersion.tryParse(n.required("version").asString()).orElseThrow(),n.required("fingerprint").asString());}
 
     private static int parseInt(JsonNode node, List<Issue> issues, String code) {
         if (node == null || !node.isIntegralNumber()) {

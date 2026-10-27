@@ -231,7 +231,13 @@ blueprint story, cast, objectives, scene intents, and choice intents provide a
 complete provider-free fallback; generated prose can replace only blocks and
 labels, never trusted routes or mechanics. Presentation calls share the
 blueprint budget, cache per run, and expose a redacted source-neutral prefetch
-result. Their snapshot capability remains
-`PENDING_DYNAMIC_DEFINITION_PERSISTENCE`, and a legacy snapshot request fails
-with `DYNAMIC_SNAPSHOT_UNAVAILABLE`. Normal CLI, session, and web hosts remain
-pack-only until Specs 27.26–27.27 add persistence and host exposure.
+result.
+
+Dynamic runs produce canonical snapshot v2 documents containing the accepted
+blueprint archive, verified materialized definition, continuation policy,
+resolved presentation artifacts, exact runtime state, and SHA-256 game
+fingerprint. A fresh engine restores these snapshots without a profile, Pack,
+blueprint call, compiler call, or provider call for accepted scenes. Local
+session stores use the source-discriminated v5 format and retain Pack snapshot
+v1 compatibility. The normal CLI remains Pack-only until Spec 27.27 exposes
+profile-driven dynamic preparation and release certification.

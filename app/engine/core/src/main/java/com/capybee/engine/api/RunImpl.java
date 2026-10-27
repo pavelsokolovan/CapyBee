@@ -10,6 +10,7 @@ import com.capybee.engine.generation.GenerationPipeline;
 import com.capybee.engine.generation.GenerationExecutionSummary;
 import com.capybee.engine.generation.GenerationArtifact;
 import com.capybee.engine.generation.blueprint.DynamicPresentationPipeline;
+import com.capybee.engine.generation.blueprint.DynamicGameBundle;
 import com.capybee.engine.input.InputContext;
 import com.capybee.engine.input.InputPolicy;
 import com.capybee.engine.input.InputResolution;
@@ -63,6 +64,7 @@ final class RunImpl implements Run {
     private final SceneSet sceneSet;
     private final GenerationPipeline generationPipeline;
     private final DynamicPresentationPipeline dynamicPresentation;
+    private DynamicGameBundle dynamicBundle;
     private final Rules rules;
     private final PlaceMap placeMap;
     private final InputGuard inputGuard;
@@ -189,6 +191,11 @@ final class RunImpl implements Run {
 
     List<Event> startupEvents() { return List.copyOf(startupEvents); }
     List<Issue> startupIssues() { return List.copyOf(startupIssues); }
+    void attachDynamicBundle(DynamicGameBundle bundle) {
+        if (dynamicPresentation == null || dynamicBundle != null || bundle == null)
+            throw new IllegalStateException("Dynamic bundle cannot be attached");
+        dynamicBundle = bundle;
+    }
 
     private Scene scene(String id) {
         if (dynamicPresentation != null && dynamicPresentation.hasScene(id)) {
@@ -317,11 +324,17 @@ final class RunImpl implements Run {
         }
         Map<String, List<String>> savedSets = new LinkedHashMap<>();
         sets.forEach((setId, members) -> savedSets.put(setId, members.stream().sorted().toList()));
-        return new RunSnapshot(1, id, definition.snapshotPack(),
-                locale, seed, persistentStartInputs(), createdAt, updatedAt, step,
-                new RunState(sceneId, List.copyOf(visited), ended, endReason,
+        RunState state = new RunState(sceneId, List.copyOf(visited), ended, endReason,
                     counters, flags, savedSets, objectives, outcome, currentPlaceId, visitedPlaces,
-                    generationPipeline == null ? List.of() : generationPipeline.artifacts()));
+                    generationPipeline == null ? List.of() : generationPipeline.artifacts());
+        if (dynamicPresentation != null) {
+            if (dynamicBundle == null) throw new EngineCapabilityException("DYNAMIC_SNAPSHOT_INVALID", "Dynamic bundle is missing");
+            return new RunSnapshot(2, id, null,
+                    new DynamicSnapshotSource(dynamicBundle, dynamicPresentation.artifacts(), dynamicPresentation.totalCalls()),
+                    locale, seed, Map.of(), createdAt, updatedAt, step, state);
+        }
+        return new RunSnapshot(1, id, definition.snapshotPack(), locale, seed, persistentStartInputs(),
+                createdAt, updatedAt, step, state);
     }
 
     @Override

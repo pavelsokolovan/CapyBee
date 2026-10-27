@@ -3,6 +3,7 @@ package com.capybee.engine.generation.blueprint;
 import com.capybee.engine.adapter.Randoms;
 import com.capybee.engine.adapter.SequentialIdSource;
 import com.capybee.engine.api.*;
+import com.capybee.engine.api.json.SnapshotCodec;
 import com.capybee.engine.pack.PackRegistry;
 import org.junit.jupiter.api.Test;
 
@@ -14,11 +15,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import tools.jackson.databind.json.JsonMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class DynamicBootstrapIntegrationTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
-    @Test void reviewedBlueprintStartsSharedRuntimeWithValidatedFallbackPresentationAndNoFakeSnapshot() {
+    @Test void reviewedBlueprintStartsSharedRuntimeAndResumesFromCanonicalDynamicSnapshot() {
         var candidate = MaterializedGameCompilerTest.reviewed(MaterializedGameCompilerTest.fixture());
         Engine engine = Engine.builder(new PackRegistry(List.of()))
                 .clock(Clock.fixed(Instant.parse("2026-10-26T10:00:00Z"), ZoneOffset.UTC))
@@ -42,9 +42,49 @@ class DynamicBootstrapIntegrationTest {
             assertThat(objective.description()).isNotBlank();
         });
         assertThat(started.run().snapshotCapability())
-                .isEqualTo(SnapshotCapability.PENDING_DYNAMIC_DEFINITION_PERSISTENCE);
-        assertThatThrownBy(started.run()::snapshot).isInstanceOfSatisfying(EngineCapabilityException.class,
-                failure -> assertThat(failure.code()).isEqualTo("DYNAMIC_SNAPSHOT_UNAVAILABLE"));
+                .isEqualTo(SnapshotCapability.SUPPORTED);
+        RunSnapshot snapshot = started.run().snapshot();
+        assertThat(snapshot.snapshotVersion()).isEqualTo(2);
+        assertThat(snapshot.pack()).isNull();
+        assertThat(snapshot.dynamic().bundle().gameFingerprint()).startsWith("sha256:");
+        String encoded = SnapshotCodec.toJson(snapshot);
+        assertThat(encoded).doesNotContain("dynamic-1");
+        SnapshotCodec.SnapshotParse parsed = SnapshotCodec.fromJson(encoded);
+        assertThat(parsed.issues()).isEmpty();
+        AtomicInteger resumedProviderCalls = new AtomicInteger();
+        Engine freshEngine = Engine.builder(new PackRegistry(List.of()))
+                .clock(Clock.fixed(Instant.parse("2026-10-26T10:01:00Z"), ZoneOffset.UTC))
+                .random(Randoms.seeded(7L)).ids(new SequentialIdSource("fresh"))
+                .textGenerator(request -> { resumedProviderCalls.incrementAndGet(); throw new AssertionError("resume called provider"); })
+                .build();
+        ResumeResult resumed = freshEngine.resume(parsed.snapshot());
+        assertThat(resumed.issues()).isEmpty();
+        assertThat(resumed.run().id()).isEqualTo(started.run().id());
+        assertThat(resumed.run().view()).isEqualTo(started.run().view());
+        assertThat(SnapshotCodec.toJson(resumed.run().snapshot())).isEqualTo(encoded);
+        assertThat(resumedProviderCalls).hasValue(0);
+
+        String tampered = encoded.replace(snapshot.dynamic().bundle().gameFingerprint(),
+                "sha256:" + "0".repeat(64));
+        SnapshotCodec.SnapshotParse rejected = SnapshotCodec.fromJson(tampered);
+        assertThat(rejected.snapshot()).isNull();
+        assertThat(rejected.issues()).extracting(Issue::code)
+                .contains("DYNAMIC_BUNDLE_FINGERPRINT_MISMATCH");
+
+        Engine offlineEngine = Engine.builder(new PackRegistry(List.of()))
+                .clock(Clock.fixed(Instant.parse("2026-10-26T10:02:00Z"), ZoneOffset.UTC))
+                .random(Randoms.seeded(8L)).ids(new SequentialIdSource("offline")).build();
+        Run offline = offlineEngine.resume(parsed.snapshot()).run();
+        for (int step = 0; step < 5; step++) {
+            assertThat(offline.view().options()).isNotEmpty();
+            assertThat(offline.apply(new Command.Choose(offline.view().options().getFirst().id())).accepted()).isTrue();
+        }
+        assertThat(offline.view().ended()).isTrue();
+        assertThat(offline.view().result().resultClass()).isEqualTo(com.capybee.engine.rules.ResultClass.SUCCESS);
+        RunSnapshot ended = offline.snapshot();
+        ResumeResult endedResume = offlineEngine.resume(SnapshotCodec.fromJson(SnapshotCodec.toJson(ended)).snapshot());
+        assertThat(endedResume.ok()).isTrue();
+        assertThat(endedResume.run().view()).isEqualTo(offline.view());
 
         String firstChoice = started.definition().runtimeSceneSet().scenes()
                 .get(started.definition().runtimeSceneSet().startId()).options().getFirst().id();

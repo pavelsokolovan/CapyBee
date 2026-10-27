@@ -17,6 +17,8 @@ import com.capybee.engine.generation.blueprint.MaterializedGameCompiler;
 import com.capybee.engine.generation.blueprint.MaterializedGameDefinition;
 import com.capybee.engine.generation.blueprint.MaterializedGameDefinitionVerifier;
 import com.capybee.engine.generation.blueprint.DynamicPresentationPipeline;
+import com.capybee.engine.generation.blueprint.DynamicGamePersistence;
+import com.capybee.engine.generation.blueprint.DynamicGameBundle;
 import com.capybee.engine.input.InputPolicy;
 import com.capybee.engine.input.InputSafetyAction;
 import com.capybee.engine.input.InputSafetyDecision;
@@ -96,7 +98,7 @@ final class DefaultEngine implements Engine {
         if (!(compiled instanceof MaterializedGameCompilationResult.Compiled success)) {
             return dynamicFailure("DYNAMIC_COMPILATION_FAILED");
         }
-        return startMaterialized(success.definition(), request.seed(), request.preparation(), reviewed.evidence().attempts());
+        return startMaterialized(success.definition(), request.seed(), request.preparation(), reviewed);
     }
 
     DynamicGameBootstrapResult startMaterialized(MaterializedGameDefinition materialized, Long requestedSeed) {
@@ -104,7 +106,8 @@ final class DefaultEngine implements Engine {
     }
 
     private DynamicGameBootstrapResult startMaterialized(MaterializedGameDefinition materialized, Long requestedSeed,
-            com.capybee.engine.generation.blueprint.BlueprintGenerationRequest preparation, int blueprintCalls) {
+            com.capybee.engine.generation.blueprint.BlueprintGenerationRequest preparation,
+            BlueprintGenerationResult.CandidateReviewed reviewed) {
         MaterializedGameDefinitionVerifier.Verification verification;
         try {
             verification = new MaterializedGameDefinitionVerifier().verify(materialized);
@@ -116,7 +119,7 @@ final class DefaultEngine implements Engine {
         try {
             DynamicPresentationPipeline presentation;
             try {
-                presentation = new DynamicPresentationPipeline(materialized, preparation, blueprintCalls,
+                presentation = new DynamicPresentationPipeline(materialized, preparation, reviewed.evidence().attempts(),
                         textGenerator, ids, clock);
             } catch (DynamicPresentationPipeline.ConfigurationException exception) {
                 return dynamicFailure("DYNAMIC_PRESENTATION_CONFIGURATION_INVALID");
@@ -132,6 +135,8 @@ final class DefaultEngine implements Engine {
             RunImpl run = new RunImpl(runId, definition, seed, Map.of(), now, now, 0L, startId,
                     new ArrayList<>(List.of(startId)), false, null, clock, null,
                     null, null, piiScrubber, null, presentation);
+            DynamicGameBundle bundle = DynamicGamePersistence.bundle(reviewed, materialized, presentation.continuation());
+            run.attachDynamicBundle(bundle);
             if (run.startupIssues().stream().anyMatch(issue -> issue.severity() == Issue.Severity.ERROR)) {
                 return dynamicFailure("DYNAMIC_START_FAILED");
             }
@@ -222,6 +227,7 @@ final class DefaultEngine implements Engine {
             issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_INVALID", "Snapshot is missing"));
             return new ResumeResult(null, issues);
         }
+        if (snapshot.snapshotVersion() == 2 || snapshot.dynamicGame()) return resumeDynamic(snapshot);
         if (snapshot.snapshotVersion() != 1 || snapshot.pack() == null || snapshot.pack().id() == null
             || snapshot.pack().version() == null || snapshot.state() == null || snapshot.runId() == null
             || snapshot.runId().isBlank() || snapshot.createdAt() == null || snapshot.updatedAt() == null
@@ -302,6 +308,50 @@ final class DefaultEngine implements Engine {
             sceneSet, clock, rules, restoredState, placeMap, inputGuard, inputInterpreter, piiScrubber,
             generationPipeline);
         return new ResumeResult(run, issues);
+    }
+
+    private ResumeResult resumeDynamic(RunSnapshot snapshot) {
+        List<Issue> issues = new ArrayList<>();
+        try {
+            if (snapshot.snapshotVersion() != 2 || snapshot.dynamic() == null || snapshot.pack() != null
+                    || snapshot.state() == null || snapshot.runId() == null || snapshot.runId().isBlank()
+                    || snapshot.createdAt() == null || snapshot.updatedAt() == null || snapshot.step() < 0
+                    || snapshot.locale() == null || !snapshot.startInputs().isEmpty()
+                    || !snapshot.state().generationArtifacts().isEmpty()) {
+                return dynamicResumeFailure("DYNAMIC_SNAPSHOT_INVALID");
+            }
+            DynamicGameBundle bundle = snapshot.dynamic().bundle();
+            var verification = DynamicGamePersistence.verify(bundle);
+            if (!verification.valid()) return dynamicResumeFailure(verification.code());
+            MaterializedGameDefinition materialized = bundle.definition();
+            if (!snapshot.locale().equals(materialized.locale())) return dynamicResumeFailure("DYNAMIC_SNAPSHOT_INVALID");
+            SceneSet scenes = materialized.runtimeSceneSet();
+            if (!scenes.scenes().containsKey(snapshot.state().sceneId())) return dynamicResumeFailure("DYNAMIC_SNAPSHOT_INVALID");
+            Set<String> artifactScenes = new HashSet<>();
+            snapshot.dynamic().artifacts().forEach(a -> artifactScenes.add(a.sceneId()));
+            if (!artifactScenes.containsAll(snapshot.state().visited())) return dynamicResumeFailure("DYNAMIC_ARTIFACT_INVALID");
+            RunState restored = migrateState(snapshot.state(), materialized.runtimeRules(), scenes, null, false, issues);
+            if (issues.stream().anyMatch(i -> i.severity() == Issue.Severity.ERROR))
+                return dynamicResumeFailure("DYNAMIC_SNAPSHOT_INVALID");
+            DynamicPresentationPipeline presentation = new DynamicPresentationPipeline(materialized,
+                    bundle.continuation(), snapshot.dynamic().totalProviderCalls(), snapshot.dynamic().artifacts(),
+                    textGenerator, ids, clock);
+            RunImpl run = new RunImpl(snapshot.runId(), new DynamicRuntimeGameDefinition(materialized), snapshot.seed(),
+                    Map.of(), snapshot.createdAt(), snapshot.updatedAt(), snapshot.step(), restored.sceneId(),
+                    new ArrayList<>(restored.visited()), restored.ended(), restored.endReason(), clock, restored,
+                    null, null, piiScrubber, null, presentation);
+            run.attachDynamicBundle(bundle);
+            run.view();
+            return new ResumeResult(run, List.of());
+        } catch (RuntimeException exception) {
+            if (Boolean.getBoolean("capybee.debug.resume")) exception.printStackTrace();
+            return dynamicResumeFailure("DYNAMIC_RESUME_FAILED");
+        }
+    }
+
+    private static ResumeResult dynamicResumeFailure(String code) {
+        return new ResumeResult(null, List.of(new Issue(Issue.Severity.ERROR, code,
+                "Dynamic snapshot could not be restored safely")));
     }
 
     private RunState migrateState(RunState saved, Rules rules, SceneSet scenes, PlaceMap placeMap,
