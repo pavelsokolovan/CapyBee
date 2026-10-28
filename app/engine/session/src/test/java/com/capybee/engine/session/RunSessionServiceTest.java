@@ -155,6 +155,100 @@ class RunSessionServiceTest {
     }
 
     @Test
+    void activatesAndAtomicallyReplacesVerifiedDynamicRuns() {
+        UUID firstId = UUID.randomUUID();
+        RunSnapshot first = DynamicSnapshotFixture.create(firstId, CLOCK);
+
+        RunSummary activated = service.activateDynamic(owner, firstId, first);
+        assertThat(activated.dynamicGame()).isTrue();
+        assertThat(activated.status()).isEqualTo(RunStatus.ACTIVE);
+        assertThat(service.activateDynamic(owner, firstId, first).runId()).isEqualTo(firstId);
+
+        UUID replacementId = UUID.randomUUID();
+        RunSnapshot replacement = DynamicSnapshotFixture.create(replacementId, CLOCK);
+        RunSummary replaced = service.replaceWithDynamic(owner, firstId, replacementId, replacement);
+        assertThat(replaced.runId()).isEqualTo(replacementId);
+        assertThat(store.find(firstId, owner).orElseThrow().status()).isEqualTo(RunStatus.SUSPENDED);
+        assertThat(store.findCurrent(owner).orElseThrow().id()).isEqualTo(replacementId);
+        assertThat(service.replaceWithDynamic(owner, firstId, replacementId, replacement).runId())
+                .isEqualTo(replacementId);
+
+        UUID conflictId = UUID.randomUUID();
+        assertThatThrownBy(() -> service.replaceWithDynamic(owner, firstId, conflictId,
+                DynamicSnapshotFixture.create(conflictId, CLOCK)))
+                .isInstanceOf(SessionException.class)
+                .extracting(error -> ((SessionException) error).code())
+                .isEqualTo(ErrorCode.REVISION_CONFLICT);
+        assertThat(store.findCurrent(owner).orElseThrow().id()).isEqualTo(replacementId);
+    }
+
+    @Test
+    void dynamicPublicationRequiresExactFreshResumeAndMapsDurableFailure() {
+        UUID runId = UUID.randomUUID();
+        RunSnapshot snapshot = DynamicSnapshotFixture.create(runId, CLOCK);
+        AtomicInteger resumes = new AtomicInteger();
+        Engine changingEngine = new Engine() {
+            @Override public StartResult start(com.capybee.engine.api.RunRequest request) {
+                throw new AssertionError("dynamic verification must not start a Pack run");
+            }
+            @Override public ResumeResult resume(RunSnapshot value) {
+                resumes.incrementAndGet();
+                RunSnapshot changed = new RunSnapshot(value.snapshotVersion(), value.runId(), value.pack(),
+                        value.dynamic(), value.locale(), value.seed(), value.startInputs(), value.createdAt(),
+                        value.updatedAt(), value.step() + 1, value.state());
+                return new ResumeResult(new TestRun(changed), List.of());
+            }
+        };
+        RunSessionService rejecting = new RunSessionService(new TestPackCatalog(pack()), store, store, store, store,
+                (ignoredOwner, ignoredId, priority) -> changingEngine, CLOCK::instant, SessionLimits.defaults(),
+                store, DIRECT, new byte[32]);
+
+        assertThatThrownBy(() -> rejecting.activateDynamic(owner, runId, snapshot))
+                .isInstanceOf(SessionException.class)
+                .extracting(error -> ((SessionException) error).code())
+                .isEqualTo(ErrorCode.RUN_UNRECOVERABLE);
+        assertThat(resumes).hasValue(1);
+        assertThat(store.find(runId, owner)).isEmpty();
+
+        SessionPorts.RunRepository failing = (SessionPorts.RunRepository) java.lang.reflect.Proxy.newProxyInstance(
+                getClass().getClassLoader(), new Class<?>[]{SessionPorts.RunRepository.class}, (proxy, method, args) -> {
+                    if (method.getName().equals("activateDynamic")) {
+                        throw new StoreException(StoreException.Code.STORE_WRITE_FAILED);
+                    }
+                    try { return method.invoke(store, args); }
+                    catch (java.lang.reflect.InvocationTargetException failure) { throw failure.getCause(); }
+                });
+        RunSessionService unavailable = new RunSessionService(new TestPackCatalog(pack()), failing, store, store, store,
+                (ignoredOwner, ignoredId, priority) -> new TestEngine(ignoredId, pack()), CLOCK::instant,
+                SessionLimits.defaults(), store, DIRECT, new byte[32]);
+        assertThatThrownBy(() -> unavailable.activateDynamic(owner, runId, snapshot))
+                .isInstanceOf(SessionException.class)
+                .extracting(error -> ((SessionException) error).code())
+                .isEqualTo(ErrorCode.SERVICE_UNAVAILABLE);
+        assertThat(store.find(runId, owner)).isEmpty();
+    }
+
+    @Test
+    void dynamicActivationPreservesOwnerIsolationAndOpenRunConflict() {
+        UUID occupied = UUID.randomUUID();
+        RunSnapshot snapshot = DynamicSnapshotFixture.create(occupied, CLOCK);
+        store.activateDynamic(new OwnerRef("other-profile"), occupied, snapshot, CLOCK.instant());
+        assertThatThrownBy(() -> service.activateDynamic(owner, occupied, snapshot))
+                .isInstanceOf(SessionException.class)
+                .extracting(error -> ((SessionException) error).code())
+                .isEqualTo(ErrorCode.RUN_NOT_FOUND);
+
+        UUID current = UUID.randomUUID();
+        service.start(owner, new StartRequest(current, PACK_ID, LOCALE, Map.of(), null, false));
+        UUID next = UUID.randomUUID();
+        assertThatThrownBy(() -> service.activateDynamic(owner, next, DynamicSnapshotFixture.create(next, CLOCK)))
+                .isInstanceOf(SessionException.class)
+                .extracting(error -> ((SessionException) error).code())
+                .isEqualTo(ErrorCode.RUN_ALREADY_ACTIVE);
+        assertThat(store.findCurrent(owner).orElseThrow().id()).isEqualTo(current);
+    }
+
+    @Test
     void reportsCompletedCommandStatusAndReadsRunEvents() {
         UUID runId = UUID.randomUUID();
         service.start(owner, new StartRequest(runId, PACK_ID, LOCALE, Map.of(), null, false));

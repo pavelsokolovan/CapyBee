@@ -74,13 +74,11 @@ public final class InMemorySessionStore implements SessionPorts.SessionStore {
 
     @Override
     public synchronized CreateOutcome activateDynamic(OwnerRef owner, UUID runId, RunSnapshot snapshot, Instant createdAt) {
-        if (snapshot == null || !snapshot.dynamicGame() || snapshot.snapshotVersion() != 2
-                || !runId.toString().equals(snapshot.runId())
-                || !DynamicGamePersistence.verify(snapshot.dynamic().bundle()).valid())
-            throw new IllegalArgumentException("invalid dynamic snapshot");
+        requireValidDynamic(runId, snapshot);
         StoredRun existing = runs.get(runId);
-        if (existing != null) return new CreateOutcome(existing.owner().equals(owner)
-                ? CreateKind.EXISTS_SAME_OWNER : CreateKind.EXISTS_OTHER_OWNER, existing.id());
+        if (existing != null) return existing.owner().equals(owner) && sameDynamicIdentity(existing.snapshot(), snapshot)
+                ? new CreateOutcome(CreateKind.EXISTS_SAME_OWNER, existing.id())
+                : new CreateOutcome(CreateKind.EXISTS_OTHER_OWNER, existing.id());
         Optional<StoredRun> active = runs.values().stream().filter(r -> r.owner().equals(owner))
                 .filter(r -> r.status() == RunStatus.PREPARING || r.status() == RunStatus.ACTIVE).findFirst();
         if (active.isPresent()) return new CreateOutcome(CreateKind.OWNER_HAS_ACTIVE, active.get().id());
@@ -88,22 +86,21 @@ public final class InMemorySessionStore implements SessionPorts.SessionStore {
         runs.put(runId, new StoredRun(runId, owner, null, snapshot.locale(),
                 snapshot.state().ended() ? RunStatus.ENDED : RunStatus.ACTIVE, 0, snapshot, null, null, null,
                 snapshot.dynamic().totalProviderCalls(), now, now, null, now, null, null));
+        runReservations.put(runId.toString(), snapshot.dynamic().totalProviderCalls());
         return new CreateOutcome(CreateKind.CREATED, runId);
     }
 
     @Override
     public synchronized CreateOutcome replaceWithDynamic(OwnerRef owner, UUID expectedCurrentRunId, UUID runId,
                                                           RunSnapshot snapshot, Instant createdAt) {
+        requireValidDynamic(runId, snapshot);
+        StoredRun existing = runs.get(runId);
+        if (existing != null) return existing.owner().equals(owner) && sameDynamicIdentity(existing.snapshot(), snapshot)
+                ? new CreateOutcome(CreateKind.EXISTS_SAME_OWNER, existing.id())
+                : new CreateOutcome(CreateKind.EXISTS_OTHER_OWNER, existing.id());
         StoredRun current = runs.get(expectedCurrentRunId);
         if (current == null || !current.owner().equals(owner) || current.status() != RunStatus.ACTIVE)
             return new CreateOutcome(CreateKind.OWNER_HAS_ACTIVE, current == null ? null : current.id());
-        StoredRun existing = runs.get(runId);
-        if (existing != null) return new CreateOutcome(existing.owner().equals(owner)
-                ? CreateKind.EXISTS_SAME_OWNER : CreateKind.EXISTS_OTHER_OWNER, existing.id());
-        if (snapshot == null || !snapshot.dynamicGame() || snapshot.snapshotVersion() != 2
-                || !runId.toString().equals(snapshot.runId())
-                || !DynamicGamePersistence.verify(snapshot.dynamic().bundle()).valid())
-            throw new IllegalArgumentException("invalid dynamic snapshot");
         Instant now = createdAt == null ? clock.instant() : createdAt;
         runs.put(current.id(), new StoredRun(current.id(), current.owner(), current.packId(), current.locale(),
                 RunStatus.SUSPENDED, current.revision(), current.snapshot(), current.pendingStart(), null,
@@ -112,7 +109,23 @@ public final class InMemorySessionStore implements SessionPorts.SessionStore {
         runs.put(runId, new StoredRun(runId, owner, null, snapshot.locale(),
                 snapshot.state().ended() ? RunStatus.ENDED : RunStatus.ACTIVE, 0, snapshot, null, null, null,
                 snapshot.dynamic().totalProviderCalls(), now, now, null, now, null, null));
+        runReservations.put(runId.toString(), snapshot.dynamic().totalProviderCalls());
         return new CreateOutcome(CreateKind.CREATED, runId);
+    }
+
+    private static void requireValidDynamic(UUID runId, RunSnapshot snapshot) {
+        if (runId == null || snapshot == null || !snapshot.dynamicGame() || snapshot.snapshotVersion() != 2
+                || !runId.toString().equals(snapshot.runId()) || snapshot.dynamic() == null
+                || !DynamicGamePersistence.verify(snapshot.dynamic().bundle()).valid()) {
+            throw new IllegalArgumentException("invalid dynamic snapshot");
+        }
+    }
+
+    private static boolean sameDynamicIdentity(RunSnapshot stored, RunSnapshot incoming) {
+        return stored != null && stored.dynamicGame() && incoming != null && incoming.dynamicGame()
+                && stored.runId().equals(incoming.runId())
+                && stored.dynamic().bundle().gameFingerprint()
+                .equals(incoming.dynamic().bundle().gameFingerprint());
     }
 
     @Override

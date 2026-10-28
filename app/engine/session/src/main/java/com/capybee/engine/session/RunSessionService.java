@@ -81,12 +81,14 @@ public final class RunSessionService {
         if (owner == null || runId == null || snapshot == null || !snapshot.dynamicGame())
             throw new SessionException(ErrorCode.REQUEST_INVALID);
         RunSnapshot owned = withRunId(snapshot, runId);
-        ResumeResult verified = resume(owner, owned, runId);
-        if (!verified.ok()) throw new SessionException(ErrorCode.RUN_UNRECOVERABLE);
-        var created = runs.activateDynamic(owner, runId, owned, clock.now());
+        verifyDynamicResume(owner, runId, owned);
+        final SessionPorts.CreateOutcome created;
+        try { created = runs.activateDynamic(owner, runId, owned, clock.now()); }
+        catch (StoreException failure) { throw new SessionException(ErrorCode.SERVICE_UNAVAILABLE); }
         if (created.kind() == CreateKind.OWNER_HAS_ACTIVE) throw new SessionException(ErrorCode.RUN_ALREADY_ACTIVE);
         if (created.kind() == CreateKind.EXISTS_OTHER_OWNER) throw new SessionException(ErrorCode.RUN_NOT_FOUND);
-        return summary(requireRun(owner, runId));
+        try { return summary(requireRun(owner, runId)); }
+        catch (StoreException failure) { throw new SessionException(ErrorCode.SERVICE_UNAVAILABLE); }
     }
 
     public RunSummary replaceWithDynamic(OwnerRef owner, UUID expectedCurrentRunId, UUID runId,
@@ -94,11 +96,21 @@ public final class RunSessionService {
         if (owner == null || expectedCurrentRunId == null || runId == null || snapshot == null || !snapshot.dynamicGame())
             throw new SessionException(ErrorCode.REQUEST_INVALID);
         RunSnapshot owned = withRunId(snapshot, runId);
-        if (!resume(owner, owned, runId).ok()) throw new SessionException(ErrorCode.RUN_UNRECOVERABLE);
-        var created = runs.replaceWithDynamic(owner, expectedCurrentRunId, runId, owned, clock.now());
+        verifyDynamicResume(owner, runId, owned);
+        final SessionPorts.CreateOutcome created;
+        try { created = runs.replaceWithDynamic(owner, expectedCurrentRunId, runId, owned, clock.now()); }
+        catch (StoreException failure) { throw new SessionException(ErrorCode.SERVICE_UNAVAILABLE); }
         if (created.kind() == CreateKind.OWNER_HAS_ACTIVE) throw new SessionException(ErrorCode.REVISION_CONFLICT);
         if (created.kind() == CreateKind.EXISTS_OTHER_OWNER) throw new SessionException(ErrorCode.RUN_NOT_FOUND);
-        return summary(requireRun(owner, runId));
+        try { return summary(requireRun(owner, runId)); }
+        catch (StoreException failure) { throw new SessionException(ErrorCode.SERVICE_UNAVAILABLE); }
+    }
+
+    private void verifyDynamicResume(OwnerRef owner, UUID runId, RunSnapshot snapshot) {
+        ResumeResult verified = resume(owner, snapshot, runId);
+        if (!verified.ok() || verified.run() == null || !snapshot.equals(verified.run().snapshot())) {
+            throw new SessionException(ErrorCode.RUN_UNRECOVERABLE);
+        }
     }
 
     public RunSessionService(PackCatalog packs, RunRepository runs, CommandLog commands,

@@ -10,6 +10,7 @@ import com.capybee.engine.generation.GenerationQualityEvaluator;
 import com.capybee.engine.pack.LocaleTag;
 import com.capybee.engine.pack.PackId;
 import com.capybee.engine.pack.PackVersion;
+import com.capybee.engine.session.DynamicSnapshotFixture;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.ObjectMapper;
@@ -80,6 +81,98 @@ class LocalSessionStoreTest {
             assertThat(restored.snapshot()).isEqualTo(new RunSnapshot(1, id.toString(), new PackRef(pack, new PackVersion(1, 0, 0)), locale, 4, Map.of(), clock.instant(), clock.instant(), 0, new RunState("start", List.of("start"), false, null)));
             assertThat(restored.pendingStart()).isNull();
             assertThat(reopened.tryClaim(id, new OwnerRef("different-owner"), Duration.ofSeconds(5))).isEmpty();
+        }
+    }
+
+    @Test
+    void persistsDynamicActivationIdentityAndCountersExactlyAcrossReopen() {
+        Clock clock = Clock.fixed(Instant.parse("2026-10-19T10:00:00Z"), ZoneOffset.UTC);
+        OwnerRef owner = new OwnerRef("dynamic-owner");
+        UUID id = UUID.randomUUID();
+        RunSnapshot snapshot = DynamicSnapshotFixture.create(id, clock);
+
+        try (LocalSessionStore store = LocalSessionStore.open(directory, clock)) {
+            assertThat(store.activateDynamic(owner, id, snapshot, clock.instant()).kind()).isEqualTo(CREATED);
+            StoredRun created = store.find(id, owner).orElseThrow();
+            assertThat(created.gameRef()).isInstanceOf(DynamicGameRef.class);
+            assertThat(created.generationCalls()).isEqualTo(snapshot.dynamic().totalProviderCalls());
+            assertThat(store.activateDynamic(owner, id, snapshot, clock.instant().plusSeconds(30)).kind())
+                    .isEqualTo(com.capybee.engine.session.SessionPorts.CreateKind.EXISTS_SAME_OWNER);
+            assertThat(store.activateDynamic(new OwnerRef("other"), id, snapshot, clock.instant()).kind())
+                    .isEqualTo(com.capybee.engine.session.SessionPorts.CreateKind.EXISTS_OTHER_OWNER);
+        }
+
+        try (LocalSessionStore reopened = LocalSessionStore.open(directory, clock)) {
+            StoredRun restored = reopened.find(id, owner).orElseThrow();
+            assertThat(restored.snapshot()).isEqualTo(snapshot);
+            assertThat(SnapshotCodec.toJson(restored.snapshot())).isEqualTo(SnapshotCodec.toJson(snapshot));
+            assertThat(restored.revision()).isZero();
+            assertThat(restored.status()).isEqualTo(RunStatus.ACTIVE);
+            assertThat(restored.generationCalls()).isEqualTo(snapshot.dynamic().totalProviderCalls());
+            assertThat(reopened.findCurrent(owner).orElseThrow().id()).isEqualTo(id);
+            assertThat(restored.gameRef()).isEqualTo(new DynamicGameRef(
+                    snapshot.dynamic().bundle().definition().profileIdentity(),
+                    snapshot.dynamic().bundle().gameFingerprint()));
+        }
+    }
+
+    @Test
+    void dynamicReplacementIsAtomicAndReopensAsCompleteNewState() {
+        Clock clock = Clock.fixed(Instant.parse("2026-10-19T10:00:00Z"), ZoneOffset.UTC);
+        OwnerRef owner = new OwnerRef("replace-owner");
+        UUID oldId = UUID.randomUUID();
+        PackId pack = new PackId("test-pack");
+        LocaleTag locale = new LocaleTag("en");
+        UUID newId = UUID.randomUUID();
+        RunSnapshot replacement = DynamicSnapshotFixture.create(newId, clock);
+
+        try (LocalSessionStore store = LocalSessionStore.open(directory, clock)) {
+            store.createPreparing(new NewRun(oldId, owner, pack, "1.0.0", locale, Map.of(), 4L, false,
+                    clock.instant()));
+            Lease lease = store.tryClaim(oldId, owner, Duration.ofSeconds(10)).orElseThrow();
+            RunSnapshot old = new RunSnapshot(1, oldId.toString(), new PackRef(pack, new PackVersion(1, 0, 0)),
+                    locale, 4, Map.of(), clock.instant(), clock.instant(), 0,
+                    new RunState("start", List.of("start"), false, null));
+            assertThat(store.saveActive(oldId, lease, 0, old, List.of())).isTrue();
+
+            assertThatThrownBy(() -> store.replaceWithDynamic(owner, oldId, UUID.randomUUID(), replacement,
+                    clock.instant())).isInstanceOf(IllegalArgumentException.class);
+            assertThat(store.find(oldId, owner).orElseThrow().status()).isEqualTo(RunStatus.ACTIVE);
+            assertThat(store.findCurrent(owner).orElseThrow().id()).isEqualTo(oldId);
+
+            assertThat(store.replaceWithDynamic(owner, oldId, newId, replacement, clock.instant()).kind())
+                    .isEqualTo(CREATED);
+            assertThat(store.find(oldId, owner).orElseThrow().status()).isEqualTo(RunStatus.SUSPENDED);
+            assertThat(store.findCurrent(owner).orElseThrow().id()).isEqualTo(newId);
+            assertThat(store.replaceWithDynamic(owner, oldId, newId, replacement, clock.instant()).kind())
+                    .isEqualTo(com.capybee.engine.session.SessionPorts.CreateKind.EXISTS_SAME_OWNER);
+        }
+
+        try (LocalSessionStore reopened = LocalSessionStore.open(directory, clock)) {
+            assertThat(reopened.find(oldId, owner).orElseThrow().status()).isEqualTo(RunStatus.SUSPENDED);
+            assertThat(reopened.find(newId, owner).orElseThrow().snapshot()).isEqualTo(replacement);
+            assertThat(reopened.findCurrent(owner).orElseThrow().id()).isEqualTo(newId);
+        }
+    }
+
+    @Test
+    void endedDynamicRunReopensEndedWithoutGeneration() {
+        Clock clock = Clock.fixed(Instant.parse("2026-10-19T10:00:00Z"), ZoneOffset.UTC);
+        OwnerRef owner = new OwnerRef("ended-owner");
+        UUID id = UUID.randomUUID();
+        RunSnapshot ended = DynamicSnapshotFixture.ended(id, clock);
+
+        try (LocalSessionStore store = LocalSessionStore.open(directory, clock)) {
+            assertThat(store.activateDynamic(owner, id, ended, clock.instant()).kind()).isEqualTo(CREATED);
+            assertThat(store.find(id, owner).orElseThrow().status()).isEqualTo(RunStatus.ENDED);
+            assertThat(store.findCurrent(owner)).isEmpty();
+        }
+        try (LocalSessionStore reopened = LocalSessionStore.open(directory, clock)) {
+            assertThat(reopened.find(id, owner).orElseThrow()).satisfies(run -> {
+                assertThat(run.status()).isEqualTo(RunStatus.ENDED);
+                assertThat(run.snapshot()).isEqualTo(ended);
+                assertThat(run.snapshot().state().ended()).isTrue();
+            });
         }
     }
 

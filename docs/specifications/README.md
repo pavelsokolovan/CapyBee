@@ -71,6 +71,7 @@ list. The current implementation boundary is:
 - [27.25](27.25-engine-blueprint-driven-lazy-scene-generation-instruction.md) - Definition-bound lazy presentation, strict scene output, shared budgets, complete fallback, dynamic views/endings, and source-neutral prefetch (implemented; in-memory and not durable)
 - [27.26](27.26-engine-dynamic-game-persistence-and-resume-instruction.md) - Canonical blueprint/definition/artifact persistence, dynamic snapshot v2, game fingerprints, store v5 migration, and exact no-regeneration resume (implemented)
 - [27.27](27.27-engine-dynamic-game-cli-testing-and-release-readiness-instruction.md) - Profile-driven dynamic CLI setup/start/resume, trusted session-owned start, real second-process recovery, packaged profile, and offline release certification (implemented)
+- [27.27.2](27.27.2-engine-dynamic-session-atomicity-recovery-and-compatibility-instruction.md) - Atomic dynamic activation/replacement, exact source-neutral recovery, Willow Marsh fresh-process compatibility, and full session coverage/certification gates (implemented)
 - 28 - Client rendering contract
 - 29 - CapyBee Polish game pack and game-pack integration
 

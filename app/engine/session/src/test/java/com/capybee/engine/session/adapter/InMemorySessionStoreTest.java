@@ -1,6 +1,7 @@
 package com.capybee.engine.session.adapter;
 
 import com.capybee.engine.api.Event;
+import com.capybee.engine.session.DynamicSnapshotFixture;
 import com.capybee.engine.port.TextGenerationResult;
 import com.capybee.engine.session.MeteredTextGenerator;
 import org.junit.jupiter.api.Test;
@@ -53,6 +54,59 @@ class InMemorySessionStoreTest {
         assertThat(store.createPreparing(new NewRun(UUID.randomUUID(), owner, run.packId(), run.packVersion(), run.locale(),
                 Map.of(), null, false, clock.instant())).kind()).isEqualTo(CreateKind.OWNER_HAS_ACTIVE);
         assertThat(store.tryClaim(runId, owner, Duration.ofSeconds(5))).isPresent();
+    }
+
+    @Test
+    void activatesAndReplaysVerifiedDynamicSnapshotWithoutResettingState() {
+        OwnerRef owner = new OwnerRef("dynamic-owner");
+        UUID runId = UUID.randomUUID();
+        var snapshot = DynamicSnapshotFixture.create(runId, clock);
+
+        assertThat(store.activateDynamic(owner, runId, snapshot, clock.instant()).kind())
+                .isEqualTo(CreateKind.CREATED);
+        StoredRun created = store.find(runId, owner).orElseThrow();
+        assertThat(created.status()).isEqualTo(RunStatus.ACTIVE);
+        assertThat(created.packId()).isNull();
+        assertThat(created.snapshot()).isEqualTo(snapshot);
+        assertThat(created.generationCalls()).isEqualTo(snapshot.dynamic().totalProviderCalls());
+
+        assertThat(store.activateDynamic(owner, runId, snapshot, clock.instant().plusSeconds(30)).kind())
+                .isEqualTo(CreateKind.EXISTS_SAME_OWNER);
+        assertThat(store.find(runId, owner).orElseThrow()).isEqualTo(created);
+        assertThat(store.activateDynamic(new OwnerRef("other"), runId, snapshot, clock.instant()).kind())
+                .isEqualTo(CreateKind.EXISTS_OTHER_OWNER);
+        assertThatThrownBy(() -> store.activateDynamic(owner, UUID.randomUUID(), snapshot, clock.instant()))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void replacesCurrentRunAtomicallyAndRejectsInvalidReplacementBeforeMutation() {
+        OwnerRef owner = new OwnerRef("dynamic-owner");
+        UUID oldId = UUID.randomUUID();
+        store.createPreparing(new NewRun(oldId, owner, new com.capybee.engine.pack.PackId("test"), "1.0.0",
+                new com.capybee.engine.pack.LocaleTag("en"), Map.of(), null, false, clock.instant()));
+        var lease = store.tryClaim(oldId, owner, Duration.ofSeconds(5)).orElseThrow();
+        var oldSnapshot = new com.capybee.engine.api.RunSnapshot(1, oldId.toString(),
+                new com.capybee.engine.api.PackRef(new com.capybee.engine.pack.PackId("test"),
+                        new com.capybee.engine.pack.PackVersion(1, 0, 0)),
+                new com.capybee.engine.pack.LocaleTag("en"), 0, Map.of(), clock.instant(), clock.instant(), 0,
+                new com.capybee.engine.api.RunState("start", List.of("start"), false, null));
+        assertThat(store.saveActive(oldId, lease, 0, oldSnapshot, List.of())).isTrue();
+
+        UUID invalidId = UUID.randomUUID();
+        var replacement = DynamicSnapshotFixture.create(UUID.randomUUID(), clock);
+        assertThatThrownBy(() -> store.replaceWithDynamic(owner, oldId, invalidId, replacement, clock.instant()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(store.find(oldId, owner).orElseThrow().status()).isEqualTo(RunStatus.ACTIVE);
+        assertThat(store.findCurrent(owner).orElseThrow().id()).isEqualTo(oldId);
+
+        UUID newId = UUID.fromString(replacement.runId());
+        assertThat(store.replaceWithDynamic(owner, oldId, newId, replacement, clock.instant()).kind())
+                .isEqualTo(CreateKind.CREATED);
+        assertThat(store.find(oldId, owner).orElseThrow().status()).isEqualTo(RunStatus.SUSPENDED);
+        assertThat(store.findCurrent(owner).orElseThrow().id()).isEqualTo(newId);
+        assertThat(store.replaceWithDynamic(owner, oldId, newId, replacement, clock.instant()).kind())
+                .isEqualTo(CreateKind.EXISTS_SAME_OWNER);
     }
 
     @Test
