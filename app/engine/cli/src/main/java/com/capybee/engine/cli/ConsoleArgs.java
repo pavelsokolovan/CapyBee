@@ -24,6 +24,8 @@ public final class ConsoleArgs {
         boolean play = args.length > 0 && "play".equals(args[0]);
         int firstArgument = play ? 1 : 0;
         Path packDir = null;
+        Path profileDir = null;
+        boolean dynamic = false;
         LocaleTag locale = null;
         Map<String, String> inputs = new LinkedHashMap<>();
         Long seed = null;
@@ -54,6 +56,7 @@ public final class ConsoleArgs {
             switch (arg) {
                 case "--help" -> help = true;
                 case "--generated" -> generated = true;
+                case "--dynamic" -> dynamic = true;
                 case "--live-smoke" -> { liveSmoke = true; generated = true; }
                 case "--session" -> session = true;
                 case "--memory" -> memory = true;
@@ -87,6 +90,10 @@ public final class ConsoleArgs {
                 case "--pack-dir" -> {
                     if (index + 1 >= args.length) return new ParseResult(null, "Missing value for --pack-dir.");
                     packDir = Path.of(args[++index]);
+                }
+                case "--profile-dir" -> {
+                    if (index + 1 >= args.length) return new ParseResult(null, "Missing value for --profile-dir.");
+                    profileDir = Path.of(args[++index]);
                 }
                 case "--locale" -> {
                     if (index + 1 >= args.length) return new ParseResult(null, "Missing value for --locale.");
@@ -139,7 +146,7 @@ public final class ConsoleArgs {
             }
         }
 
-        if (help && (packDir != null || locale != null || !inputs.isEmpty() || seed != null || script != null
+        if (help && (packDir != null || profileDir != null || dynamic || locale != null || !inputs.isEmpty() || seed != null || script != null
                 || save != null || load != null || generated || liveSmoke || session || storeDir != null
                 || runId != null || newRun || debug || prefetch != null || callsPerDay != null || runCalls != null
                 || memory || classic || continueRun || replaceCurrent || acceptGenerationDisclosure || offline)) {
@@ -154,6 +161,14 @@ public final class ConsoleArgs {
             return new ParseResult(null, "--live-smoke requires --script and cannot be combined with --load.");
         }
         if (liveSmoke && offline) return new ParseResult(null, "--live-smoke cannot be combined with --offline.");
+        if (dynamic && packDir != null) return new ParseResult(null, "--dynamic cannot be combined with --pack-dir.");
+        if (profileDir != null && !dynamic) return new ParseResult(null, "--profile-dir requires --dynamic.");
+        if (dynamic && profileDir == null && runId == null && !continueRun)
+            return new ParseResult(null, "A profile directory is required for a new dynamic game.");
+        if (dynamic && (classic || generated || liveSmoke || save != null || load != null))
+            return new ParseResult(null, "--dynamic cannot be combined with Pack-only or classic options.");
+        if (dynamic && !inputs.isEmpty())
+            return new ParseResult(null, "--input is not accepted for dynamic play; use the reviewed setup wizard.");
 
         if (play && !classic) session = true;
         if (!session && (storeDir != null || runId != null || newRun || debug || prefetch != null || callsPerDay != null || runCalls != null
@@ -174,7 +189,7 @@ public final class ConsoleArgs {
         if (continueRun && (newRun || replaceCurrent || runId != null)) return new ParseResult(null, "--continue cannot be combined with --new, --replace-current or --run.");
         if (replaceCurrent && !newRun) return new ParseResult(null, "--replace-current requires --new.");
 
-        return new ParseResult(new ConsoleOptions(packDir, locale, inputs, seed, script, save, load,
+        return new ParseResult(new ConsoleOptions(packDir, profileDir, dynamic, locale, inputs, seed, script, save, load,
             generated, liveSmoke, help, session, storeDir, runId, newRun, debug, prefetch, callsPerDay, runCalls,
             play, memory, classic, continueRun, replaceCurrent, noColor, acceptGenerationDisclosure, offline), null);
     }

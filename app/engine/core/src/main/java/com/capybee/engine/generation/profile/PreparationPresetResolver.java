@@ -25,12 +25,18 @@ public final class PreparationPresetResolver {
             else if (!inputs.containsKey(id)) issue(issues, "PREPARATION_INPUT_INVALID");
         }
         Map<String, List<String>> values = new LinkedHashMap<>();
+        Map<String, ProfileSetup.SetupQuestion> questions = new LinkedHashMap<>();
+        profile.setup().questions().forEach(question -> questions.put(question.inputId(), question));
         for (int i = 0; i < profile.setup().inputs().size(); i++) {
             StartInputDef input = profile.setup().inputs().get(i);
             if (input instanceof StartInputDef.FreeTextInput) continue;
             PreparationAnswer answer = submitted.get(input.id());
             List<String> chosen;
-            if (answer == null) chosen = profile.setup().questions().get(i).defaultValues();
+            if (answer == null) {
+                ProfileSetup.SetupQuestion question = questions.get(input.id());
+                if (question == null) { issue(issues, "PREPARATION_INPUT_INVALID"); continue; }
+                chosen = question.defaultValues();
+            }
             else if (answer instanceof PreparationAnswer.Cleared) chosen = List.of();
             else chosen = ((PreparationAnswer.Selected) answer).values();
             validate(input, chosen, issues);

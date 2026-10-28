@@ -109,4 +109,23 @@ class ConsoleArgsTest {
         assertThat(ConsoleArgs.parse(new String[]{"play", "--pack-dir", "packs/demo", "--replace-current"}).error())
                 .isEqualTo("--replace-current requires --new.");
     }
+
+    @Test
+    void parsesDynamicEntryAndRejectsAmbiguousOrPrivacyUnsafeCombinations() {
+        var dynamic = ConsoleArgs.parse(new String[]{"play", "--dynamic", "--profile-dir", "profiles/adventure",
+                "--locale", "pl", "--seed", "7", "--memory"});
+        assertThat(dynamic.ok()).isTrue();
+        assertThat(dynamic.options().dynamic()).isTrue();
+        assertThat(dynamic.options().profileDir()).isEqualTo(Path.of("profiles/adventure"));
+        assertThat(dynamic.options().session()).isTrue();
+
+        assertThat(ConsoleArgs.parse(new String[]{"play", "--dynamic", "--pack-dir", "packs/demo",
+                "--profile-dir", "profiles/adventure"}).error()).contains("cannot be combined");
+        assertThat(ConsoleArgs.parse(new String[]{"play", "--profile-dir", "profiles/adventure"}).error())
+                .isEqualTo("--profile-dir requires --dynamic.");
+        assertThat(ConsoleArgs.parse(new String[]{"play", "--dynamic", "--profile-dir", "profiles/adventure",
+                "--input", "story-wish=private"}).error()).contains("reviewed setup wizard");
+        assertThat(ConsoleArgs.parse(new String[]{"play", "--dynamic", "--continue", "--store-dir", "runs"}).ok())
+                .isTrue();
+    }
 }

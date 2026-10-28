@@ -50,7 +50,7 @@ final class SessionConsole {
         }
         out.println("Saved game found");
         out.println("Story: " + ConsoleRenderer.sanitize(current.view() != null && current.view().story() != null
-                ? current.view().story().title() : current.packId().value()));
+                ? current.view().story().title() : current.dynamicGame() ? "Dynamic game" : current.packId().value()));
         out.println("Status: " + (current.status() == SessionTypes.RunStatus.ACTIVE ? "In progress" : current.status()));
         out.println("Last saved: " + current.updatedAt());
         out.println("\n1) Continue\n2) Start over\n3) Show details\n/quit) Leave");
@@ -64,8 +64,10 @@ final class SessionConsole {
                 if (answer != null && (answer.equalsIgnoreCase("y") || answer.equalsIgnoreCase("yes"))) return StartupChoice.NEW;
                 out.println("Cancelled.");
             } else if (line.trim().equals("3")) {
-                out.println("Run: " + current.runId() + "\nPack: " + current.packId().value() + " "
-                        + current.packVersion() + "\nLocale: " + current.locale().value() + "\nRevision: " + current.revision());
+                String source = current.dynamicGame() ? "Source: Dynamic game"
+                        : "Pack: " + current.packId().value() + " " + current.packVersion();
+                out.println("Run: " + current.runId() + "\n" + source
+                        + "\nLocale: " + current.locale().value() + "\nRevision: " + current.revision());
             } else out.println("Choose 1, 2, 3, or /quit.");
         }
     }
@@ -76,6 +78,14 @@ final class SessionConsole {
         if (input == null) return new InteractiveSetup.Result(true, java.util.Map.of());
         var locale = options.locale() == null ? pack.manifest().defaultLocale() : options.locale();
         return new InteractiveSetup(input, out).run(pack, locale, providerAvailable, options.inputs());
+    }
+
+    DynamicSetup.Result dynamicSetup(ConsoleOptions options,
+            com.capybee.engine.generation.profile.ValidatedGeneratorProfile profile,
+            com.capybee.engine.pack.LocaleTag locale, boolean providerAvailable) {
+        BufferedReader input = reader(options);
+        if (input == null) return new DynamicSetup.Result(true, java.util.Map.of(), null, 1);
+        return new DynamicSetup(input, out).run(profile, locale, providerAvailable);
     }
 
     SessionTypes.RunSummary awaitActive(RunSessionService sessions, SessionTypes.OwnerRef owner,
@@ -119,7 +129,8 @@ final class SessionConsole {
         SessionTypes.RunSummary summary = initialSummary;
         View view = summary.view();
         out.println("Run " + summary.runId());
-        out.println("Running " + summary.packId().value() + " in locale " + summary.locale().value());
+        out.println("Running " + (summary.dynamicGame() ? "dynamic game" : summary.packId().value())
+                + " in locale " + summary.locale().value());
         String header = ConsoleRenderer.renderHeader(view);
         if (!header.isEmpty()) out.println(header);
         out.println(renderView(options, view));
@@ -408,7 +419,7 @@ final class SessionConsole {
     }
 
     private ConsoleOptions withDebug(ConsoleOptions options, boolean debug) {
-        return new ConsoleOptions(options.packDir(), options.locale(), options.inputs(), options.seed(),
+        return new ConsoleOptions(options.packDir(), options.profileDir(), options.dynamic(), options.locale(), options.inputs(), options.seed(),
                 options.script(), options.save(), options.load(), options.generated(), options.liveSmoke(),
                 options.help(), options.session(), options.storeDir(), options.runId(), options.newRun(), debug,
                 options.prefetch(), options.callsPerDay(), options.runCalls(), options.play(), options.memory(),

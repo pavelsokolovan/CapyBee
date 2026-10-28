@@ -3,6 +3,10 @@ package com.capybee.engine.session;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.util.UUID;
+
+import com.capybee.engine.pack.LocaleTag;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -47,6 +51,22 @@ class SessionLimitsTest {
             assertThat(limits.prefetchGlobalReserve()).isEqualTo(100);
             assertThat(limits.prefetchRunReserve()).isEqualTo(4);
         }
+    }
+
+    @Test
+    void sourceNeutralValueTypesExposeSafeDefaultsAndDynamicOutcomes() {
+        assertThat(SessionTypes.RunQuery.visible())
+                .isEqualTo(new SessionTypes.RunQuery(false, false));
+        assertThat(SessionTypes.PurgeConfirmation.denied())
+                .isEqualTo(new SessionTypes.PurgeConfirmation(false, false, Duration.ofDays(30)));
+        var summary = new SessionTypes.RunSummary(UUID.randomUUID(), SessionTypes.RunStatus.ACTIVE,
+                0, null, null, new LocaleTag("en"), null, null, null, Instant.EPOCH);
+        assertThat(summary.dynamicGame()).isTrue();
+
+        assertThat(new DynamicStartCoordinator.Started(summary).run()).isSameAs(summary);
+        assertThat(new DynamicStartCoordinator.NeedsInput("INPUT_BLOCKED").code()).isEqualTo("INPUT_BLOCKED");
+        assertThat(new DynamicStartCoordinator.FallbackOffered("FALLBACK").code()).isEqualTo("FALLBACK");
+        assertThat(new DynamicStartCoordinator.Cancelled("CANCELLED").code()).isEqualTo("CANCELLED");
     }
 
     private SessionLimits limits(int fanout, int concurrent, int profileReserve,

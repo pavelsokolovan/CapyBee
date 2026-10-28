@@ -76,6 +76,8 @@ public final class ConsoleApp {
             return 0;
         }
 
+        if (options.dynamic()) return runDynamic(options);
+
         if (options.packDir() == null) {
             err.println("A pack directory is required.");
             return 2;
@@ -129,6 +131,7 @@ public final class ConsoleApp {
 
     private String consoleUsage() {
         return "Usage: java -jar engine-cli.jar play --pack-dir <dir> [--locale <tag>] [--generated] [--offline] [options]\n"
+                + "       java -jar engine-cli.jar play --dynamic --profile-dir <dir> [--locale <tag>] [options]\n"
                 + "       java -jar engine-cli.jar certify --help\n"
                 + "       Normal play is saved automatically. Use --memory for temporary play.\n"
                 + "       Missing provider configuration uses the complete reviewed fallback; --offline forces it.\n"
@@ -142,8 +145,36 @@ public final class ConsoleApp {
                 + "       Provider configuration: GENERATION_MODEL_ID and ANTHROPIC_API_KEY environment variables.";
     }
 
+    private int runDynamic(ConsoleOptions options) {
+        try {
+            if (options.profileDir() == null)
+                return DynamicSessionWiring.run(options, null, in, out, err, clock, ids, random,
+                        textGenerator, consoleTuning, sessionStore);
+            var loaded = ProfileDirectory.load(options.profileDir());
+            if (!loaded.valid()) {
+                loaded.issues().forEach(issue -> err.println(issue.code()));
+                return 1;
+            }
+            if (options.locale() != null && loaded.profile().orElseThrow().profile().supportedLocales().stream()
+                    .noneMatch(options.locale()::equals)) {
+                err.println("PROFILE_LOCALE_UNSUPPORTED");
+                return 2;
+            }
+            if (options.storeDir() == null && !options.memory())
+                options = withStoreDir(options, consolePaths.stateDirectory().toAbsolutePath().normalize());
+            return DynamicSessionWiring.run(options, loaded.profile().orElseThrow(), in, out, err, clock, ids,
+                    random, textGenerator, consoleTuning, sessionStore);
+        } catch (java.io.IOException failure) {
+            err.println(failure.getMessage() == null ? "PROFILE_SOURCE_INVALID" : failure.getMessage());
+            return 1;
+        } catch (RuntimeException failure) {
+            err.println("PROFILE_SOURCE_INVALID");
+            return 1;
+        }
+    }
+
     private ConsoleOptions withStoreDir(ConsoleOptions value, Path storeDir) {
-        return new ConsoleOptions(value.packDir(), value.locale(), value.inputs(), value.seed(), value.script(),
+        return new ConsoleOptions(value.packDir(), value.profileDir(), value.dynamic(), value.locale(), value.inputs(), value.seed(), value.script(),
                 value.save(), value.load(), value.generated(), value.liveSmoke(), value.help(), value.session(),
                 storeDir, value.runId(), value.newRun(), value.debug(), value.prefetch(), value.callsPerDay(),
                 value.runCalls(), value.play(), value.memory(), value.classic(), value.continueRun(),

@@ -24,15 +24,23 @@ public final class PlayMain {
         PrintStream out = new PrintStream(System.out, true, StandardCharsets.UTF_8);
         PrintStream err = new PrintStream(System.err, true, StandardCharsets.UTF_8);
         if (args != null && args.length > 0 && "certify".equals(args[0])) {
-            int exitCode = new CertificationCommand(out, err, Clock.systemUTC()).run(args);
+            int exitCode = java.util.Arrays.asList(args).contains("--dynamic")
+                    ? new DynamicCertificationCommand(out, err, Clock.systemUTC()).run(args)
+                    : new CertificationCommand(out, err, Clock.systemUTC()).run(args);
             if (exitCode != 0) System.exit(exitCode);
             return;
         }
         TextGenerator generator = null;
         boolean offline = args != null && java.util.Arrays.asList(args).contains("--offline");
         ProviderMode providerMode = ProviderMode.fromEnvironment();
+        String fixtureDirectory = System.getenv("CAPYBEE_CERTIFICATION_FIXTURE_DIR");
+        if (!offline && providerMode == ProviderMode.CERTIFICATION && fixtureDirectory != null
+                && args != null && java.util.Arrays.asList(args).contains("--dynamic")) {
+            try { generator = CertificationFixtureTextGenerator.open(java.nio.file.Path.of(fixtureDirectory)); }
+            catch (IllegalArgumentException ignored) { generator = null; }
+        }
         if (!offline && providerMode == ProviderMode.ENABLED && args != null
-                && java.util.Arrays.stream(args).anyMatch(arg -> arg.equals("--generated") || arg.equals("--live-smoke"))) {
+                && java.util.Arrays.stream(args).anyMatch(arg -> arg.equals("--generated") || arg.equals("--live-smoke") || arg.equals("--dynamic"))) {
             try {
                 generator = new AnthropicTextGenerator(AnthropicConfig.fromEnvironment());
             } catch (IllegalArgumentException ignored) {

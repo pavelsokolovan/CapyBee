@@ -92,6 +92,30 @@ public final class InMemorySessionStore implements SessionPorts.SessionStore {
     }
 
     @Override
+    public synchronized CreateOutcome replaceWithDynamic(OwnerRef owner, UUID expectedCurrentRunId, UUID runId,
+                                                          RunSnapshot snapshot, Instant createdAt) {
+        StoredRun current = runs.get(expectedCurrentRunId);
+        if (current == null || !current.owner().equals(owner) || current.status() != RunStatus.ACTIVE)
+            return new CreateOutcome(CreateKind.OWNER_HAS_ACTIVE, current == null ? null : current.id());
+        StoredRun existing = runs.get(runId);
+        if (existing != null) return new CreateOutcome(existing.owner().equals(owner)
+                ? CreateKind.EXISTS_SAME_OWNER : CreateKind.EXISTS_OTHER_OWNER, existing.id());
+        if (snapshot == null || !snapshot.dynamicGame() || snapshot.snapshotVersion() != 2
+                || !runId.toString().equals(snapshot.runId())
+                || !DynamicGamePersistence.verify(snapshot.dynamic().bundle()).valid())
+            throw new IllegalArgumentException("invalid dynamic snapshot");
+        Instant now = createdAt == null ? clock.instant() : createdAt;
+        runs.put(current.id(), new StoredRun(current.id(), current.owner(), current.packId(), current.locale(),
+                RunStatus.SUSPENDED, current.revision(), current.snapshot(), current.pendingStart(), null,
+                current.failureCode(), current.generationCalls(), current.createdAt(), now, current.packVersion(),
+                now, current.archivedAt(), current.trashedAt()));
+        runs.put(runId, new StoredRun(runId, owner, null, snapshot.locale(),
+                snapshot.state().ended() ? RunStatus.ENDED : RunStatus.ACTIVE, 0, snapshot, null, null, null,
+                snapshot.dynamic().totalProviderCalls(), now, now, null, now, null, null));
+        return new CreateOutcome(CreateKind.CREATED, runId);
+    }
+
+    @Override
     public synchronized Optional<StoredRun> find(UUID runId, OwnerRef owner) {
         StoredRun run = runs.get(runId);
         return run != null && run.owner().equals(owner) ? Optional.of(withGenerationCalls(run)) : Optional.empty();

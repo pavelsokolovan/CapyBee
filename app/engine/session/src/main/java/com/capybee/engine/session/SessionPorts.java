@@ -28,6 +28,9 @@ public final class SessionPorts {
         CreateOutcome createPreparing(NewRun run);
         /** Atomically publishes a complete dynamic snapshot; no PREPARING row is created. */
         CreateOutcome activateDynamic(OwnerRef owner, UUID runId, RunSnapshot snapshot, Instant createdAt);
+        /** Atomically suspends the expected current run and publishes a complete dynamic replacement. */
+        CreateOutcome replaceWithDynamic(OwnerRef owner, UUID expectedCurrentRunId, UUID runId,
+                                         RunSnapshot snapshot, Instant createdAt);
         Optional<StoredRun> find(UUID runId, OwnerRef owner);
         Optional<StoredRun> findCurrent(OwnerRef owner);
         Optional<Lease> tryClaim(UUID runId, OwnerRef owner, Duration ttl);

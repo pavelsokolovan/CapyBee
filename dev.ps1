@@ -30,6 +30,11 @@ if ($Action -eq 'game-certify-offline') {
     --pack-dir (Join-Path $distribution 'packs\lanterns-of-willow-marsh') `
     --suite (Join-Path $distribution 'certification\willow-marsh-v1\suite.json') `
     --evidence-dir (Join-Path $distribution 'evidence\offline')
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  & java @javaUtf8Args -jar (Join-Path $distribution 'bin\engine-cli.jar') certify --mode offline --dynamic `
+    --profile-dir (Join-Path $distribution 'profiles\generic-adventure') `
+    --fixture-dir (Join-Path $distribution 'certification\dynamic-v1') `
+    --evidence-dir (Join-Path $distribution 'evidence\offline-dynamic')
   exit $LASTEXITCODE
 }
 

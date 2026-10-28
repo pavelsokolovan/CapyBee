@@ -239,5 +239,20 @@ resolved presentation artifacts, exact runtime state, and SHA-256 game
 fingerprint. A fresh engine restores these snapshots without a profile, Pack,
 blueprint call, compiler call, or provider call for accepted scenes. Local
 session stores use the source-discriminated v5 format and retain Pack snapshot
-v1 compatibility. The normal CLI remains Pack-only until Spec 27.27 exposes
-profile-driven dynamic preparation and release certification.
+v1 compatibility.
+
+The normal CLI exposes dynamic play explicitly:
+
+```powershell
+java -jar engine-cli.jar play --dynamic --profile-dir profiles/generic-adventure
+java -jar engine-cli.jar play --dynamic --continue --store-dir <dir>
+```
+
+The profile-driven EN/PL wizard remains local until final confirmation. Optional
+fictional text is never accepted in argv, echoed in review output, or persisted
+in the resumable snapshot. AI output configures only the bounded existing
+mechanics vocabulary; it cannot contribute executable code, scripts,
+expressions, commands, URLs, or new rule implementations. Initial publication
+is atomic, and resume needs neither the original profile nor a provider.
+Offline mode never claims a fresh dynamic game; use an explicitly reviewed Pack
+fallback where one is configured.

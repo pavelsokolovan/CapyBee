@@ -46,7 +46,11 @@ public final class GenerationQualityProfileParser {
         List<GenerationQualityProfile.TruthPhraseFamily> truths=new ArrayList<>(); JsonNode truthNode=root.get("truthPhrases");
         if(truthNode==null||!truthNode.isArray()||truthNode.size()>64)fail("PACK_QUALITY_TRUTH_REFERENCE_INVALID"); Set<String> truthIds=new java.util.HashSet<>();
         for(JsonNode n:truthNode){exact(n,Set.of("factId","affirming","contradicting"));String fact=text(n,"factId");List<String>a=phrases(n.get("affirming")),c=phrases(n.get("contradicting"));if(fact==null||!fact.matches("(outcome|objective|result|actor|setting|phase):[A-Za-z0-9:_-]+")||!truthIds.add(fact)||a.isEmpty()||c.isEmpty()){fail("PACK_QUALITY_TRUTH_REFERENCE_INVALID");}Set<String> normalized=new java.util.HashSet<>();a.forEach(x->normalized.add(GenerationQualityEvaluator.normalize(x)));if(c.stream().map(GenerationQualityEvaluator::normalize).anyMatch(normalized::contains))fail("PACK_QUALITY_TRUTH_AMBIGUOUS");truths.add(new GenerationQualityProfile.TruthPhraseFamily(fact,a,c));}
-        String canonical=GenerationJson.encode(Map.of("schemaVersion",1,"profileId",id,"locale",localeText,"readability",readability,"repetition",repetition,"phraseSets",phraseSets,"toneProfiles",tones,"truthPhrases",truths));
+        Map<String,Object> canonicalProfile=new LinkedHashMap<>();
+        canonicalProfile.put("schemaVersion",1);canonicalProfile.put("profileId",id);canonicalProfile.put("locale",localeText);
+        canonicalProfile.put("readability",readability);canonicalProfile.put("repetition",repetition);
+        canonicalProfile.put("phraseSets",phraseSets);canonicalProfile.put("toneProfiles",tones);canonicalProfile.put("truthPhrases",truths);
+        String canonical=GenerationJson.encode(canonicalProfile);
         return new GenerationQualityProfile(1,id,locale,readability,repetition,phraseSets,tones,truths,sha256(canonical));
     }
     private static List<String> phrases(JsonNode n){List<String> values=strings(n,64);Set<String> seen=new java.util.HashSet<>();for(String v:values){int cp=v.codePointCount(0,v.length());String normalized=GenerationQualityEvaluator.normalize(v);if(cp<1||cp>120||normalized.isBlank()||!seen.add(normalized)||v.matches("(?is).*<\\s*(script|iframe).*"))fail("PACK_QUALITY_PHRASE_INVALID");}return values;}

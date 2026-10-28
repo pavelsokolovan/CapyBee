@@ -31,6 +31,7 @@ class ConsoleAppTest {
     private static final String DUNGEON_PACK = Path.of("..", "fixtures", "game-packs", "fixture-text-dungeon").toString();
     private static final String TEXT_INPUT_PACK = Path.of("..", "fixtures", "game-packs", "fixture-text-input").toString();
     private static final String GENERATED_PACK = Path.of("..", "fixtures", "game-packs", "fixture-generated").toString();
+    private static final String DYNAMIC_PROFILE = Path.of("..", "generator-profiles", "generic-adventure").toString();
 
     @Test
     void helpAndMissingPackDirectoryReturnUsageErrors() {
@@ -38,8 +39,17 @@ class ConsoleAppTest {
         assertThat(help.exitCode).isZero();
         assertThat(help.output).contains("--script <file>");
         assertThat(help.output).contains("--live-smoke");
+        assertThat(help.output).contains("--dynamic --profile-dir");
         assertThat(run(new String[0], "").exitCode).isEqualTo(2);
         assertThat(run(new String[]{"--pack-dir", "missing-pack"}, "").exitCode).isEqualTo(1);
+    }
+
+    @Test void offlineDynamicStartLoadsProfileButMakesNoProviderCallOrRun() {
+        var result = run(new String[]{"play", "--dynamic", "--profile-dir", DYNAMIC_PROFILE,
+                "--memory", "--offline"}, "\n");
+        assertThat(result.exitCode).isEqualTo(4);
+        assertThat(result.errors).contains("DYNAMIC_PROVIDER_UNAVAILABLE");
+        assertThat(result.output).doesNotContain("new dynamic game");
     }
 
     @Test

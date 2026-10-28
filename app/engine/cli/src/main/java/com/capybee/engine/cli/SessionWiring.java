@@ -153,7 +153,7 @@ final class SessionWiring {
     }
 
     private static ConsoleOptions withInputs(ConsoleOptions value, java.util.Map<String, String> inputs) {
-        return new ConsoleOptions(value.packDir(), value.locale(), inputs, value.seed(), value.script(),
+        return new ConsoleOptions(value.packDir(), value.profileDir(), value.dynamic(), value.locale(), inputs, value.seed(), value.script(),
                 value.save(), value.load(), value.generated(), value.liveSmoke(), value.help(), value.session(),
                 value.storeDir(), value.runId(), value.newRun(), value.debug(), value.prefetch(), value.callsPerDay(),
                 value.runCalls(), value.play(), value.memory(), value.classic(), value.continueRun(),

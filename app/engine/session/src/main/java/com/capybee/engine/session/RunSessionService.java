@@ -89,6 +89,18 @@ public final class RunSessionService {
         return summary(requireRun(owner, runId));
     }
 
+    public RunSummary replaceWithDynamic(OwnerRef owner, UUID expectedCurrentRunId, UUID runId,
+                                         RunSnapshot snapshot) {
+        if (owner == null || expectedCurrentRunId == null || runId == null || snapshot == null || !snapshot.dynamicGame())
+            throw new SessionException(ErrorCode.REQUEST_INVALID);
+        RunSnapshot owned = withRunId(snapshot, runId);
+        if (!resume(owner, owned, runId).ok()) throw new SessionException(ErrorCode.RUN_UNRECOVERABLE);
+        var created = runs.replaceWithDynamic(owner, expectedCurrentRunId, runId, owned, clock.now());
+        if (created.kind() == CreateKind.OWNER_HAS_ACTIVE) throw new SessionException(ErrorCode.REVISION_CONFLICT);
+        if (created.kind() == CreateKind.EXISTS_OTHER_OWNER) throw new SessionException(ErrorCode.RUN_NOT_FOUND);
+        return summary(requireRun(owner, runId));
+    }
+
     public RunSessionService(PackCatalog packs, RunRepository runs, CommandLog commands,
                              EventOutbox outbox, PrefetchStore prefetch, EngineFactory engines,
                              SessionClock clock, SessionLimits limits, Transaction transaction,
