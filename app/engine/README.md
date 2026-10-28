@@ -107,6 +107,18 @@ Use `--offline --generated` to force reviewed fallbacks even when provider crede
 
 Build the portable development distribution with `./dev.ps1 game-package` and run its deterministic package gate with `./dev.ps1 game-certify-offline`. The archive contains the shaded CLI JAR, frozen Willow Marsh pack and suite, build metadata, CycloneDX SBOM, legal files, and SHA-256 manifests. `--live-smoke` remains diagnostic-only and is not release evidence.
 
+Dynamic live certification is a separate, optional paid operation. Review an external pricing document, pin `GENERATION_MODEL_ID`, set `GENERATION_PROVIDER_MODE=certification` and the provider credential, then supply explicit call and cost ceilings:
+
+```powershell
+./dev.ps1 game-certify-live -- --dynamic --scope full `
+  --profile-dir app/engine/target/distribution/capybee-engine-cli-0.1.0-SNAPSHOT/profiles/generic-adventure `
+  --suite app/engine/target/distribution/capybee-engine-cli-0.1.0-SNAPSHOT/certification/dynamic-live-v1/suite.json `
+  --pricing-file <reviewed-pricing.json> --max-provider-calls <n> --max-cost-usd <usd> `
+  --evidence-dir <private-evidence-dir> --confirm-live-provider-cost
+```
+
+Canary evidence is diagnostic only. A passing full certificate binds the suite, profile, provider/model and pricing digests, expires after 14 days, and must be reissued when any bound input changes. Evidence contains structural counters and fingerprints only; it excludes prompts, generated content, blueprints, credentials, snapshots and provider bodies.
+
 The [app POM](../pom.xml) is an aggregator, not a shared parent.
 `mvn -f app/pom.xml verify` from the repository root verifies both the engine
 and backend; backend tests still need their existing environment. Spec 27 adds the framework-neutral session

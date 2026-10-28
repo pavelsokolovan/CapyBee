@@ -30,6 +30,11 @@ final class DynamicCertificationCommand {
     }
 
     int run(String[] args) {
+        if (java.util.Arrays.asList(args).contains("--help")) {
+            out.println(usage());
+            return 0;
+        }
+        if (isLive(args)) return new DynamicLiveCertificationCommand(out, err, clock).run(args);
         Path profile = null, fixture = null, evidence = null;
         try {
             for (int i = 1; i < args.length; i++) switch (args[i]) {
@@ -123,6 +128,17 @@ final class DynamicCertificationCommand {
     }
 
     private static String next(String[] args, int index) { if (index >= args.length) throw new IllegalArgumentException(); return args[index]; }
+    private static boolean isLive(String[] args) {
+        for (int i = 0; i + 1 < args.length; i++) if ("--mode".equals(args[i])) return "live".equals(args[i + 1]);
+        return false;
+    }
+    static String usage() {
+        return "Usage: java -jar engine-cli.jar certify --mode offline --dynamic --profile-dir <dir> --fixture-dir <dir> --evidence-dir <dir>\n"
+                + "       java -jar engine-cli.jar certify --mode live --dynamic --scope canary|full --profile-dir <dir>\n"
+                + "              --suite <suite.json> --pricing-file <reviewed.json> --max-provider-calls <n>\n"
+                + "              --max-cost-usd <decimal> --evidence-dir <dir> --confirm-live-provider-cost\n"
+                + "Live dynamic certification is optional and makes explicitly authorized paid provider calls.";
+    }
     private static void deleteTree(Path root) throws Exception { if (root == null || !Files.exists(root)) return; try (var paths=Files.walk(root)){for(Path path:paths.sorted(java.util.Comparator.reverseOrder()).toList())Files.deleteIfExists(path);} }
     private record ProcessResult(long pid, int exit) {}
     private record SnapshotEvidence(UUID runId, long revision, String gameFingerprint, String definitionFingerprint,

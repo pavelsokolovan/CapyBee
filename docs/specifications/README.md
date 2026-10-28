@@ -72,6 +72,7 @@ list. The current implementation boundary is:
 - [27.26](27.26-engine-dynamic-game-persistence-and-resume-instruction.md) - Canonical blueprint/definition/artifact persistence, dynamic snapshot v2, game fingerprints, store v5 migration, and exact no-regeneration resume (implemented)
 - [27.27](27.27-engine-dynamic-game-cli-testing-and-release-readiness-instruction.md) - Profile-driven dynamic CLI setup/start/resume, trusted session-owned start, real second-process recovery, packaged profile, and offline release certification (implemented)
 - [27.27.2](27.27.2-engine-dynamic-session-atomicity-recovery-and-compatibility-instruction.md) - Atomic dynamic activation/replacement, exact source-neutral recovery, Willow Marsh fresh-process compatibility, and full session coverage/certification gates (implemented)
+- [27.27.3](27.27.3-engine-dynamic-live-provider-certification-and-release-attestation-instruction.md) - Explicit cost-bounded live dynamic certification, provider-disabled restart proof, and privacy-safe release attestation (implemented)
 - 28 - Client rendering contract
 - 29 - CapyBee Polish game pack and game-pack integration
 

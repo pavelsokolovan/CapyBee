@@ -23,6 +23,7 @@ Copy-Item -LiteralPath (Join-Path $engine 'reference-game-packs\lanterns-of-will
 Copy-Item -LiteralPath (Join-Path $engine 'generator-profiles\generic-adventure') -Destination (Join-Path $distribution 'profiles') -Recurse
 Copy-Item -LiteralPath (Join-Path $engine 'certification\willow-marsh-v1') -Destination (Join-Path $distribution 'certification') -Recurse
 Copy-Item -LiteralPath (Join-Path $engine 'certification\dynamic-v1') -Destination (Join-Path $distribution 'certification') -Recurse
+Copy-Item -LiteralPath (Join-Path $engine 'certification\dynamic-live-v1') -Destination (Join-Path $distribution 'certification') -Recurse
 Copy-Item -LiteralPath (Join-Path $engine 'CERTIFICATION.md') -Destination (Join-Path $distribution 'docs\CERTIFICATION.md')
 Copy-Item -LiteralPath (Join-Path $engine 'OPERATIONS.md') -Destination (Join-Path $distribution 'docs\OPERATIONS.md')
 Copy-Item -LiteralPath (Join-Path $engine 'LICENSE.txt') -Destination $distribution

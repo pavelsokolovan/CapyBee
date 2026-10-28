@@ -10,6 +10,23 @@ import java.time.Clock;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DynamicCertificationCommandTest {
+    @Test
+    void documentsLiveDynamicCertificationWithoutConstructingAProvider() {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        int exit = new DynamicCertificationCommand(new PrintStream(output), System.err, Clock.systemUTC())
+                .run(new String[]{"certify", "--help", "--dynamic"});
+        assertThat(exit).isZero();
+        assertThat(output.toString()).contains("--mode live", "--scope canary|full", "paid provider calls");
+    }
+
+    @Test
+    void liveDynamicRejectsIncompleteAndAmbiguousArgumentsBeforeProviderAccess() {
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+        int missing = new DynamicCertificationCommand(System.out, new PrintStream(errors), Clock.systemUTC())
+                .run(new String[]{"certify", "--mode", "live", "--dynamic"});
+        assertThat(missing).isEqualTo(2);
+        assertThat(errors.toString()).contains("CERTIFICATION_ARGUMENT_INVALID");
+    }
     @Test void rejectsIncompleteArgumentsWithoutLaunchingAProcess() {
         var error = new ByteArrayOutputStream();
         int exit = new DynamicCertificationCommand(new PrintStream(ByteArrayOutputStream.nullOutputStream()),

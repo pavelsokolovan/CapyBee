@@ -111,6 +111,7 @@
               </rules>
               <excludes>
                 <exclude>com/capybee/engine/cli/CertificationCommand*</exclude>
+                <exclude>com/capybee/engine/cli/DynamicLiveCertificationCommand*</exclude>
               </excludes>
             </configuration>
           </execution>

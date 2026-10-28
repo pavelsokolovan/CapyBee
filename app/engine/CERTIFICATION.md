@@ -40,3 +40,15 @@ Capability labels mean:
 - `live-certified`: the exact distribution/provider/model/pack/pricing tuple has an unexpired full certificate.
 
 A live certificate expires after 14 days by policy and is invalid immediately when any tuple digest changes.
+
+## Dynamic live certification
+
+The dynamic gate uses the same provider environment and reviewed pricing boundary, but adds `--dynamic`, the packaged `dynamic-live-v1` suite, and the packaged generator profile:
+
+```text
+java -jar bin/engine-cli.jar certify --mode live --dynamic --scope full --profile-dir profiles/generic-adventure --suite certification/dynamic-live-v1/suite.json --pricing-file <reviewed-pricing.json> --max-provider-calls <reviewed-limit> --max-cost-usd <reviewed-limit> --evidence-dir <private-directory> --confirm-live-provider-cost
+```
+
+All paths, suite fields, profile resources, provider mode, debug settings, model/pricing identity, and numeric ceilings are checked before provider construction. Full scope performs two independent trusted dynamic starts; one is checkpointed and completed in a fresh provider-disabled JVM. Canary performs one bounded start and remains diagnostic.
+
+Dynamic evidence is finalized from `<id>.incomplete` to `<id>` only after its JSON files and SHA-256 manifest are written. It records structural facts, fingerprints, token counts and decimal cost only. Never publish the operator pricing document or evidence directory with a normal release archive. Treat a certificate as invalid after 14 days or immediately after the distribution, suite, profile, provider/model, pricing or policy tuple changes.

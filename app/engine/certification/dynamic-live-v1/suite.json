@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "suiteId": "dynamic-live-v1",
+  "thresholdProfileId": "dynamic-live-v1",
+  "cases": [
+    {"id":"canary-en-short","scope":"canary","seed":2727301,"locale":"en","length":"short","challenge":"gentle","checkpointCommands":1,"maxCommands":12},
+    {"id":"full-en-short","scope":"full","seed":2727302,"locale":"en","length":"short","challenge":"gentle","checkpointCommands":2,"maxCommands":24},
+    {"id":"full-pl-medium","scope":"full","seed":2727303,"locale":"pl","length":"medium","challenge":"standard","checkpointCommands":2,"maxCommands":32}
+  ]
+}
