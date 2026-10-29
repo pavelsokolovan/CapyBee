@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static com.capybee.engine.session.SessionPorts.CreateKind;
 import static com.capybee.engine.session.SessionPorts.CreateOutcome;
@@ -46,6 +47,8 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
     private final Clock clock;
+    /** Calls made before a dynamic run is atomically published; never contains request content. */
+    private final ConcurrentHashMap<UUID, Integer> provisionalRunCalls = new ConcurrentHashMap<>();
 
     public JdbcSessionStore(JdbcTemplate jdbc, PlatformTransactionManager transactionManager, Clock clock) {
         this.jdbc = jdbc;
@@ -139,6 +142,7 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
                 snapshot.state().endReason() == null ? null : snapshot.state().endReason().name(),
                 snapshot.dynamic().totalProviderCalls(), SnapshotCodec.toJson(snapshot), now, now,
                 snapshot.state().ended() ? now : null);
+        provisionalRunCalls.remove(runId);
         return new CreateOutcome(CreateKind.CREATED, runId);
     }
 
@@ -354,8 +358,9 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
                 profile.value(), day);
         jdbc.update("UPDATE game_generation_usage SET calls = GREATEST(0, calls - 1) WHERE scope = ? AND day = ?",
                 global.value(), day);
-        jdbc.update("UPDATE game_runs SET generation_calls = GREATEST(0, generation_calls - 1) WHERE id = ?",
+        int changed = jdbc.update("UPDATE game_runs SET generation_calls = GREATEST(0, generation_calls - 1) WHERE id = ?",
                 runId);
+        if (changed == 0) provisionalRunCalls.computeIfPresent(runId, (ignored, calls) -> calls <= 1 ? null : calls - 1);
     }
 
     @Override
@@ -444,10 +449,19 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
 
     private boolean reserveRun(UUID runId, int cap) {
         if (cap < 1) return false;
-        return !jdbc.query("""
+        boolean durable = !jdbc.query("""
                 UPDATE game_runs SET generation_calls = generation_calls + 1
                 WHERE id = ? AND generation_calls < ? RETURNING generation_calls
                 """, (rs, row) -> rs.getInt(1), runId, cap).isEmpty();
+        if (durable) return true;
+        final boolean[] admitted = {false};
+        provisionalRunCalls.compute(runId, (ignored, calls) -> {
+            int current = calls == null ? 0 : calls;
+            if (current >= cap) return current;
+            admitted[0] = true;
+            return current + 1;
+        });
+        return admitted[0];
     }
 
     private boolean reserveScope(String scope, int cap, LocalDate day,
