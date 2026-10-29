@@ -73,6 +73,7 @@ list. The current implementation boundary is:
 - [27.27](27.27-engine-dynamic-game-cli-testing-and-release-readiness-instruction.md) - Profile-driven dynamic CLI setup/start/resume, trusted session-owned start, real second-process recovery, packaged profile, and offline release certification (implemented)
 - [27.27.2](27.27.2-engine-dynamic-session-atomicity-recovery-and-compatibility-instruction.md) - Atomic dynamic activation/replacement, exact source-neutral recovery, Willow Marsh fresh-process compatibility, and full session coverage/certification gates (implemented)
 - [27.27.3](27.27.3-engine-dynamic-live-provider-certification-and-release-attestation-instruction.md) - Explicit cost-bounded live dynamic certification, provider-disabled restart proof, and privacy-safe release attestation (implemented)
+- [27.27.4](27.27.4-engine-dynamic-web-session-api-and-jdbc-persistence-instruction.md) - Source-neutral dynamic web sessions, allowlisted profile discovery, confirmed wait-then-poll starts, and atomic JDBC Pack-or-dynamic persistence (implemented)
 - 28 - Client rendering contract
 - 29 - CapyBee Polish game pack and game-pack integration
 

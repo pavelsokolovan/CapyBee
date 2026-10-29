@@ -57,9 +57,9 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
     public CreateOutcome createPreparing(NewRun run) {
         try {
             jdbc.update("""
-                    INSERT INTO game_runs (id, user_id, pack_id, pack_version, locale, status, revision,
+                    INSERT INTO game_runs (id, user_id, source_kind, pack_id, pack_version, locale, status, revision,
                                            pending_start, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, 'PREPARING', 0, ?::jsonb, ?, ?)
+                    VALUES (?, ?, 'PACK', ?, ?, ?, 'PREPARING', 0, ?::jsonb, ?, ?)
                     """, run.id(), ownerId(run.owner()), run.packId().value(), run.packVersion(),
                     run.locale().value(), encodeStart(run), run.createdAt(), run.createdAt());
             return new CreateOutcome(CreateKind.CREATED, run.id());
@@ -80,6 +80,97 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
                     """, (rs, row) -> rs.getObject(1, UUID.class), ownerId(run.owner()))
                     .stream().findFirst().orElseThrow(() -> duplicate);
             return new CreateOutcome(CreateKind.OWNER_HAS_ACTIVE, active);
+        }
+    }
+
+    @Override
+    public CreateOutcome activateDynamic(OwnerRef owner, UUID runId, RunSnapshot snapshot, Instant createdAt) {
+        requireDynamic(runId, snapshot);
+        try {
+            return transaction.execute(status -> insertDynamic(owner, runId, snapshot, createdAt));
+        } catch (DuplicateKeyException duplicate) {
+            return dynamicConflict(owner, runId, snapshot, duplicate);
+        }
+    }
+
+    @Override
+    public CreateOutcome replaceWithDynamic(OwnerRef owner, UUID expectedCurrentRunId, UUID runId,
+                                            RunSnapshot snapshot, Instant createdAt) {
+        requireDynamic(runId, snapshot);
+        try {
+            CreateOutcome outcome = transaction.execute(status -> {
+                List<StoredRun> existing = jdbc.query("SELECT * FROM game_runs WHERE id = ? FOR UPDATE",
+                        RUN_MAPPER, runId);
+                if (!existing.isEmpty()) return replayOutcome(owner, snapshot, existing.getFirst());
+                List<StoredRun> current = jdbc.query("""
+                        SELECT * FROM game_runs WHERE id = ? AND user_id = ? FOR UPDATE
+                        """, RUN_MAPPER, expectedCurrentRunId, ownerId(owner));
+                if (current.isEmpty() || current.getFirst().status() != RunStatus.ACTIVE) {
+                    return new CreateOutcome(CreateKind.OWNER_HAS_ACTIVE,
+                            current.isEmpty() ? null : current.getFirst().id());
+                }
+                int suspended = jdbc.update("""
+                        UPDATE game_runs SET status = 'SUSPENDED', updated_at = ?
+                        WHERE id = ? AND user_id = ? AND status = 'ACTIVE'
+                        """, clock.instant(), expectedCurrentRunId, ownerId(owner));
+                if (suspended != 1) throw new IllegalStateException("DYNAMIC_REPLACEMENT_CONFLICT");
+                CreateOutcome inserted = insertDynamic(owner, runId, snapshot, createdAt);
+                if (inserted.kind() != CreateKind.CREATED) throw new IllegalStateException("DYNAMIC_REPLACEMENT_CONFLICT");
+                return inserted;
+            });
+            return outcome;
+        } catch (DuplicateKeyException duplicate) {
+            return dynamicConflict(owner, runId, snapshot, duplicate);
+        }
+    }
+
+    private CreateOutcome insertDynamic(OwnerRef owner, UUID runId, RunSnapshot snapshot, Instant createdAt) {
+        var identity = snapshot.dynamic().bundle().definition().profileIdentity();
+        Instant now = createdAt == null ? clock.instant() : createdAt;
+        String status = snapshot.state().ended() ? "ENDED" : "ACTIVE";
+        jdbc.update("""
+                INSERT INTO game_runs
+                    (id, user_id, source_kind, profile_id, profile_version, game_fingerprint,
+                     locale, status, end_reason, revision, generation_calls, snapshot, created_at,
+                     updated_at, ended_at)
+                VALUES (?, ?, 'DYNAMIC', ?, ?, ?, ?, ?, ?, 0, ?, ?::jsonb, ?, ?, ?)
+                """, runId, ownerId(owner), identity.id().value(), identity.version().toString(),
+                snapshot.dynamic().bundle().gameFingerprint(), snapshot.locale().value(), status,
+                snapshot.state().endReason() == null ? null : snapshot.state().endReason().name(),
+                snapshot.dynamic().totalProviderCalls(), SnapshotCodec.toJson(snapshot), now, now,
+                snapshot.state().ended() ? now : null);
+        return new CreateOutcome(CreateKind.CREATED, runId);
+    }
+
+    private CreateOutcome dynamicConflict(OwnerRef owner, UUID runId, RunSnapshot snapshot,
+                                          DuplicateKeyException duplicate) {
+        List<StoredRun> same = jdbc.query("SELECT * FROM game_runs WHERE id = ?", RUN_MAPPER, runId);
+        if (!same.isEmpty()) return replayOutcome(owner, snapshot, same.getFirst());
+        UUID active = jdbc.query("""
+                SELECT id FROM game_runs WHERE user_id = ? AND status IN ('PREPARING', 'ACTIVE')
+                ORDER BY updated_at DESC LIMIT 1
+                """, (rs, row) -> rs.getObject(1, UUID.class), ownerId(owner)).stream()
+                .findFirst().orElseThrow(() -> duplicate);
+        return new CreateOutcome(CreateKind.OWNER_HAS_ACTIVE, active);
+    }
+
+    private static CreateOutcome replayOutcome(OwnerRef owner, RunSnapshot snapshot, StoredRun stored) {
+        boolean sameOwner = stored.owner().equals(owner);
+        boolean sameIdentity = stored.snapshot() != null && stored.snapshot().dynamicGame()
+                && stored.snapshot().dynamic().bundle().gameFingerprint()
+                .equals(snapshot.dynamic().bundle().gameFingerprint());
+        return new CreateOutcome(sameOwner && sameIdentity ? CreateKind.EXISTS_SAME_OWNER
+                : CreateKind.EXISTS_OTHER_OWNER, stored.id());
+    }
+
+    private static void requireDynamic(UUID runId, RunSnapshot snapshot) {
+        if (snapshot == null || !snapshot.dynamicGame() || snapshot.dynamic() == null
+                || !runId.toString().equals(snapshot.runId())
+                || snapshot.dynamic().bundle() == null
+                || snapshot.dynamic().bundle().definition() == null
+                || snapshot.dynamic().bundle().definition().profileIdentity() == null
+                || snapshot.dynamic().totalProviderCalls() < 0) {
+            throw new IllegalArgumentException("DYNAMIC_SNAPSHOT_INVALID");
         }
     }
 
@@ -402,13 +493,32 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
         UUID leaseToken = rs.getObject("lease_token", UUID.class);
         var status = RunStatus.valueOf(rs.getString("status"));
         Lease lease = leaseToken == null ? null : new Lease(leaseToken, instant(rs, "lease_until"));
+        String sourceKind = rs.getString("source_kind");
+        String packId = rs.getString("pack_id");
+        String packVersion = rs.getString("pack_version");
+        RunSnapshot snapshot = snapshotJson == null ? null : decodeSnapshot(snapshotJson);
+        boolean dynamic = "DYNAMIC".equals(sourceKind);
+        if (dynamic != (snapshot != null && snapshot.dynamicGame())
+                || dynamic && (packId != null || packVersion != null)
+                || !dynamic && (packId == null || packVersion == null)) {
+            throw new IllegalStateException("RUN_SOURCE_IDENTITY_INVALID");
+        }
+        if (dynamic) {
+            var identity = snapshot.dynamic().bundle().definition().profileIdentity();
+            if (!identity.id().value().equals(rs.getString("profile_id"))
+                    || !identity.version().toString().equals(rs.getString("profile_version"))
+                    || !snapshot.dynamic().bundle().gameFingerprint().equals(rs.getString("game_fingerprint"))) {
+                throw new IllegalStateException("RUN_SOURCE_IDENTITY_INVALID");
+            }
+        }
         return new StoredRun(rs.getObject("id", UUID.class),
                 new OwnerRef(rs.getObject("user_id", UUID.class).toString()),
-                new PackId(rs.getString("pack_id")), new LocaleTag(rs.getString("locale")), status,
-                rs.getLong("revision"), snapshotJson == null ? null : decodeSnapshot(snapshotJson),
+                dynamic ? null : new PackId(packId), new LocaleTag(rs.getString("locale")), status,
+                rs.getLong("revision"), snapshot,
                 pendingJson == null ? null : decodeStart(pendingJson), lease,
                 rs.getString("failure_code"), rs.getInt("generation_calls"),
-                instant(rs, "created_at"), instant(rs, "updated_at"));
+                instant(rs, "created_at"), instant(rs, "updated_at"), packVersion,
+                instant(rs, "updated_at"), null, null);
     }
 
     private static RunSnapshot decodeSnapshot(String json) {

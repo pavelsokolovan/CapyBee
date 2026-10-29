@@ -76,4 +76,17 @@ class SessionJsonTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("SESSION_JSON_DECODE_FAILED");
     }
+
+    @Test
+    void dynamicSummaryHasSourceIdentityWithoutFabricatedPackAliases() {
+        var source = new RunSummaryDto.SourceDto("DYNAMIC", null, null,
+                "generic-adventure", "1.0.0", "sha256:fixture");
+        var summary = new RunSummaryDto(UUID.randomUUID().toString(), "ACTIVE", 0, source,
+                null, null, "en", null, null, 2, null, Instant.EPOCH);
+
+        RunSummaryDto decoded = SessionJson.decode(SessionJson.encode(summary), RunSummaryDto.class);
+        assertThat(decoded.source()).isEqualTo(source);
+        assertThat(decoded.packId()).isNull();
+        assertThat(decoded.packVersion()).isNull();
+    }
 }

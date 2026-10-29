@@ -41,6 +41,13 @@ public final class DynamicStartCoordinator {
     }
     private Result execute(OwnerRef owner,UUID requestId,ConfirmedDynamicPreparation p,Long seed,UUID expected,Duration wait){
         UUID runId=UUID.nameUUIDFromBytes(("dynamic:"+requestId).getBytes(StandardCharsets.UTF_8));
+        try {
+            RunSummary published = sessions.get(owner, runId);
+            if (published.dynamicGame()) return new Started(published);
+            return new Failed("DYNAMIC_REQUEST_CONFLICT");
+        } catch (SessionException missing) {
+            if (missing.code() != ErrorCode.RUN_NOT_FOUND) throw missing;
+        }
         var scope=new LedgerScope("profile:"+p.profile().identity().id().value()+":"+p.profile().identity().version(),
                 p.profile().profile().generationBudget().totalCallsPerRun());
         TextGenerator metered=generators.forRun(scope,LocalDate.now(clock),runId,MeteredTextGenerator.Priority.DEMAND);

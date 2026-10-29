@@ -630,11 +630,11 @@ public final class RunSessionService {
 
     private RunSummary summary(StoredRun stored) {
         if (stored.snapshot() == null) {
-            return new RunSummary(stored.id(), stored.status(), stored.revision(), stored.packId(),
+            return new RunSummary(stored.id(), stored.status(), stored.revision(), stored.gameRef(), stored.packId(),
                     null, stored.locale(), null, stored.failureCode(), null, stored.updatedAt());
         }
         ViewAndStatus view = view(stored.owner(), stored.snapshot());
-        return new RunSummary(stored.id(), stored.status(), stored.revision(), stored.packId(),
+        return new RunSummary(stored.id(), stored.status(), stored.revision(), stored.gameRef(), stored.packId(),
                 stored.snapshot().dynamicGame() ? null : stored.snapshot().pack().version().toString(), stored.locale(),
                 stored.snapshot().state().endReason() == null ? null
                         : stored.snapshot().state().endReason().name(),

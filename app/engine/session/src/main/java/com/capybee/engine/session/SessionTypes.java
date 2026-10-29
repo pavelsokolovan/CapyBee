@@ -122,9 +122,17 @@ public final class SessionTypes {
         public static PurgeConfirmation denied() { return new PurgeConfirmation(false, false, Duration.ofDays(30)); }
     }
 
-    public record RunSummary(UUID runId, RunStatus status, long revision, PackId packId,
+    public record RunSummary(UUID runId, RunStatus status, long revision, StoredGameRef source, PackId packId,
                              String packVersion, LocaleTag locale, String endReason,
                              String failureCode, View view, Instant updatedAt) {
+        public RunSummary(UUID runId, RunStatus status, long revision, PackId packId,
+                          String packVersion, LocaleTag locale, String endReason,
+                          String failureCode, View view, Instant updatedAt) {
+            this(runId, status, revision,
+                    packId == null || PackVersion.tryParse(packVersion).isEmpty() ? null
+                            : new PackGameRef(packId, PackVersion.tryParse(packVersion).orElseThrow()),
+                    packId, packVersion, locale, endReason, failureCode, view, updatedAt);
+        }
         public boolean dynamicGame() { return packId == null; }
     }
 

@@ -10,6 +10,10 @@ import com.capybee.engine.pack.PackId;
 import com.capybee.engine.pack.PackRegistry;
 import com.capybee.engine.pack.json.PackLoader;
 import com.capybee.engine.port.TextGenerator;
+import com.capybee.engine.input.DefaultInputGuard;
+import com.capybee.engine.generation.blueprint.DefaultBlueprintOutputReviewer;
+import com.capybee.engine.session.DynamicStartCoordinator;
+import com.capybee.engine.session.SessionGenerators;
 import com.capybee.engine.session.MeteredTextGenerator;
 import com.capybee.engine.session.RunSessionService;
 import com.capybee.engine.session.SessionLimits;
@@ -35,6 +39,8 @@ import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.nio.file.Path;
+import java.time.Duration;
 
 @Configuration
 public class GameSessionConfiguration {
@@ -125,6 +131,39 @@ public class GameSessionConfiguration {
     GameCommandRateLimiter gameCommandRateLimiter(Clock gameSessionClock,
             @Value("${capybee.game.limits.commands-per-minute:60}") int commandsPerMinute) {
         return new GameCommandRateLimiter(gameSessionClock, commandsPerMinute);
+    }
+
+    @Bean
+    DynamicStartRateLimiter dynamicStartRateLimiter(Clock gameSessionClock,
+            @Value("${capybee.game.dynamic.starts-per-hour:3}") int startsPerHour) {
+        return new DynamicStartRateLimiter(gameSessionClock, startsPerHour);
+    }
+
+    @Bean
+    GeneratorProfileCatalog generatorProfileCatalog(
+            @Value("${capybee.game.dynamic.enabled:false}") boolean enabled,
+            @Value("${capybee.game.dynamic.profile-root:}") String root,
+            @Value("${capybee.game.dynamic.profile-ids:}") String configuredIds) {
+        List<String> ids = Arrays.stream(configuredIds.split(",")).map(String::trim)
+                .filter(value -> !value.isEmpty()).toList();
+        return new GeneratorProfileCatalog(enabled, root.isBlank() ? null : Path.of(root), ids);
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "capybee.game.dynamic.enabled", havingValue = "true")
+    DynamicStartCoordinator dynamicStartCoordinator(RunSessionService sessions, TextGenerator generator,
+            SessionPorts.GenerationLedger ledger, SessionLimits limits, Clock gameSessionClock) {
+        return new DynamicStartCoordinator(sessions, new SessionGenerators(generator, ledger, limits),
+                new DefaultBlueprintOutputReviewer(), new DefaultInputGuard(), new UuidIdSource(), gameSessionClock);
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "capybee.game.dynamic.enabled", havingValue = "true")
+    DynamicStartOperationService dynamicStartOperationService(DynamicStartCoordinator coordinator,
+            @Qualifier("gameSessionWorkers") Executor workers,
+            @Value("${capybee.game.dynamic.operation-timeout-seconds:180}") long timeoutSeconds) {
+        return new DynamicStartOperationService(coordinator, workers,
+                Duration.ofSeconds(Math.max(1, Math.min(600, timeoutSeconds))));
     }
 
     @Bean

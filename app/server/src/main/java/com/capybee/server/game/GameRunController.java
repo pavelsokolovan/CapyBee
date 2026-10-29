@@ -180,12 +180,26 @@ public class GameRunController {
         return new CommandRequest(body.id(), body.expectedRevision(), mapped);
     }
 
-    private static RunSummaryDto summary(RunSummary summary) {
+    static RunSummaryDto toSummary(RunSummary summary) {
+        RunSummaryDto.SourceDto source;
+        if (summary.source() instanceof PackGameRef pack) {
+            source = new RunSummaryDto.SourceDto("PACK", pack.packId().value(),
+                    pack.packVersion().toString(), null, null, null);
+        } else if (summary.source() instanceof DynamicGameRef dynamic) {
+            source = new RunSummaryDto.SourceDto("DYNAMIC", null, null,
+                    dynamic.profile().id().value(), dynamic.profile().version().toString(),
+                    dynamic.gameFingerprint());
+        } else {
+            throw new SessionException(ErrorCode.RUN_UNRECOVERABLE);
+        }
         return new RunSummaryDto(summary.runId().toString(), summary.status().name(), summary.revision(),
-                summary.packId().value(), summary.packVersion(), summary.locale().value(),
+                source, summary.packId() == null ? null : summary.packId().value(), summary.packVersion(),
+                summary.locale().value(),
                 summary.endReason() == null ? null : EndReason.valueOf(summary.endReason()),
                 summary.failureCode(), View.CURRENT_VIEW_SCHEMA, summary.view(), summary.updatedAt());
     }
+
+    private static RunSummaryDto summary(RunSummary summary) { return toSummary(summary); }
 
     private static CommandOutcomeDto commandOutcome(CommandOutcome outcome) {
         return new CommandOutcomeDto(outcome.commandId(), outcome.outcome().name(), outcome.accepted(),
