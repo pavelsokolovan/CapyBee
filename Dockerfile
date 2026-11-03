@@ -17,7 +17,12 @@ RUN mvn -B -f app/pom.xml -DskipTests -pl server -am package
 
 FROM eclipse-temurin:25-jre
 WORKDIR /app
+ARG CAPYBEE_VERSION=0.1.0-SNAPSHOT
+ARG CAPYBEE_REVISION=unknown
+LABEL org.opencontainers.image.title="CapyBee server" \
+      org.opencontainers.image.version="$CAPYBEE_VERSION" \
+      org.opencontainers.image.revision="$CAPYBEE_REVISION"
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75 -Xss256k -Dfile.encoding=UTF-8"
-COPY --from=server-build /workspace/app/server/target/capybee-server-0.0.1-SNAPSHOT.jar /app/app.jar
+COPY --from=server-build /workspace/app/server/target/capybee-server-*.jar /app/app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

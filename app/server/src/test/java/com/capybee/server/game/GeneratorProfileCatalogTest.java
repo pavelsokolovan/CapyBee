@@ -29,4 +29,9 @@ class GeneratorProfileCatalogTest {
         assertThatThrownBy(() -> new GeneratorProfileCatalog(true, PROFILES, List.of("missing-profile")))
                 .isInstanceOf(IllegalStateException.class).hasMessage("DYNAMIC_PROFILE_INVALID");
     }
+
+    @Test void loadsCanonicalEmbeddedReleaseProfile() {
+        var catalog = new GeneratorProfileCatalog(true, null, List.of("generic-adventure"));
+        assertThat(catalog.find("generic-adventure").orElseThrow().identity().fingerprint()).isNotBlank();
+    }
 }

@@ -50,7 +50,10 @@ The project is scaffolded as a mono-repo, so the backend and frontend can be dev
 Run `mvn -f app/engine/pom.xml clean verify` from the repo root to build and test
 the SDK without PostgreSQL, Spring, OAuth, or the UI. Open `app/engine/` alone in
 an IDE for independent development. See [app/engine/README.md](app/engine/README.md)
-for the pack API and console-first roadmap.
+for the pack API, console-first roadmap, and build-once release flow.
+`./dev.ps1 game-package`, `game-verify`, and `game-certify-offline -SkipBuild`
+assemble, independently verify, and certify the same immutable candidate;
+generated evidence is never placed back into the archive.
 
 With Java 25 and Maven installed, start the maintained game from PowerShell:
 

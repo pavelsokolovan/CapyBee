@@ -1,5 +1,20 @@
 # Live generation operations
 
+## Release, restart, and rollback
+
+Build with `./dev.ps1 game-package`, inspect with `./dev.ps1 game-verify`, and run
+`./dev.ps1 game-certify-offline -SkipBuild`. A public promotion requires a clean,
+non-snapshot version whose `v<version>` tag points at the recorded commit, complete
+credential-free evidence, and an explicit operator action. Retain the candidate,
+server digest, SBOMs, checksums, release manifest, and public offline evidence for
+the release lifetime. Keep paid live evidence restricted.
+
+For rollback, disable new dynamic starts and provider access first, back up
+PostgreSQL, then deploy the previous exact server/CLI digests. Never delete or
+rewrite persisted runs. Existing read, command, and resume paths remain available
+when new starts or providers are disabled. An external profile root is an operator
+override and must validate to the canonical embedded profile fingerprint.
+
 Ordinary CLI play does not require a provider. Missing, partial, disabled, or invalid provider configuration selects reviewed authored fallback; use `--offline` to force it. Durable play uses the platform-local state directory unless `--store-dir` is supplied. If it cannot be used, choose another directory or use `--memory` for a temporary run. Never include private save paths, setup text, credentials, prompts, or provider bodies in support evidence.
 
 ## Disable and fallback

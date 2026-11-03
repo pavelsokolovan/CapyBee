@@ -57,6 +57,24 @@
     </testResources>
     <plugins>
       <plugin>
+        <groupId>org.cyclonedx</groupId>
+        <artifactId>cyclonedx-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>cli-runtime-sbom</id>
+            <phase>package</phase>
+            <goals><goal>makeBom</goal></goals>
+            <configuration>
+              <outputFormat>json</outputFormat>
+              <outputName>sbom</outputName>
+              <includeTestScope>false</includeTestScope>
+              <includeBomSerialNumber>false</includeBomSerialNumber>
+              <includeLicenseText>false</includeLicenseText>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
         <version>3.5.3</version>

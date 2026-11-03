@@ -105,6 +105,45 @@
   <build>
     <plugins>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-resources-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>embed-canonical-generator-profile</id>
+            <phase>process-resources</phase>
+            <goals><goal>copy-resources</goal></goals>
+            <configuration>
+              <outputDirectory>${project.build.outputDirectory}/release/profiles/generic-adventure</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>${project.basedir}/../engine/generator-profiles/generic-adventure</directory>
+                  <filtering>false</filtering>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.cyclonedx</groupId>
+        <artifactId>cyclonedx-maven-plugin</artifactId>
+        <version>2.9.1</version>
+        <executions>
+          <execution>
+            <id>server-runtime-sbom</id>
+            <phase>package</phase>
+            <goals><goal>makeBom</goal></goals>
+            <configuration>
+              <outputFormat>json</outputFormat>
+              <outputName>sbom</outputName>
+              <includeTestScope>false</includeTestScope>
+              <includeBomSerialNumber>false</includeBomSerialNumber>
+              <includeLicenseText>false</includeLicenseText>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
       </plugin>

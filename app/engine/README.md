@@ -105,19 +105,29 @@ responses, player text, and credentials are not logged.
 
 Use `--offline --generated` to force reviewed fallbacks even when provider credentials are present. `GENERATION_PROVIDER_MODE=disabled|enabled|certification` is the host kill switch; invalid values fail closed to disabled. Certification is a separate top-level command and is documented in [CERTIFICATION.md](CERTIFICATION.md), with disable, rollback, and incident procedures in [OPERATIONS.md](OPERATIONS.md).
 
-Build the portable development distribution with `./dev.ps1 game-package` and run its deterministic package gate with `./dev.ps1 game-certify-offline`. The archive contains the shaded CLI JAR, frozen Willow Marsh pack and suite, build metadata, CycloneDX SBOM, legal files, and SHA-256 manifests. `--live-smoke` remains diagnostic-only and is not release evidence.
+Build one portable candidate with `./dev.ps1 game-package`, inspect it independently
+with `./dev.ps1 game-verify`, and certify the same bytes from a fresh extraction with
+`./dev.ps1 game-certify-offline -SkipBuild`. The strict archive contains the shaded
+CLI JAR, canonical profile, Pack and dynamic suites, reviewed fallback Pack,
+operations/certification docs, legal files, Maven-generated CycloneDX SBOM, build
+identity, and complete SHA-256 inventory. The server JAR embeds the same profile and
+the verifier enforces byte parity. Evidence remains outside the immutable archive.
 
 Dynamic live certification is a separate, optional paid operation. Review an external pricing document, pin `GENERATION_MODEL_ID`, set `GENERATION_PROVIDER_MODE=certification` and the provider credential, then supply explicit call and cost ceilings:
 
 ```powershell
 ./dev.ps1 game-certify-live -- --dynamic --scope full `
-  --profile-dir app/engine/target/distribution/capybee-engine-cli-0.1.0-SNAPSHOT/profiles/generic-adventure `
-  --suite app/engine/target/distribution/capybee-engine-cli-0.1.0-SNAPSHOT/certification/dynamic-live-v1/suite.json `
+  --profile-dir <extracted-candidate>/profiles/generic-adventure `
+  --suite <extracted-candidate>/certification/dynamic-live-v1/suite.json `
   --pricing-file <reviewed-pricing.json> --max-provider-calls <n> --max-cost-usd <usd> `
   --evidence-dir <private-evidence-dir> --confirm-live-provider-cost
 ```
 
 Canary evidence is diagnostic only. A passing full certificate binds the suite, profile, provider/model and pricing digests, expires after 14 days, and must be reissued when any bound input changes. Evidence contains structural counters and fingerprints only; it excludes prompts, generated content, blueprints, credentials, snapshots and provider bodies.
+
+Release claims are limited to `development`, `verified`, `offline-ready`,
+`live-certified`, and `revoked`. They cover engine/server readiness only; Spec 28
+owns end-user web UI completion. Checksums do not establish publisher identity.
 
 The [app POM](../pom.xml) is an aggregator, not a shared parent.
 `mvn -f app/pom.xml verify` from the repository root verifies both the engine

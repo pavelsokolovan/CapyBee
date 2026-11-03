@@ -2,14 +2,23 @@
 
 Normal builds and tests are offline. Live certification is a separate, explicit, paid operation and never runs during `mvn verify`.
 
-## Offline release gate
+## Immutable candidate and offline release gate
 
 Build the release directory and run all three Willow Marsh fallback routes:
 
 ```powershell
 ./dev.ps1 game-package
-./dev.ps1 game-certify-offline
+./dev.ps1 game-verify
+./dev.ps1 game-certify-offline -SkipBuild
 ```
+
+Packaging reads the Maven engine version, records the exact Git revision and
+deterministic build epoch, emits Maven-derived CLI/server CycloneDX SBOMs, and
+builds the ZIP once. Dirty or snapshot candidates are `development` and cannot
+be promoted. Verification performs bounded extraction, complete inventory and
+checksum validation, JAR/SBOM inspection, production-loader validation, and
+CLI/server profile parity without provider or network access. Evidence is a
+sibling artifact under `target/evidence`; it is never injected into the ZIP.
 
 The authoritative unpacked command is:
 
@@ -35,11 +44,15 @@ Evidence contains identifiers, hashes, counts, timings, usage, costs, and stable
 
 Capability labels mean:
 
-- `development`: locally produced; no production certification claim.
+- `development`: dirty, snapshot, or incomplete local candidate.
+- `verified`: package structure, complete inventory, SBOM, resources, and checksums passed.
 - `offline-ready`: deterministic verification and packaged offline certification passed.
 - `live-certified`: the exact distribution/provider/model/pack/pricing tuple has an unexpired full certificate.
+- `revoked`: a promoted candidate was withdrawn with a content-free reason code and timestamp.
 
 A live certificate expires after 14 days by policy and is invalid immediately when any tuple digest changes.
+Checksums prove byte integrity, not publisher identity. Promotion references the
+same candidate bytes and never rebuilds or edits them.
 
 ## Dynamic live certification
 

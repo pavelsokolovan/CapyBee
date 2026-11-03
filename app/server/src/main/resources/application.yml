@@ -70,6 +70,10 @@ capybee:
   game:
     enabled: ${CAPYBEE_GAME_ENABLED:false}
     generation-enabled: ${CAPYBEE_GAME_GENERATION_ENABLED:false}
+    dynamic:
+      enabled: ${CAPYBEE_GAME_DYNAMIC_ENABLED:false}
+      profile-root: ${CAPYBEE_GAME_DYNAMIC_PROFILE_ROOT:}
+      profile-ids: ${CAPYBEE_GAME_DYNAMIC_PROFILE_IDS:generic-adventure}
     allow-seed: ${CAPYBEE_GAME_ALLOW_SEED:false}
     pack-ids: ${CAPYBEE_GAME_PACK_IDS:}
     command-hmac-key: ${CAPYBEE_GAME_COMMAND_HMAC_KEY:${APP_SECRET:}}
