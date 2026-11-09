@@ -194,6 +194,17 @@ Spec 27.7 owns richer result and ending behavior.
 
 ## Dynamic generator profiles
 
+For a substantial, fair-play classic detective mystery, use the bilingual
+`classic-detective` profile. It is tuned to one medium-length preset with 10–12
+meaningful story transitions, 12–18 scenes, clue tracking, contradictions,
+multiple suspects, and standard or expert deduction difficulty:
+
+```powershell
+./dev.ps1 game `
+  --dynamic `
+  --profile-dir ./app/engine/generator-profiles/classic-detective
+```
+
 Spec 27.18 adds a scenario-neutral bootstrap configuration under
 `com.capybee.engine.generation.profile`. A generator profile is not a playable
 pack: it contains bounded capability declarations, localized wizard metadata,

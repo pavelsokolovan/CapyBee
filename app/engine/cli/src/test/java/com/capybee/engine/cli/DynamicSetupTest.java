@@ -14,6 +14,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class DynamicSetupTest {
     private static final Path PROFILE = Path.of("..", "generator-profiles", "generic-adventure");
+    private static final Path DETECTIVE_PROFILE = Path.of("..", "generator-profiles", "classic-detective");
+
+    @Test void classicDetectiveProfileLoadsWithSolidMediumInvestigationDefaults() throws Exception {
+        var loaded = ProfileDirectory.load(DETECTIVE_PROFILE);
+
+        assertThat(loaded.valid()).isTrue();
+        var profile = loaded.profile().orElseThrow().profile();
+        assertThat(profile.id().value()).isEqualTo("classic-detective");
+        assertThat(profile.lengthPresets()).singleElement().satisfies(length -> {
+            assertThat(length.id()).isEqualTo("medium");
+            assertThat(length.minStoryTransitions()).isEqualTo(10);
+            assertThat(length.maxStoryTransitions()).isEqualTo(12);
+        });
+        assertThat(profile.capabilities().minScenes()).isEqualTo(12);
+        assertThat(profile.capabilities().maxScenes()).isEqualTo(18);
+        assertThat(profile.setup().questions()).filteredOn(question -> question.inputId().equals("length"))
+                .singleElement().extracting(question -> question.defaultValues())
+                .isEqualTo(java.util.List.of("medium"));
+    }
 
     @Test void packagedProfileLoadsAndWizardKeepsSuggestionStatusOnly() throws Exception {
         var loaded = ProfileDirectory.load(PROFILE);
