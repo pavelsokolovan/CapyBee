@@ -2181,3 +2181,25 @@ a:hover {
     width: 94vw;
   }
 }
+
+/* Text-first adventure preparation; no engine mechanics or generated asset URLs. */
+.adventure-overlay { position:fixed; inset:0; z-index:1200; background:#fdf3d9; overflow-y:auto; overscroll-behavior:contain; padding:16px; color:#503b24; }
+.adventure-panel { max-width:720px; margin:0 auto; min-height:100%; padding-bottom:32px; overflow-wrap:anywhere; }
+.adventure-panel header { display:flex; align-items:center; justify-content:space-between; gap:12px; position:sticky; top:-16px; padding:12px 0; background:#fdf3d9; z-index:1; }
+.adventure-panel h2:focus { outline:none; }
+.adventure-panel button,.adventure-panel select { min-height:44px; padding:10px 14px; border-radius:12px; }
+.adventure-panel button { cursor:pointer; }
+.adventure-panel button:disabled { cursor:default; opacity:.55; }
+.adventure-panel :focus-visible { outline:3px solid #795300; outline-offset:3px; }
+.adventure-panel p { line-height:1.6; margin:12px 0; }
+.adventure-panel dl>div { margin:12px 0; }
+.adventure-panel dt { font-weight:700; }
+.adventure-panel dd { margin:4px 0 0; }
+.adventure-panel .play-game-row { margin-bottom:12px; width:100%; text-align:left; }
+.adventure-field { display:block; border:1px solid #d5b977; border-radius:16px; padding:16px; margin:16px 0; min-width:0; }
+.adventure-field legend { padding:0 6px; font-weight:700; }
+.adventure-option { display:flex; align-items:center; gap:12px; min-height:44px; padding:8px; }
+.adventure-option input { flex-shrink:0; width:22px; height:22px; accent-color:#795300; }
+.adventure-field textarea { width:100%; min-height:130px; font:inherit; padding:12px; border:1px solid #967741; border-radius:12px; box-sizing:border-box; }
+.adventure-actions { display:flex; gap:12px; flex-wrap:wrap; margin-top:20px; }
+.adventure-prose { white-space:pre-wrap; }

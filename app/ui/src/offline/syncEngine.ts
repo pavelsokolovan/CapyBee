@@ -18,6 +18,7 @@ export type SyncedEvent = {
 type SyncedListener = (event: SyncedEvent) => void;
 const listeners = new Set<SyncListener>();
 const syncedListeners = new Set<SyncedListener>();
+export type { GameReply, OperationMarker } from '../game/gameTransport';
 export { GameTransport, retryDelay, decodeGameResponse } from '../game/gameTransport';
 
 let flushing = false;

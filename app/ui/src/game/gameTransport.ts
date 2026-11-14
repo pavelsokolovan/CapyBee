@@ -1,4 +1,4 @@
-import { decodeOperation, decodeSummary, decodeCapabilities, decodeProfile, decodeView, object, integer, text } from './gameDecoders';
+import { decodeOperation, decodeSummary, decodeCapabilities, decodeProfile, decodePack, decodeView, object, integer, text } from './gameDecoders';
 import type { GameCommandRequest } from './gameApi';
 export type OperationMarker = {owner: string; id: string; path: string; runId?: string; expectedRevision?: number; createdAt: number};
 export type GameReply = {status: number; body: unknown; retryAfter?: string | null};
@@ -10,6 +10,8 @@ export function retryDelay(value: unknown, header: string | null, attempt=0, now
 /** One foreground transport; components provide existing auth restoration and owner identity. */
 export class GameTransport {
   private generation=0;
+  private language="en";
+  setLanguage(locale:string) {this.language=locale;}
   private restoring?: Promise<void>;
   private active=new Map<string,Promise<GameReply>>();
   private polls=new Set<string>();
@@ -26,14 +28,15 @@ export class GameTransport {
     const timer=setTimeout(()=>controller.abort(),25000);
     try {
       let res=await fetch(path,{method,credentials:'include',cache:'no-store',signal:controller.signal,
-        ...(body === undefined ? {} : {headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})});
+        headers:{'Accept-Language':this.language,...(body === undefined ? {} : {'Content-Type':'application/json'})},
+        ...(body === undefined ? {} : {body:JSON.stringify(body)})});
       if(res.status === 401) {
         this.restoring ??= this.restore().finally(()=>{this.restoring=undefined;});
         await this.restoring;
         // A restoration never silently replays a mutation.
         if(this.owner() !== owner)throw new Error('GAME_OWNER_CHANGED');
         if(method !== 'GET')throw new Error('GAME_RECONCILE_REQUIRED');
-        res=await fetch(path,{credentials:'include',cache:'no-store',signal:controller.signal});
+        res=await fetch(path,{credentials:'include',cache:'no-store',signal:controller.signal,headers:{'Accept-Language':this.language}});
       }
       if(generation !== this.generation || owner !== this.owner())throw new Error('GAME_OWNER_CHANGED');
       if(!res.headers.get('content-type')?.includes('application/json'))throw new Error('GAME_CONTRACT_UNSUPPORTED');
@@ -42,6 +45,10 @@ export class GameTransport {
       if(generation !== this.generation || owner !== this.owner())throw new Error('GAME_OWNER_CHANGED');
       const reply={status:res.status,body:value,retryAfter:res.headers.get('retry-after')};
       if(res.ok && path.endsWith('/capabilities'))return {...reply,body:decodeCapabilities(value)};
+      if(res.ok && path.endsWith('/packs')) {
+        if(!Array.isArray(value) || value.length>64)throw new Error('GAME_CONTRACT_UNSUPPORTED');
+        return {...reply,body:value.map(decodePack)};
+      }
       if(res.ok && path.endsWith('/generator-profiles')) {
         if(!Array.isArray(value) || value.length>64)throw new Error('GAME_CONTRACT_UNSUPPORTED');
         return {...reply,body:value.map(decodeProfile)};
@@ -60,6 +67,10 @@ export class GameTransport {
       runId:marker.runId,expectedRevision:marker.expectedRevision,createdAt:marker.createdAt}));
     const pending=this.request(marker.path,method,body).finally(()=>this.active.delete(key));
     this.active.set(key,pending);return pending;
+  }
+  async cancel(marker:OperationMarker):Promise<GameReply> {
+    if(marker.owner!==this.owner())throw new Error('GAME_OWNER_CHANGED');
+    return this.request(`${marker.path}/${marker.id}`,'DELETE');
   }
   adopt(value:unknown) {
     const run=decodeSummary(value), old=this.revisions.get(run.runId);

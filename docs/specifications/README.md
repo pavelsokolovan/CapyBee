@@ -77,7 +77,7 @@ list. The current implementation boundary is:
 - [27.27.5](27.27.5-engine-dynamic-packaging-and-release-closure-instruction.md) - Immutable build-once dynamic CLI/server artifacts, clean-room offline and PostgreSQL certification, digest-bound live evidence, and release promotion closure (implemented)
 - [28](28-client-rendering-contract-instruction.md) - Web RPG client and rendering contract (draft; delivery split into 28.1–28.4)
 - [28.1](28.1-game-client-contracts-and-transport-instruction.md) - Source-neutral public contracts, localized setup metadata, safe mutation/polling transport and operation prerequisites (implemented)
-- [28.2](28.2-game-preparation-and-start-instruction.md) - Play entry, preparation wizard, disclosure, confirmed start and unknown-outcome recovery (draft)
+- [28.2](28.2-game-preparation-and-start-instruction.md) - Play entry, preparation wizard, disclosure, confirmed start and unknown-outcome recovery (implemented)
 - [28.3](28.3-gameplay-renderer-and-run-controls-instruction.md) - Shared text-first scene renderer, legal commands, objectives/cast/places, endings and run controls (draft)
 - [28.4](28.4-game-client-recovery-and-release-acceptance-instruction.md) - Offline/auth/PWA/multitab recovery, integrated acceptance and release documentation (draft)
 - 29 - CapyBee Polish game pack and game-pack integration

@@ -23,6 +23,7 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -64,7 +65,7 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
                                            pending_start, created_at, updated_at)
                     VALUES (?, ?, 'PACK', ?, ?, ?, 'PREPARING', 0, ?::jsonb, ?, ?)
                     """, run.id(), ownerId(run.owner()), run.packId().value(), run.packVersion(),
-                    run.locale().value(), encodeStart(run), run.createdAt(), run.createdAt());
+                    run.locale().value(), encodeStart(run), timestamp(run.createdAt()), timestamp(run.createdAt()));
             return new CreateOutcome(CreateKind.CREATED, run.id());
         } catch (DuplicateKeyException duplicate) {
             Optional<UUID> sameIdOwner = jdbc.query("""
@@ -115,7 +116,7 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
                 int suspended = jdbc.update("""
                         UPDATE game_runs SET status = 'SUSPENDED', updated_at = ?
                         WHERE id = ? AND user_id = ? AND status = 'ACTIVE'
-                        """, clock.instant(), expectedCurrentRunId, ownerId(owner));
+                        """, timestamp(clock.instant()), expectedCurrentRunId, ownerId(owner));
                 if (suspended != 1) throw new IllegalStateException("DYNAMIC_REPLACEMENT_CONFLICT");
                 CreateOutcome inserted = insertDynamic(owner, runId, snapshot, createdAt);
                 if (inserted.kind() != CreateKind.CREATED) throw new IllegalStateException("DYNAMIC_REPLACEMENT_CONFLICT");
@@ -140,8 +141,8 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
                 """, runId, ownerId(owner), identity.id().value(), identity.version().toString(),
                 snapshot.dynamic().bundle().gameFingerprint(), snapshot.locale().value(), status,
                 snapshot.state().endReason() == null ? null : snapshot.state().endReason().name(),
-                snapshot.dynamic().totalProviderCalls(), SnapshotCodec.toJson(snapshot), now, now,
-                snapshot.state().ended() ? now : null);
+                snapshot.dynamic().totalProviderCalls(), encodeSnapshot(snapshot), timestamp(now), timestamp(now),
+                snapshot.state().ended() ? timestamp(now) : null);
         provisionalRunCalls.remove(runId);
         return new CreateOutcome(CreateKind.CREATED, runId);
     }
@@ -200,7 +201,7 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
                 UPDATE game_runs SET lease_token = ?, lease_until = ?, updated_at = ?
                 WHERE id = ? AND user_id = ? AND status IN ('PREPARING', 'ACTIVE')
                   AND (lease_until IS NULL OR lease_until <= ?)
-                """, token, until, clock.instant(), runId, ownerId(owner), clock.instant());
+                """, token, timestamp(until), timestamp(clock.instant()), runId, ownerId(owner), timestamp(clock.instant()));
         return changed == 1 ? Optional.of(new Lease(token, until)) : Optional.empty();
     }
 
@@ -217,8 +218,8 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
                 WHERE id = ? AND lease_token = ? AND revision = ? AND status IN ('PREPARING', 'ACTIVE')
                 """, snapshot.state().ended() ? "ENDED" : "ACTIVE",
                 snapshot.state().endReason() == null ? null : snapshot.state().endReason().name(),
-                SnapshotCodec.toJson(snapshot), now, snapshot.state().ended() ? "ENDED" : "ACTIVE",
-                now, runId, lease.token(), expectedRevision);
+                encodeSnapshot(snapshot), timestamp(now), snapshot.state().ended() ? "ENDED" : "ACTIVE",
+                timestamp(now), runId, lease.token(), expectedRevision);
         return changed == 1;
     }
 
@@ -228,7 +229,7 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
                 UPDATE game_runs SET status = 'FAILED', failure_code = ?, pending_start = NULL,
                     lease_token = NULL, lease_until = NULL, updated_at = ?
                 WHERE id = ? AND lease_token = ?
-                """, failureCode, clock.instant(), runId, lease.token()) == 1;
+                """, failureCode, timestamp(clock.instant()), runId, lease.token()) == 1;
     }
 
     @Override
@@ -236,7 +237,7 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
         jdbc.update("""
                 UPDATE game_runs SET lease_token = NULL, lease_until = NULL, updated_at = ?
                 WHERE id = ? AND lease_token = ?
-                """, clock.instant(), runId, lease.token());
+                """, timestamp(clock.instant()), runId, lease.token());
     }
 
     @Override
@@ -267,7 +268,7 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
                     INSERT INTO game_run_commands
                         (run_id, command_id, payload_mac, state, revision_before, created_at)
                     VALUES (?, ?, ?, 'IN_PROGRESS', ?, ?)
-                    """, runId, commandId, payloadMac, revisionBefore, clock.instant());
+                    """, runId, commandId, payloadMac, revisionBefore, timestamp(clock.instant()));
             return InsertKind.INSERTED;
         } catch (DuplicateKeyException duplicate) {
             return InsertKind.EXISTS;
@@ -394,7 +395,7 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
                     INSERT INTO game_run_events (run_id, seq, command_id, revision, event_id, payload, created_at)
                     VALUES (?, ?, ?, ?, ?, ?::jsonb, ?)
                     """, runId, seq++, commandId, revision, event.id(),
-                    SessionJson.encode(event.payload()), now);
+                    SessionJson.encode(event.payload()), timestamp(now));
         }
     }
 
@@ -428,7 +429,7 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
             jdbc.update("""
                     INSERT INTO game_run_prefetch (run_id, scene_id, based_on_revision, artifact, created_at)
                     VALUES (?, ?, ?, ?::jsonb, ?)
-                    """, runId, sceneId, basedOnRevision, encodeArtifact(artifact), clock.instant());
+                    """, runId, sceneId, basedOnRevision, encodeArtifact(artifact), timestamp(clock.instant()));
             return true;
         } catch (DuplicateKeyException duplicate) {
             return false;
@@ -535,7 +536,24 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
                 instant(rs, "updated_at"), null, null);
     }
 
+    /** JSONB reorders object keys. Keep fingerprinted engine bytes opaque to the database. */
+    private static String encodeSnapshot(RunSnapshot snapshot) {
+        String canonical = SnapshotCodec.toJson(snapshot);
+        if (canonical.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 1_048_576)
+            throw new IllegalArgumentException("RUN_SNAPSHOT_TOO_LARGE");
+        return snapshot.dynamicGame() ? SessionJson.encode(Map.of(
+                "snapshotEncoding", "canonical-json-v1", "canonicalSnapshot", canonical)) : canonical;
+    }
+
     private static RunSnapshot decodeSnapshot(String json) {
+        var envelope = SessionJson.tree(json);
+        if (envelope.has("snapshotEncoding")) {
+            if (envelope.size() != 2 || !"canonical-json-v1".equals(envelope.path("snapshotEncoding").asString())
+                    || !envelope.path("canonicalSnapshot").isString()) throw new IllegalStateException("RUN_SNAPSHOT_INVALID");
+            json = envelope.path("canonicalSnapshot").asString();
+            if (json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 1_048_576)
+                throw new IllegalStateException("RUN_SNAPSHOT_TOO_LARGE");
+        }
         var parsed = SnapshotCodec.fromJson(json);
         if (parsed.snapshot() == null) throw new IllegalStateException("RUN_SNAPSHOT_INVALID");
         return parsed.snapshot();
@@ -560,6 +578,10 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
     private static Instant instant(ResultSet rs, String column) throws SQLException {
         var timestamp = rs.getTimestamp(column);
         return timestamp == null ? null : timestamp.toInstant();
+    }
+
+    private static Timestamp timestamp(Instant value) {
+        return value == null ? null : Timestamp.from(value);
     }
 
     private static UUID ownerId(OwnerRef owner) {

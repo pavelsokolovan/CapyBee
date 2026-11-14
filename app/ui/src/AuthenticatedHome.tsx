@@ -11,6 +11,7 @@ import { OnboardingTutorial } from './components/OnboardingTutorial';
 import { HomeIcon, MissionsIcon, FriendshipsIcon, MemoriesIcon, PlayIcon, ProfileIcon } from './components/NavIcons';
 import { createPollenMatchBoard, evaluateTurn, type PollenMatchTile } from './hooks/usePollenMatchGame';
 import { createHiveBuilderTapSequence, type HiveBuilderTapTile } from './hooks/useHiveBuilderTapGame';
+import { AdventureEntry } from './components/game/AdventureEntry';
 import { HiveBuilderTapGame } from './components/HiveBuilderTapGame';
 import {
   CategoryAllIcon,
@@ -2429,6 +2430,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
               </div>
 
               <div className="play-list">
+                {user.id ? <AdventureEntry owner={user.id} locale={locale} /> : null}
                 <button
                   type="button"
                   className="play-game-row"
