@@ -79,8 +79,8 @@ class PreparationHttpIntegrationTest {
                     new TextGenerationResult.TokenUsage(1,1,0,0),"preparation-fixture",TextGenerationResult.FinishReason.COMPLETE);
         };
     }
-    static PackRegistry packs(){return new PackRegistry(List.of(new PackLoader(Engine.sectionValidators()).load(
-            new PackId("fixture-minimal"),new DirectoryPackSource(Path.of("../engine/fixtures/game-packs/fixture-minimal")))));}
+    static PackRegistry packs(){return new PackRegistry(List.of("fixture-minimal","fixture-text-dungeon").stream().map(id -> new PackLoader(Engine.sectionValidators()).load(
+            new PackId(id),new DirectoryPackSource(Path.of("../engine/fixtures/game-packs/"+id)))).toList());}
     @DynamicPropertySource static void database(DynamicPropertyRegistry properties){
         properties.add("server.port",()->HTTP_PORT);
         properties.add("app.cors.allowed-origins",()->"http://localhost:5173,http://127.0.0.1:"+HTTP_PORT);

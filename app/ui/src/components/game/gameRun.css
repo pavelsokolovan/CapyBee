@@ -1,0 +1,12 @@
+.game-run { min-width: 0; overflow-wrap: anywhere; padding-block: 1rem; }
+.game-run p { white-space: pre-wrap; }
+.game-run button, .game-run summary { min-height: 44px; padding: .65rem; }
+.game-run button { max-width: 100%; white-space: normal; }
+.game-run button:focus-visible, .game-run summary:focus-visible, .game-run textarea:focus-visible { outline: 3px solid #765321; outline-offset: 3px; }
+.game-run fieldset { min-width: 0; border: 0; padding: 0; }
+.game-run textarea { display: block; width: 100%; box-sizing: border-box; min-height: 7rem; }
+.game-run details { margin-block: .75rem; }
+.game-run dd { margin-inline-start: 1rem; }
+.game-run dialog { max-width: min(28rem, 80vw); overflow-wrap: anywhere; }
+.game-system { border-inline-start: 3px solid #bca67c; padding-inline-start: .75rem; }
+@media (prefers-reduced-motion: reduce) { .game-run *, .game-run *::before, .game-run *::after { animation: none !important; transition: none !important; } }

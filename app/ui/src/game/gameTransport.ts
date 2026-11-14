@@ -87,7 +87,8 @@ export class GameTransport {
       if(document.visibilityState!=='hidden' && navigator.onLine) {
         try {const reply=await this.read(path);if(signal.aborted)return;
           const body=object(reply.body);
-          if ((reply.status === 408 || reply.status === 429 || reply.status >= 500) && body.status !== 'FAILED') {
+          const fatal=body.error != null && ['RUN_UNRECOVERABLE','RUN_QUARANTINED','RUN_ARCHIVED','RUN_TRASHED'].includes(String(object(body.error).code));
+          if ((reply.status === 408 || reply.status === 429 || reply.status >= 500) && body.status !== 'FAILED' && !fatal) {
             delay=retryDelay(body.retryAfterMs,reply.retryAfter ?? null,++attempt);
           } else {
           accept(reply);

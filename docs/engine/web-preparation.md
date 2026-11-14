@@ -67,3 +67,20 @@ Spring-served assets, not a Vite mock. It checks 360px and desktop views,
 private-text review/storage, explicit start, keyboard focus, reload/Continue and
 browser Back. It writes local screenshots under `/tmp` and emits a content-free
 result. No real OAuth sign-in, provider credential or paid provider call is used.
+
+
+## Gameplay verification (28.3)
+
+The same browser command now plays a dynamic fixture to an ending, then an
+authored Polish choice/Continue fixture and a dungeon with legal movement.
+It also checks abandon confirmation/cancel, scene focus, reduced motion and
+200% content zoom. Game text and command bodies are never added to durable
+browser storage; only operation identities survive an uncertain command.
+The scene renderer uses public places and availableMoves, and preserves plain
+text for unknown block kinds. Game rollout stays disabled pending 28.4.
+
+The engine continuity window excludes the current scene before selecting recent
+history. Previously entering a later scene could shift that window, replace an
+accepted artifact and lose its provider-call evidence, causing subsequent
+snapshot resume to fail. Visited artifacts are now stable; tests cover each
+scene's snapshot round trip and a provider-free read before advancing.

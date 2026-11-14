@@ -91,6 +91,35 @@ class DynamicBootstrapIntegrationTest {
         assertThat(started.run().apply(new Command.Choose(firstChoice)).accepted()).isTrue();
     }
 
+    @Test void everyAcceptedSceneRemainsReadableWithoutProviderCallsAfterSnapshotRoundTrip() {
+        var candidate = MaterializedGameCompilerTest.reviewed(MaterializedGameCompilerTest.fixture());
+        AtomicInteger calls = new AtomicInteger();
+        Engine engine = Engine.builder(new PackRegistry(List.of())).clock(Clock.systemUTC())
+                .random(Randoms.seeded(42L)).ids(new SequentialIdSource("run"))
+                .dynamicBlueprints(request -> candidate).textGenerator(request -> {
+                    calls.incrementAndGet();
+                    return new com.capybee.engine.port.TextGenerationResult("{}",
+                            new com.capybee.engine.port.TextGenerationResult.TokenUsage(1,1,0,0),"fixture",
+                            com.capybee.engine.port.TextGenerationResult.FinishReason.COMPLETE);
+                }).build();
+        var started = (DynamicGameBootstrapResult.Started) engine.startDynamic(new DynamicGameBootstrapRequest(
+                BlueprintGenerationServiceTest.context().request("history-window", null, BlueprintCancellation.NEVER), 99L));
+        Run run = started.run();
+        for (int step=0;step<8;step++) {
+            var before = run.view();
+            int acceptedCalls = calls.get();
+            var snapshot = SnapshotCodec.fromJson(SnapshotCodec.toJson(run.snapshot())).snapshot();
+            var restored = engine.resume(snapshot);
+            assertThat(restored.ok()).as("resume at step %s",step).isTrue();
+            assertThat(restored.run().view()).isEqualTo(before);
+            assertThat(calls.get()).as("reading must preserve accepted artifacts").isEqualTo(acceptedCalls);
+            run = restored.run();
+            if (run.view().ended()) return;
+            assertThat(run.apply(new Command.Choose(run.view().options().stream().filter(option -> option.enabled()).findFirst().orElseThrow().id())).accepted()).isTrue();
+        }
+        throw new AssertionError("Fixture did not reach its ending");
+    }
+
     @Test void missingCoordinatorFailsWithoutAllocatingIdentity() {
         var ids = new SequentialIdSource("run");
         Engine engine = Engine.builder(new PackRegistry(List.of()))

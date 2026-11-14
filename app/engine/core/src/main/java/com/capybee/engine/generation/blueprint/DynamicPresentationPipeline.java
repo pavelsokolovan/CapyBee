@@ -172,7 +172,7 @@ public final class DynamicPresentationPipeline {
     public synchronized Scene resolveScene(String sceneId, List<String> visited) {
         DynamicPresentationArtifact artifact = cache.get(sceneId);
         List<String> basis = continuityBasis(sceneId, visited == null ? List.of() : visited);
-        if (artifact != null && !artifact.continuityBasisSceneIds().equals(basis)) {
+        if (artifact != null && visited != null && !visited.contains(sceneId) && !artifact.continuityBasisSceneIds().equals(basis)) {
             cache.remove(sceneId); artifact = null;
         }
         if (artifact == null) { artifact = resolve(sceneId, visited == null ? List.of() : visited); cache.put(sceneId, artifact); }
@@ -280,7 +280,12 @@ public final class DynamicPresentationPipeline {
         List<SceneOption> options=source.options().stream().map(v->new SceneOption(v.id(),labels.get(v.id()),v.next(),v.effects(),v.requires(),v.unmetHint(),v.hideWhenUnmet())).toList();
         return new Scene(source.id(),source.start(),blocks,options,source.next(),source.end(),source.onEnter(),source.branches(),source.outcome(),source.inputMode(),source.maxChars());
     }
-    private List<String> continuityBasis(String current,List<String> visited){return visited.stream().filter(id->!id.equals(current)&&cache.containsKey(id)).distinct().skip(Math.max(0,visited.size()-4L)).toList();}
+    private List<String> continuityBasis(String current,List<String> visited){
+        // Entering the current scene must not shift the history window and regenerate
+        // an already accepted artifact (which also loses its provider-call evidence).
+        List<String> prior = visited.stream().filter(id->!id.equals(current)&&cache.containsKey(id)).distinct().toList();
+        return prior.stream().skip(Math.max(0,prior.size()-4L)).toList();
+    }
     private GenerationOutputParser.DynamicSceneContext context(MaterializedGameDefinition.ScenePlan p){return new GenerationOutputParser.DynamicSceneContext(p.id(),p.actorIds(),p.choices().stream().map(MaterializedGameDefinition.ChoicePlan::id).toList(),p.objectiveIds(),canonical(p.id()).end());}
     private Scene canonical(String id){Scene v=definition.runtimeSceneSet().scenes().get(id);if(v==null)throw new IllegalArgumentException("Unknown scene");return v;}
     private MaterializedGameDefinition.ScenePlan plan(String id){return definition.scenePlans().stream().filter(v->v.id().equals(id)).findFirst().orElseThrow();}

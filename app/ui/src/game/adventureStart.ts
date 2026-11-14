@@ -71,7 +71,8 @@ export class AdventureStart {
    const [current,packs,profiles]=calls;
    if(current.status==='fulfilled'){
     if(current.value.status===200)patch.current=decodeSummary(current.value.body);
-    else if(current.value.status!==404)patch.message=current.value.status===401?'signin':'unavailable';
+    else if(current.value.status===404)patch.current=null;
+    else patch.message=current.value.status===401?'signin':'unavailable';
    }else patch.message=message(current.reason);
    if(packs.status==='fulfilled' && packs.value.status===200 && caps.packStartEnabled && Array.isArray(packs.value.body))
     for(const pack of packs.value.body.slice(0,64))games.push({kind:'PACK',pack:pack as GamePackInfoDto});

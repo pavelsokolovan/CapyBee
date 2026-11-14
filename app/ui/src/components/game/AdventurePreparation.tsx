@@ -4,6 +4,7 @@ import {GameTransport} from '../../offline/syncEngine';
 import {AdventureStart} from '../../game/adventureStart';
 import {adventureCopy} from '../../game/adventureCopy';
 import {compatible,effective,inputsOf,localesOf,titleOf,validation,codePoints,type Adventure} from '../../game/preparation';
+import {GameRun} from './GameRun';
 import {restoreGameSession} from '../../game/restoreGameSession';
 
 type Props={owner:string;locale:'en'|'pl';onClose:()=>void;onRunReady?:(run:GameRunSummaryDto)=>void;flow?:AdventureStart};
@@ -70,7 +71,7 @@ export function AdventurePreparation({owner,locale,onClose,onRunReady,flow:provi
   onKeyDown={event=>{
    if(event.key==='Escape'&&!composing){event.preventDefault();close();}
    if(event.key==='Tab'){
-    const nodes=panel.current?.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select,textarea,a[href]');
+    const nodes=Array.from(panel.current?.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select,textarea,summary,a[href]')??[]).filter(node=>!node.closest('dialog:not([open])')&&!node.closest('fieldset:disabled'));
     if(!nodes?.length)return;const first=nodes[0],last=nodes[nodes.length-1];
     if(event.shiftKey&&(document.activeElement===first||document.activeElement===heading.current)){event.preventDefault();last.focus();}
     else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
@@ -87,7 +88,7 @@ export function AdventurePreparation({owner,locale,onClose,onRunReady,flow:provi
     <h3>{copy.newGame}</h3>
     {!state.loading&&!state.games.length&&!state.message?<p>{copy.empty}</p>:null}
     {state.games.map(game=><button type="button" className="play-game-row" key={`${game.kind}:${game.kind==='DYNAMIC'?game.profile.id:game.pack.id}`}
-      disabled={!compatible(game)||!state.caps?.viewFeatures.includes('canAdvance')} onClick={()=>select(game)}>
+      disabled={state.loading||!compatible(game)||!state.caps?.viewFeatures.includes('canAdvance')} onClick={()=>select(game)}>
       <span><strong>{titleOf(game)||copy.unsupported}</strong><small>{!compatible(game)?copy.unsupported:game.kind==='DYNAMIC'?copy.dynamic:copy.authored}</small></span>
     </button>)}
     <button type="button" className="secondary-button" onClick={()=>void flow.load()} disabled={state.loading}>{copy.retry}</button>
@@ -126,12 +127,7 @@ export function AdventurePreparation({owner,locale,onClose,onRunReady,flow:provi
     {activeCurrent?<button type="button" onClick={()=>void flow.resume()}>{copy.continue}</button>:null}
     <button type="button" onClick={()=>{setWish('');flow.catalog();void flow.load(false);}}>{copy.newGame}</button>
    </>:null}
-   {state.phase==='ready'&&state.ready?<SavedAdventure run={state.ready} locale={locale}/>:null}
+   {state.phase==='ready'&&state.ready?<GameRun key={owner+state.ready.runId} run={state.ready} owner={owner} locale={locale} onAnother={()=>{flow.catalog();void flow.load(false);}}/>:null}
   </div>
  </div>;
-}
-/** Explicit read-only handoff seam: Spec 28.3 supplies mechanical controls. */
-export function SavedAdventure({run,locale}:{run:GameRunSummaryDto;locale:'en'|'pl'}) {
- const copy=adventureCopy[locale];return <section aria-label={copy.saved}><h3>{'story' in (run.view??{})?(run.view as {story?:{title:string}}).story?.title??copy.saved:copy.saved}</h3>
-  <p>{copy.ready}</p><p>{new Intl.DisplayNames([locale],{type:'language'}).of(run.locale)}</p>{run.view?.blocks.map((block,i)=><p key={i} className="adventure-prose">{block.text}</p>)}</section>;
 }

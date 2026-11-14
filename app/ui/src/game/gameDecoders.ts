@@ -40,7 +40,7 @@ export function decodeView(value: unknown, schema: unknown): GameView {
   }
   if(v.places != null) {
     const p=object(v.places); text(p.currentPlaceId);text(p.layoutKind);strings(p.availableMoves);strings(p.visitedPlaceIds);
-    for(const item of array(p.places)){const x=object(item);text(x.id);text(x.label);text(x.description);for(const k of ['x','y'])if(x[k] != null && !Number.isSafeInteger(x[k]))throw new GameContractError();}
+    for(const item of array(p.places)){const x=object(item);text(x.id);text(x.label);if(x.description!=null)text(x.description);for(const k of ['x','y'])if(x[k] != null && !Number.isSafeInteger(x[k]))throw new GameContractError();}
     for(const item of array(p.links)){const x=object(item);text(x.from);text(x.to);bool(x.bidirectional);}
   }
   return v as unknown as GameView;

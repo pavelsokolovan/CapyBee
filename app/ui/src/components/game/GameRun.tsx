@@ -1,0 +1,29 @@
+import {useEffect,useLayoutEffect,useRef,useState,useSyncExternalStore} from 'react';
+import type {GameRunSummaryDto} from '../../game/gameApi';
+import {GameTransport} from '../../game/gameTransport';
+import {RunController} from '../../game/runController';
+import {restoreGameSession} from '../../game/restoreGameSession';
+import {SceneBlocks,SceneActions,ScenePanels,SceneResult} from './GameScene';
+import {adventureCopy} from '../../game/adventureCopy';
+import {runCopy} from './runCopy';
+import './gameRun.css';
+export function GameRun({run,owner,locale,onAnother,controller:provided}:{run:GameRunSummaryDto;owner:string;locale:'en'|'pl';onAnother:()=>void;controller?:RunController}){
+ const [controller]=useState(()=>provided??new RunController(run,new GameTransport(()=>owner,()=>restoreGameSession(owner)),owner));
+ const state=useSyncExternalStore(controller.subscribe,controller.getSnapshot),c=runCopy[locale],view=state.run.view;
+ const heading=useRef<HTMLHeadingElement>(null),abandon=useRef<HTMLButtonElement>(null),dialog=useRef<HTMLDialogElement>(null);
+ useEffect(()=>{void controller.check();return()=>controller.detach();},[controller]);
+ useLayoutEffect(()=>{heading.current?.focus();},[state.run.revision]);
+ const ended=!!view?.ended||state.run.status==='ENDED';
+ const unsupported=!view||typeof view.canAdvance!=='boolean'||!!(view.input?.mode==='TEXT'&&view.options.some(o=>o.enabled))||!!(view.places?.availableMoves.some(id=>!view.places?.places.some(p=>p.id===id)));
+ const locked=state.pending||state.run.status!=='ACTIVE'||!!view?.ended||unsupported;
+ const submit=controller.submit.bind(controller);
+ const cancel=()=>{dialog.current?.close();abandon.current?.focus();};
+ return <section className="game-run" lang={state.run.locale}><h3 tabIndex={-1} ref={heading}>{view&&'story' in view?view.story?.title??c.scene:c.scene}</h3>
+ {state.message==='saved'?<p>{adventureCopy[locale].ready}</p>:null}<p role="status" aria-live="polite">{c[state.message]}</p>{unsupported?<p>{c.unsupported}</p>:null}{state.run.status!=='ACTIVE'&&!ended?<p>{c.unavailable}</p>:null}
+ {view?<><SceneBlocks view={view} locale={locale}/>{!locked||state.pending?<SceneActions key={state.run.revision} view={view} locale={locale} locked={locked} selection={state.selection} submit={submit}/>:null}
+ <ScenePanels view={view} locale={locale} locked={locked} submit={submit}/>{ended?<SceneResult view={view} locale={locale}/>:null}</>:null}
+ {state.pending?<button type="button" onClick={()=>void controller.check()}>{c.check}</button>:null}
+ {ended?<button type="button" onClick={onAnother}>{c.newGame}</button>:null}
+ {state.run.status==='ACTIVE'?<button type="button" ref={abandon} disabled={locked} onClick={()=>dialog.current?.showModal()}>{c.abandon}</button>:null}
+ <dialog onKeyDown={e=>e.stopPropagation()} ref={dialog} aria-labelledby="game-abandon-title" onCancel={e=>{e.preventDefault();cancel();}}><h4 id="game-abandon-title">{c.confirm}</h4><button type="button" onClick={cancel}>{c.cancel}</button><button type="button" disabled={locked} onClick={()=>{cancel();void submit({type:'ABANDON'});}}>{c.abandon}</button></dialog></section>;
+}

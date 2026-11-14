@@ -118,7 +118,7 @@ export interface GamePackInfoDto {
 export type GameSource = { kind: 'PACK'; packId: string; packVersion: string }
   | { kind: 'DYNAMIC'; profileId: string; profileVersion: string; gameFingerprint: string };
 export interface PlacesView {
-  currentPlaceId: string; places: Array<{id: string; label: string; description: string; x: number | null; y: number | null}>;
+  currentPlaceId: string; places: Array<{id: string; label: string; description?: string | null; x: number | null; y: number | null}>;
   links: Array<{from: string; to: string; bidirectional: boolean}>;
   availableMoves: string[]; visitedPlaceIds: string[]; layoutKind: string;
 }

@@ -47,9 +47,57 @@ try {
  await page.reload();await page.getByRole('button',{name:'Play',exact:true}).click();await page.getByRole('button',{name:/Adventures/}).click();
  await page.getByRole('button',{name:'Continue',exact:true}).click();await page.getByText('Your adventure is saved. You can leave and come back.').waitFor();
  assert.equal(requests.length,1,'reload submitted another paid attempt');
+ // Drive the shared renderer through a dynamic ending via the actual controller API.
+ const gameplay=page.locator('.game-run');
+ for(let step=0;step<12;step++){
+  if(await gameplay.getByRole('button',{name:'Start another adventure',exact:true}).count())break;
+  const beforeCommands=requests.length;
+  await gameplay.locator('fieldset button:enabled').first().click();
+  await page.waitForFunction(()=>document.querySelector('.game-run [role=status]')?.textContent==='Saved');
+  assert.ok(requests.length>beforeCommands);
+ }
+ await gameplay.getByRole('button',{name:'Start another adventure',exact:true}).click();
+ // A separate authored fixture exercises explicit Continue in Polish.
+ await page.getByRole('button',{name:/Fixture — Minimal/}).click();
+ while(await page.getByRole('button',{name:'Next',exact:true}).count())await page.getByRole('button',{name:'Next',exact:true}).click();
+ await page.getByRole('button',{name:'Review',exact:true}).click();
+ await page.getByRole('button',{name:'Start adventure',exact:true}).click();
+ await gameplay.getByRole('button',{name:'Wsiadam do łódki',exact:true}).click();
+ await gameplay.getByRole('button',{name:'Continue',exact:true}).click();
+ await gameplay.getByRole('button',{name:'Start another adventure',exact:true}).waitFor();
+ assert.equal(await gameplay.getAttribute('lang'),'pl');
+ // The dungeon exposes informational places and server-authorized movement.
+ await gameplay.getByRole('button',{name:'Start another adventure',exact:true}).click();
+ await page.getByRole('button',{name:/Fixture — Text Dungeon/}).click();
+ await page.getByRole('button',{name:'Review',exact:true}).click();
+ await page.getByRole('button',{name:'Start adventure',exact:true}).click();
+ await gameplay.getByText('Places',{exact:true}).click();
+ await gameplay.getByRole('button',{name:'Go to: Corridor',exact:true}).click();
+ await page.waitForFunction(()=>document.querySelector('.game-run [role=status]')?.textContent==='Saved');
+ // Movement changes the place, not the scene: use the advertised choices.
+ for(const label of ['Step into the corridor','Go left','Return to the corridor','Go right','Climb the stairs']){
+  await gameplay.getByRole('button',{name:label,exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('.game-run [role=status]')?.textContent==='Saved');
+ }
+ await gameplay.getByRole('button',{name:'Start another adventure',exact:true}).waitFor();
+ await gameplay.getByRole('button',{name:'Start another adventure',exact:true}).click();
+ await page.getByRole('button',{name:/Fixture — Minimal/}).click();
+ while(await page.getByRole('button',{name:'Next',exact:true}).count())await page.getByRole('button',{name:'Next',exact:true}).click();
+ await page.getByRole('button',{name:'Review',exact:true}).click();await page.getByRole('button',{name:'Start adventure',exact:true}).click();
+ const endButton=gameplay.getByRole('button',{name:'End adventure',exact:true});await endButton.click();
+ await gameplay.locator('dialog').getByRole('button',{name:'Cancel',exact:true}).click();
+ assert.equal(await endButton.evaluate(node=>node===document.activeElement),true);
+ await endButton.click();await gameplay.locator('dialog').getByRole('button',{name:'End adventure',exact:true}).click();
+ await gameplay.getByText('Abandoned',{exact:true}).waitFor();
+ assert.equal(await gameplay.locator('h3').evaluate(node=>node===document.activeElement),true);
+ await page.emulateMedia({reducedMotion:'reduce'});
+ await page.evaluate(()=>document.querySelector('.game-run').style.zoom='2');
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth));
+ await page.evaluate(()=>document.querySelector('.game-run').style.zoom='1');
+ const finalRequests=requests.length;
  await page.setViewportSize({width:1280,height:900});await page.screenshot({path:'/tmp/282-preparation-desktop.png'});
  await page.goBack();await page.locator('[role=dialog]').waitFor({state:'detached'});
  await page.waitForFunction(()=>document.activeElement?.textContent?.includes('Adventures'));
- assert.equal(requests.length,1);assert.deepEqual(errors,[]);
+ assert.equal(requests.length,finalRequests);assert.deepEqual(errors,[]);
  console.log('PASS: Spring-served preparation, private review, 360px/desktop, explicit start, reload/continue, browser Back and storage');
-}finally{await browser.close();}
+}catch(error){console.error('GAME DIAGNOSTIC',await page.locator('[role=dialog]').first().innerText({timeout:1000}).catch(()=>''));throw error;}finally{await browser.close();}
