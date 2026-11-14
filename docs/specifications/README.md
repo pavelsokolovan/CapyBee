@@ -80,7 +80,12 @@ list. The current implementation boundary is:
 - [28.2](28.2-game-preparation-and-start-instruction.md) - Play entry, preparation wizard, disclosure, confirmed start and unknown-outcome recovery (implemented)
 - [28.3](28.3-gameplay-renderer-and-run-controls-instruction.md) - Shared text-first scene renderer, legal commands, objectives/cast/places, endings and run controls (implemented)
 - [28.4](28.4-game-client-recovery-and-release-acceptance-instruction.md) - Offline/auth/PWA/multitab recovery, integrated acceptance and release documentation (implemented)
-- 29 - CapyBee Polish game pack and game-pack integration (unimplemented)
+- [29](29-capybee-polish-game-and-product-integration-instruction.md) - CapyBee Polish game and product integration (draft; split into 29.1–29.5)
+- [29.1](29.1-capybee-polish-authored-pack-instruction.md) - Polish Authored Pack (draft)
+- [29.2](29.2-capybee-theme-generation-and-safety-instruction.md) - Theme-first Generation and Safety (draft)
+- [29.3](29.3-game-hex-map-and-encounters-instruction.md) - Accessible Hex Map and Encounter UI (draft)
+- [29.4](29.4-rpg-missions-and-daily-cell-integration-instruction.md) - Missions and Daily Game-cell Integration (draft)
+- [29.5](29.5-capybee-game-release-acceptance-instruction.md) - Polish Game Release Acceptance (draft)
 
 ### Roadmap reconciliation
 
