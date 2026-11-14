@@ -41,7 +41,8 @@ jobs:
 
   build-and-test:
     name: Build & Test
-    runs-on: ubuntu-latest
+    # Playwright 1.58 browser dependencies target Ubuntu 24.04, not runner image 26.04.
+    runs-on: ubuntu-24.04
 
     services:
       postgres:
