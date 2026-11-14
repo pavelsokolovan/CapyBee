@@ -68,6 +68,7 @@ logging:
 
 capybee:
   game:
+    web-client-enabled: ${CAPYBEE_GAME_WEB_CLIENT_ENABLED:false}
     enabled: ${CAPYBEE_GAME_ENABLED:false}
     generation-enabled: ${CAPYBEE_GAME_GENERATION_ENABLED:false}
     dynamic:

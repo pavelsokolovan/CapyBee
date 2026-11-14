@@ -1,0 +1,491 @@
+{
+  "pack": {
+    "runId": "5f2fc4c8-bfc4-4b2f-8fd6-04fd187d687e",
+    "status": "ACTIVE",
+    "revision": 4,
+    "source": {
+      "kind": "PACK",
+      "packId": "fixture-minimal",
+      "packVersion": "1.0.0",
+      "profileId": null,
+      "profileVersion": null,
+      "gameFingerprint": null
+    },
+    "packId": "fixture-minimal",
+    "packVersion": "1.0.0",
+    "locale": "en",
+    "endReason": null,
+    "failureCode": null,
+    "viewSchema": 2,
+    "view": {
+      "blocks": [],
+      "options": [],
+      "input": null,
+      "status": [],
+      "ended": false,
+      "endReason": null,
+      "objectives": [],
+      "outcome": null,
+      "places": null,
+      "story": null,
+      "characters": [],
+      "result": null,
+      "canAdvance": false
+    },
+    "updatedAt": "2026-10-16T20:11:03Z"
+  },
+  "dynamic": {
+    "runId": "5f2fc4c8-bfc4-4b2f-8fd6-04fd187d687e",
+    "status": "ACTIVE",
+    "revision": 4,
+    "source": {
+      "kind": "DYNAMIC",
+      "packId": null,
+      "packVersion": null,
+      "profileId": "generic-adventure",
+      "profileVersion": "1.0.0",
+      "gameFingerprint": "fingerprint"
+    },
+    "packId": null,
+    "packVersion": null,
+    "locale": "en",
+    "endReason": null,
+    "failureCode": null,
+    "viewSchema": 2,
+    "view": {
+      "blocks": [],
+      "options": [],
+      "input": null,
+      "status": [],
+      "ended": false,
+      "endReason": null,
+      "objectives": [],
+      "outcome": null,
+      "places": null,
+      "story": null,
+      "characters": [],
+      "result": null,
+      "canAdvance": false
+    },
+    "updatedAt": "2026-10-16T20:11:03Z"
+  },
+  "packV1": {
+    "runId": "5f2fc4c8-bfc4-4b2f-8fd6-04fd187d687e",
+    "status": "ACTIVE",
+    "revision": 4,
+    "source": {
+      "kind": "PACK",
+      "packId": "fixture-minimal",
+      "packVersion": "1.0.0",
+      "profileId": null,
+      "profileVersion": null,
+      "gameFingerprint": null
+    },
+    "packId": "fixture-minimal",
+    "packVersion": "1.0.0",
+    "locale": "en",
+    "endReason": null,
+    "failureCode": null,
+    "viewSchema": 1,
+    "view": {
+      "blocks": [
+        {
+          "kind": "NARRATION",
+          "actorId": null,
+          "text": "A story.",
+          "tags": []
+        }
+      ],
+      "options": [],
+      "input": null,
+      "status": [],
+      "ended": false,
+      "endReason": null,
+      "objectives": [],
+      "outcome": null,
+      "places": null,
+      "story": null,
+      "characters": [],
+      "result": null,
+      "canAdvance": false
+    },
+    "updatedAt": "2026-10-16T20:11:03Z"
+  },
+  "processing": {
+    "status": "PROCESSING",
+    "retryAfterMs": 1000,
+    "run": null,
+    "code": null
+  },
+  "started": {
+    "status": "STARTED",
+    "retryAfterMs": 0,
+    "run": {
+      "runId": "5f2fc4c8-bfc4-4b2f-8fd6-04fd187d687e",
+      "status": "ACTIVE",
+      "revision": 4,
+      "source": {
+        "kind": "DYNAMIC",
+        "packId": null,
+        "packVersion": null,
+        "profileId": "generic-adventure",
+        "profileVersion": "1.0.0",
+        "gameFingerprint": "fingerprint"
+      },
+      "packId": null,
+      "packVersion": null,
+      "locale": "en",
+      "endReason": null,
+      "failureCode": null,
+      "viewSchema": 2,
+      "view": {
+        "blocks": [],
+        "options": [],
+        "input": null,
+        "status": [],
+        "ended": false,
+        "endReason": null,
+        "objectives": [],
+        "outcome": null,
+        "places": null,
+        "story": null,
+        "characters": [],
+        "result": null,
+        "canAdvance": false
+      },
+      "updatedAt": "2026-10-16T20:11:03Z"
+    },
+    "code": null
+  },
+  "failed": {
+    "status": "FAILED",
+    "retryAfterMs": 0,
+    "run": null,
+    "code": "DYNAMIC_START_UNAVAILABLE"
+  },
+  "error": {
+    "error": {
+      "code": "RUN_NOT_FOUND",
+      "message": "Run not found",
+      "details": {}
+    }
+  },
+  "command": {
+    "commandId": "5f2fc4c8-bfc4-4b2f-8fd6-04fd187d687e",
+    "outcome": "APPLIED",
+    "accepted": true,
+    "appliedRevision": 4,
+    "revision": 4,
+    "status": "ACTIVE",
+    "view": {
+      "blocks": [],
+      "options": [],
+      "input": null,
+      "status": [],
+      "ended": false,
+      "endReason": null,
+      "objectives": [],
+      "outcome": null,
+      "places": null,
+      "story": null,
+      "characters": [],
+      "result": null,
+      "canAdvance": false
+    },
+    "viewSchema": 2,
+    "events": [],
+    "issues": []
+  },
+  "profile": {
+    "id": "generic-adventure",
+    "version": "1.0.0",
+    "fingerprint": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "title": "New adventure",
+    "description": "A fresh bounded adventure",
+    "supportedLocales": [
+      "en",
+      "pl"
+    ],
+    "defaultLocale": "en",
+    "questions": [
+      {
+        "id": "tone",
+        "help": "Choose a tone",
+        "defaults": [
+          "curious"
+        ],
+        "options": [
+          {
+            "id": "cozy",
+            "label": "Cozy"
+          },
+          {
+            "id": "curious",
+            "label": "Curious"
+          }
+        ],
+        "notice": null
+      },
+      {
+        "id": "interests",
+        "help": "Choose interests",
+        "defaults": [],
+        "options": [
+          {
+            "id": "animals",
+            "label": "Animals"
+          },
+          {
+            "id": "nature",
+            "label": "Nature"
+          }
+        ],
+        "notice": null
+      },
+      {
+        "id": "length",
+        "help": "Choose length",
+        "defaults": [
+          "short"
+        ],
+        "options": [
+          {
+            "id": "short",
+            "label": "Short"
+          },
+          {
+            "id": "medium",
+            "label": "Medium"
+          }
+        ],
+        "notice": null
+      },
+      {
+        "id": "challenge",
+        "help": "Choose challenge",
+        "defaults": [
+          "gentle"
+        ],
+        "options": [
+          {
+            "id": "gentle",
+            "label": "Gentle"
+          },
+          {
+            "id": "standard",
+            "label": "Standard"
+          }
+        ],
+        "notice": null
+      },
+      {
+        "id": "game-locale",
+        "help": "Choose game language",
+        "defaults": [
+          "en"
+        ],
+        "options": [
+          {
+            "id": "en",
+            "label": "English"
+          },
+          {
+            "id": "pl",
+            "label": "Polish"
+          }
+        ],
+        "notice": null
+      },
+      {
+        "id": "story-wish",
+        "help": "Do not enter real names, contacts, exact locations, schools or secrets.",
+        "defaults": [],
+        "options": [],
+        "notice": "This optional idea may be sent to an external service after confirmation."
+      }
+    ],
+    "lengthPresets": [
+      {
+        "id": "short",
+        "label": "Short"
+      },
+      {
+        "id": "medium",
+        "label": "Medium"
+      }
+    ],
+    "challengePresets": [
+      {
+        "id": "gentle",
+        "label": "Gentle"
+      },
+      {
+        "id": "standard",
+        "label": "Standard"
+      }
+    ],
+    "suggestionAllowed": true,
+    "maxSuggestionCodePoints": 300,
+    "setupSchemaVersion": 1,
+    "metadataLocale": "en",
+    "steps": [
+      {
+        "id": "feel",
+        "title": "Feel",
+        "inputIds": [
+          "tone",
+          "interests"
+        ]
+      },
+      {
+        "id": "scope",
+        "title": "Scope",
+        "inputIds": [
+          "length",
+          "challenge"
+        ]
+      },
+      {
+        "id": "language",
+        "title": "Language",
+        "inputIds": [
+          "game-locale"
+        ]
+      },
+      {
+        "id": "idea",
+        "title": "Idea",
+        "inputIds": [
+          "story-wish"
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "id": "tone",
+        "kind": "ENUM",
+        "label": "Tone",
+        "help": "Choose a tone",
+        "required": false,
+        "maxItems": 1,
+        "maxCodePoints": null,
+        "defaults": [
+          "curious"
+        ],
+        "options": [
+          {
+            "id": "cozy",
+            "label": "Cozy"
+          },
+          {
+            "id": "curious",
+            "label": "Curious"
+          }
+        ],
+        "notice": null
+      },
+      {
+        "id": "interests",
+        "kind": "ENUM_SET",
+        "label": "Interests",
+        "help": "Choose interests",
+        "required": false,
+        "maxItems": 2,
+        "maxCodePoints": null,
+        "defaults": [],
+        "options": [
+          {
+            "id": "animals",
+            "label": "Animals"
+          },
+          {
+            "id": "nature",
+            "label": "Nature"
+          }
+        ],
+        "notice": null
+      },
+      {
+        "id": "length",
+        "kind": "ENUM",
+        "label": "Length",
+        "help": "Choose length",
+        "required": true,
+        "maxItems": 1,
+        "maxCodePoints": null,
+        "defaults": [
+          "short"
+        ],
+        "options": [
+          {
+            "id": "short",
+            "label": "Short"
+          },
+          {
+            "id": "medium",
+            "label": "Medium"
+          }
+        ],
+        "notice": null
+      },
+      {
+        "id": "challenge",
+        "kind": "ENUM",
+        "label": "Challenge",
+        "help": "Choose challenge",
+        "required": true,
+        "maxItems": 1,
+        "maxCodePoints": null,
+        "defaults": [
+          "gentle"
+        ],
+        "options": [
+          {
+            "id": "gentle",
+            "label": "Gentle"
+          },
+          {
+            "id": "standard",
+            "label": "Standard"
+          }
+        ],
+        "notice": null
+      },
+      {
+        "id": "game-locale",
+        "kind": "ENUM",
+        "label": "Language",
+        "help": "Choose game language",
+        "required": true,
+        "maxItems": 1,
+        "maxCodePoints": null,
+        "defaults": [
+          "en"
+        ],
+        "options": [
+          {
+            "id": "en",
+            "label": "English"
+          },
+          {
+            "id": "pl",
+            "label": "Polish"
+          }
+        ],
+        "notice": null
+      },
+      {
+        "id": "story-wish",
+        "kind": "FREE_TEXT",
+        "label": "Optional idea",
+        "help": "Do not enter real names, contacts, exact locations, schools or secrets.",
+        "required": false,
+        "maxItems": 1,
+        "maxCodePoints": 300,
+        "defaults": [],
+        "options": [],
+        "notice": "This optional idea may be sent to an external service after confirmation."
+      }
+    ]
+  }
+}

@@ -3,6 +3,7 @@ package com.capybee.server.game;
 import com.capybee.engine.generation.GenerationSetup.SetupOption;
 import com.capybee.engine.generation.profile.*;
 import com.capybee.engine.pack.LocaleTag;
+import com.capybee.engine.pack.StartInputDef;
 import com.capybee.engine.session.ConfirmedDynamicPreparation;
 import com.capybee.engine.session.DynamicStartCoordinator;
 import com.capybee.engine.session.SessionException;
@@ -28,6 +29,8 @@ public class DynamicGameController {
     private final UserService users;
     private final FamilyProfileRepository familyProfiles;
     private final boolean allowSeed;
+    private final boolean webEnabled, gameEnabled, generationEnabled;
+    private final java.time.Clock clock;
     private final DynamicStartRateLimiter rateLimiter;
     private final long syncWaitMs;
     private final Set<String> allowedOrigins;
@@ -39,7 +42,11 @@ public class DynamicGameController {
             @Value("${capybee.game.allow-seed:false}") boolean allowSeed,
             @Value("${capybee.game.sync-wait-ms:8000}") long syncWaitMs,
             @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:4173,https://capybee.fly.dev}")
-            String configuredOrigins) {
+            String configuredOrigins, java.time.Clock clock,
+            @Value("${capybee.game.web-client-enabled:false}") boolean webEnabled,
+            @Value("${capybee.game.enabled:false}") boolean gameEnabled,
+            @Value("${capybee.game.generation-enabled:false}") boolean generationEnabled) {
+        this.clock = clock; this.webEnabled = webEnabled; this.gameEnabled = gameEnabled; this.generationEnabled = generationEnabled;
         this.catalog = catalog; this.operations = operations; this.users = users;
         this.familyProfiles = familyProfiles; this.rateLimiter = rateLimiter; this.allowSeed = allowSeed;
         this.syncWaitMs = Math.max(0, Math.min(20_000, syncWaitMs));
@@ -52,7 +59,7 @@ public class DynamicGameController {
             @RequestHeader(name = "Accept-Language", required = false) Locale locale) {
         owner(authentication);
         List<ProfileDto> result = catalog.enabled() ? catalog.all().stream()
-                .map(profile -> metadata(profile, locale)).toList() : List.of();
+                .filter(profile -> eligible(authentication, profile)).map(profile -> metadata(profile, locale)).toList() : List.of();
         return noStore(result);
     }
 
@@ -62,8 +69,9 @@ public class DynamicGameController {
             @RequestHeader(name = "Accept-Language", required = false) Locale locale) {
         owner(authentication);
         if (!catalog.enabled()) throw new SessionException(ErrorCode.GENERATION_UNAVAILABLE);
-        return noStore(metadata(catalog.find(profileId)
-                .orElseThrow(() -> new SessionException(ErrorCode.RUN_NOT_FOUND)), locale));
+        var selected = catalog.find(profileId).orElseThrow(() -> new SessionException(ErrorCode.RUN_NOT_FOUND));
+        if (!eligible(authentication, selected)) throw new SessionException(ErrorCode.GENERATION_UNAVAILABLE);
+        return noStore(metadata(selected, locale));
     }
 
     @PostMapping(value = "/dynamic-starts", consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -73,13 +81,15 @@ public class DynamicGameController {
         requireSameOrigin(origin);
         OwnerRef owner = owner(authentication);
         if (!catalog.enabled() || body == null || body.requestId() == null || !body.confirmed()
-                || body.disclosureRevision() < 1 || body.profileId() == null || body.profileVersion() == null
+                || body.disclosureRevision() != 1 || body.profileId() == null || body.profileVersion() == null
                 || body.profileFingerprint() == null || body.locale() == null
                 || body.lengthPreset() == null || body.challengePreset() == null
                 || body.selections() != null && body.selections().size() > 8
                 || body.seed() != null && !allowSeed) throw new SessionException(ErrorCode.REQUEST_INVALID);
         ValidatedGeneratorProfile profile = catalog.find(body.profileId())
                 .orElseThrow(() -> new SessionException(ErrorCode.REQUEST_INVALID));
+        if (!gameEnabled || !generationEnabled || !eligible(authentication, profile))
+            throw new SessionException(ErrorCode.GENERATION_UNAVAILABLE);
         if (!profile.identity().version().toString().equals(body.profileVersion())
                 || !profile.identity().fingerprint().equals(body.profileFingerprint()))
             throw new SessionException(ErrorCode.REQUEST_INVALID);
@@ -118,14 +128,14 @@ public class DynamicGameController {
     }
 
     @DeleteMapping("/dynamic-starts/{requestId}")
-    public ResponseEntity<OperationDto> cancel(OAuth2AuthenticationToken authentication,
+    public ResponseEntity<?> cancel(OAuth2AuthenticationToken authentication,
                                                 @PathVariable UUID requestId,
                                                 @RequestHeader("Origin") String origin) {
         requireSameOrigin(origin);
         DynamicStartOperationService service = operations.getIfAvailable();
         if (service == null || !service.cancel(owner(authentication), requestId))
             throw new SessionException(ErrorCode.RUN_NOT_FOUND);
-        return noStore(new OperationDto("CANCELLED", 0, null, "DYNAMIC_CANCELLED"));
+        return response(service.status(owner(authentication), requestId));
     }
 
     private ResponseEntity<?> response(DynamicStartOperationService.Submission submission) {
@@ -153,6 +163,29 @@ public class DynamicGameController {
         return new OwnerRef(user.getId().toString());
     }
 
+    private boolean eligible(OAuth2AuthenticationToken authentication, ValidatedGeneratorProfile profile) {
+        var user = users.getCurrentUser(authentication);
+        Integer year = familyProfiles.findByParentUser_Id(user.getId()).filter(p -> p.isActive())
+                .map(p -> p.getBirthYear()).orElse(null);
+        return audienceEligible(year, java.time.Year.now(clock).getValue(),
+                profile.profile().policy().minAge(), profile.profile().policy().maxAge());
+    }
+    static boolean audienceEligible(Integer birthYear, int currentYear, int minAge, int maxAge) {
+        return birthYear != null && currentYear - birthYear - 1 >= minAge && currentYear - birthYear <= maxAge;
+    }
+    @GetMapping("/capabilities")
+    public ResponseEntity<Map<String, Object>> capabilities(OAuth2AuthenticationToken authentication) {
+        owner(authentication);
+        boolean ageKnown = familyProfiles.findByParentUser_Id(users.getCurrentUser(authentication).getId())
+                .filter(p -> p.isActive()).map(p -> p.getBirthYear()).isPresent();
+        boolean dynamic = gameEnabled && generationEnabled && catalog.enabled() && operations.getIfAvailable() != null
+                && catalog.all().stream().anyMatch(p -> eligible(authentication, p));
+        return noStore(Map.of("schemaVersion", 1, "clientEnabled", webEnabled, "gameEnabled", gameEnabled,
+                "packStartEnabled", gameEnabled, "packGenerationEnabled", gameEnabled && generationEnabled && ageKnown,
+                "dynamicStartEnabled", dynamic, "supportedViewSchemas", List.of(1, 2),
+                "viewFeatures", List.of("canAdvance"), "disclosureRevision", 1, "dynamicCancelMode", "BEST_EFFORT"));
+    }
+
     private void requireSameOrigin(String origin) {
         if (origin == null || !allowedOrigins.contains(origin)) throw new SessionException(ErrorCode.REQUEST_INVALID);
     }
@@ -160,7 +193,7 @@ public class DynamicGameController {
     private static ProfileDto metadata(ValidatedGeneratorProfile value, Locale requested) {
         var profile = value.profile();
         LocaleTag locale = profile.supportedLocales().stream()
-                .filter(item -> requested != null && item.value().equalsIgnoreCase(requested.toLanguageTag()))
+                .filter(item -> requested != null && item.value().equalsIgnoreCase(requested.getLanguage()))
                 .findFirst().orElse(profile.defaultLocale());
         Map<String, String> strings = profile.strings().get(locale);
         List<QuestionDto> questions = profile.setup().questions().stream().map(question ->
@@ -172,7 +205,17 @@ public class DynamicGameController {
                 profile.supportedLocales().stream().map(LocaleTag::value).toList(), profile.defaultLocale().value(),
                 questions, profile.lengthPresets().stream().map(p -> new PresetDto(p.id(), strings.get(p.labelKey()))).toList(),
                 profile.challengePresets().stream().map(p -> new PresetDto(p.id(), strings.get(p.labelKey()))).toList(),
-                profile.policy().freeTextAllowed(), profile.policy().maxSuggestionCodePoints());
+                profile.policy().freeTextAllowed(), profile.policy().maxSuggestionCodePoints(), 1, locale.value(),
+                profile.setup().steps().stream().map(step -> new StepDto(step.id(), strings.get(step.titleKey()), step.inputIds())).toList(),
+                profile.setup().inputs().stream().map(input -> {
+                    var question = profile.setup().questions().stream().filter(q -> q.inputId().equals(input.id())).findFirst().orElseThrow();
+                    return new InputDto(input.id(), input instanceof StartInputDef.EnumInput ? "ENUM" : input instanceof StartInputDef.EnumSetInput ? "ENUM_SET" : "FREE_TEXT",
+                            strings.get(input.labelKey()), strings.get(question.helpKey()), input.required(),
+                            input instanceof StartInputDef.EnumSetInput set ? set.maxItems() : 1,
+                            input instanceof StartInputDef.FreeTextInput text ? Math.min(text.maxChars(), profile.policy().maxSuggestionCodePoints()) : null,
+                            question.defaultValues(), question.options().stream().map(o -> option(o, strings)).toList(),
+                            question.freeTextNoticeKey() == null ? null : strings.get(question.freeTextNoticeKey()));
+                }).toList());
     }
 
     private static OptionDto option(SetupOption option, Map<String, String> strings) {
@@ -190,7 +233,11 @@ public class DynamicGameController {
     public record ProfileDto(String id, String version, String fingerprint, String title, String description,
             List<String> supportedLocales, String defaultLocale, List<QuestionDto> questions,
             List<PresetDto> lengthPresets, List<PresetDto> challengePresets,
-            boolean suggestionAllowed, int maxSuggestionCodePoints) {}
+            boolean suggestionAllowed, int maxSuggestionCodePoints, int setupSchemaVersion, String metadataLocale,
+            List<StepDto> steps, List<InputDto> inputs) {}
+    public record StepDto(String id, String title, List<String> inputIds) {}
+    public record InputDto(String id, String kind, String label, String help, boolean required,
+            int maxItems, Integer maxCodePoints, List<String> defaults, List<OptionDto> options, String notice) {}
     public record QuestionDto(String id, String help, List<String> defaults, List<OptionDto> options, String notice) {}
     public record OptionDto(String id, String label) {}
     public record PresetDto(String id, String label) {}

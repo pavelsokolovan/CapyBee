@@ -32,18 +32,30 @@ public final class DynamicStartCoordinator {
     }
     public Result startDynamic(OwnerRef owner,UUID requestId,ConfirmedDynamicPreparation preparation,
             Long seed,UUID expectedCurrentRunId,Duration wait){
+        return startDynamic(owner, requestId, preparation, seed, expectedCurrentRunId, wait, new Cancellation());
+    }
+    public static final class Cancellation implements BlueprintCancellation {
+        private boolean cancelled;
+        private boolean published;
+        public synchronized boolean cancelled() { return cancelled; }
+        public synchronized boolean cancel() { if (published) return false; cancelled = true; return true; }
+    }
+    public Result startDynamic(OwnerRef owner,UUID requestId,ConfirmedDynamicPreparation preparation,
+            Long seed,UUID expectedCurrentRunId,Duration wait,Cancellation cancellation){
         if(owner==null||requestId==null||preparation==null||wait==null||wait.isNegative()||wait.isZero())return new Failed("DYNAMIC_REQUEST_INVALID");
         String signature=preparation.signature()+"|"+seed+"|"+expectedCurrentRunId;
         Operation candidate=new Operation(signature,new CompletableFuture<>()), operation=operations.putIfAbsent(requestId,candidate);
         if(operation!=null){if(!operation.signature.equals(signature))return new Failed("DYNAMIC_REQUEST_CONFLICT");return operation.result.join();}
-        try{Result result=execute(owner,requestId,preparation,seed,expectedCurrentRunId,wait);candidate.result.complete(result);return result;}
+        try{Result result=execute(owner,requestId,preparation,seed,expectedCurrentRunId,wait,cancellation);candidate.result.complete(result);return result;}
         catch(RuntimeException failure){Result result=new Failed("DYNAMIC_START_UNAVAILABLE");candidate.result.complete(result);return result;}
     }
-    private Result execute(OwnerRef owner,UUID requestId,ConfirmedDynamicPreparation p,Long seed,UUID expected,Duration wait){
+    private Result execute(OwnerRef owner,UUID requestId,ConfirmedDynamicPreparation p,Long seed,UUID expected,Duration wait,Cancellation cancellation){
         UUID runId=UUID.nameUUIDFromBytes(("dynamic:"+requestId).getBytes(StandardCharsets.UTF_8));
         try {
             RunSummary published = sessions.get(owner, runId);
-            if (published.dynamicGame()) return new Started(published);
+            if (published.dynamicGame()) {
+                synchronized (cancellation) { cancellation.published = true; return new Started(published); }
+            }
             return new Failed("DYNAMIC_REQUEST_CONFLICT");
         } catch (SessionException missing) {
             if (missing.code() != ErrorCode.RUN_NOT_FOUND) throw missing;
@@ -52,7 +64,7 @@ public final class DynamicStartCoordinator {
                 p.profile().profile().generationBudget().totalCallsPerRun());
         TextGenerator metered=generators.forRun(scope,LocalDate.now(clock),runId,MeteredTextGenerator.Priority.DEMAND);
         var request=new BlueprintGenerationRequest(requestId.toString(),p.revision(),p.revision(),p.profile(),p.preferences(),p.constraints(),
-                p.suggestion(),guard,BlueprintCancellation.NEVER,clock.instant().plus(wait));
+                p.suggestion(),guard,cancellation,clock.instant().plus(wait));
         var service=new BlueprintGenerationService(metered,reviewer,new DefaultBlueprintSemanticValidator(),ids,BlueprintFallbackResolver.NONE,clock);
         Engine engine=Engine.builder(new PackRegistry(List.of())).clock(clock)
                 .random(Randoms.seeded(seed==null?runId.getMostSignificantBits():seed)).ids(ids)
@@ -62,7 +74,11 @@ public final class DynamicStartCoordinator {
         if(boot instanceof DynamicGameBootstrapResult.Failed failed){String code=failed.code();if(code.startsWith("INPUT_")||code.contains("INPUT"))return new NeedsInput(code);if(code.contains("CANCEL"))return new Cancelled(code);return new Failed(code);}
         RunSnapshot snapshot=((DynamicGameBootstrapResult.Started)boot).run().snapshot();
         if(!snapshot.dynamicGame()||snapshot.dynamic()==null)return new Failed("DYNAMIC_SNAPSHOT_INVALID");
+        synchronized (cancellation) {
+        if (cancellation.cancelled()) return new Cancelled("DYNAMIC_CANCELLED");
         RunSummary summary=expected==null?sessions.activateDynamic(owner,runId,snapshot):sessions.replaceWithDynamic(owner,expected,runId,snapshot);
+        cancellation.published = true;
         return new Started(summary);
+        }
     }
 }

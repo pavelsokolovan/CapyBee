@@ -35,14 +35,17 @@ class EngineRuntimeTest {
         assertThat(result.ok()).isTrue();
         assertThat(result.run()).isNotNull();
         assertThat(result.run().view().options()).hasSize(2);
+        assertThat(result.run().view().canAdvance()).isFalse();
 
         var choice = result.run().apply(new Command.Choose("boat"));
         assertThat(choice.accepted()).isTrue();
+        assertThat(choice.view().canAdvance()).isTrue();
         assertThat(choice.view().blocks()).isNotEmpty();
 
         var next = result.run().apply(new Command.Advance());
         assertThat(next.accepted()).isTrue();
         assertThat(next.view().blocks()).isNotEmpty();
+        assertThat(next.view().canAdvance()).isFalse();
     }
 
     @Test

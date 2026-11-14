@@ -6,10 +6,17 @@ import java.util.List;
 
 public record View(List<Block> blocks, List<Option> options, InputSpec input, List<StatusItem> status,
                    boolean ended, EndReason endReason, List<ObjectiveItem> objectives, String outcome,
-                   PlacesView places, StoryInfo story, List<CharacterItem> characters, RunResult result) {
+                   PlacesView places, StoryInfo story, List<CharacterItem> characters, RunResult result, Boolean canAdvance) {
     public static final int CURRENT_VIEW_SCHEMA = 2;
 
+    public View(List<Block> blocks, List<Option> options, InputSpec input, List<StatusItem> status,
+                boolean ended, EndReason endReason, List<ObjectiveItem> objectives, String outcome,
+                PlacesView places, StoryInfo story, List<CharacterItem> characters, RunResult result) {
+        this(blocks, options, input, status, ended, endReason, objectives, outcome, places, story, characters, result, false);
+    }
+
     public View {
+        canAdvance = Boolean.TRUE.equals(canAdvance);
         blocks = blocks == null ? List.of() : List.copyOf(blocks);
         options = options == null ? List.of() : List.copyOf(options);
         status = status == null ? List.of() : List.copyOf(status);

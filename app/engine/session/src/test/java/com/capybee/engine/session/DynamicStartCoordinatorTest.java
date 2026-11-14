@@ -56,6 +56,43 @@ class DynamicStartCoordinatorTest {
                 .isEqualTo(new DynamicStartCoordinator.Failed("DYNAMIC_REQUEST_CONFLICT"));
     }
 
+    @Test void cancellationAndPublicationHaveAnOrderedWinner() throws Exception {
+        for (boolean cancelDuringGeneration : List.of(true, false)) {
+            var store = new InMemorySessionStore(CLOCK);
+            SessionPorts.PackCatalog catalog = new SessionPorts.PackCatalog() {
+                public List<Pack> all() { return List.of(); }
+                public Optional<Pack> find(String id) { return Optional.empty(); }
+            };
+            RunSessionService sessions = new RunSessionService(catalog, store, store, store, store,
+                    (owner,id,priority) -> Engine.builder(new com.capybee.engine.pack.PackRegistry(List.of())).clock(CLOCK)
+                            .random(com.capybee.engine.adapter.Randoms.seeded(7L)).ids(() -> UUID.randomUUID().toString()).build(),
+                    CLOCK::instant, SessionLimits.defaults(), store, Runnable::run, new byte[32]);
+            var cancellation = new DynamicStartCoordinator.Cancellation();
+            String blueprint = Files.readString(Path.of("..", "certification", "dynamic-v1", "blueprint.json"));
+            TextGenerator provider = request -> {
+                if (cancelDuringGeneration) cancellation.cancel();
+                return new com.capybee.engine.port.TextGenerationResult(
+                        request.purpose() == com.capybee.engine.port.StructuredGenerationRequest.Purpose.GAME_BLUEPRINT ? blueprint : "{}",
+                        new com.capybee.engine.port.TextGenerationResult.TokenUsage(1,1,0,0), "fixture",
+                        com.capybee.engine.port.TextGenerationResult.FinishReason.COMPLETE);
+            };
+            var coordinator = new DynamicStartCoordinator(sessions, new SessionGenerators(provider,store,SessionLimits.defaults()),
+                    new DefaultBlueprintOutputReviewer(), new DefaultInputGuard(), () -> UUID.randomUUID().toString(), CLOCK);
+            var profile = profile();
+            var resolved = new PreparationPresetResolver().resolve(profile,Map.of(),profile.profile().defaultLocale(),HostGenerationCeilings.none());
+            var preparation = new ConfirmedDynamicPreparation(profile,resolved.preferences().orElseThrow(),resolved.constraints().orElseThrow(),1,null);
+            var result = coordinator.startDynamic(new OwnerRef("owner"),UUID.randomUUID(),preparation,7L,null,Duration.ofMinutes(1),cancellation);
+            if (cancelDuringGeneration) {
+                assertThat(result).isInstanceOf(DynamicStartCoordinator.Cancelled.class);
+                org.assertj.core.api.Assertions.assertThatThrownBy(() -> sessions.current(new OwnerRef("owner"))).isInstanceOf(SessionException.class);
+            } else {
+                assertThat(result).isInstanceOf(DynamicStartCoordinator.Started.class);
+                assertThat(cancellation.cancel()).isFalse();
+                assertThat(sessions.current(new OwnerRef("owner")).dynamicGame()).isTrue();
+            }
+        }
+    }
+
     private static ValidatedGeneratorProfile profile() throws Exception {
         Path root=Path.of("..","generator-profiles","generic-adventure").toAbsolutePath().normalize();
         Map<String,byte[]> files=new LinkedHashMap<>();

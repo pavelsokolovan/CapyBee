@@ -18,7 +18,11 @@ export type SyncedEvent = {
 type SyncedListener = (event: SyncedEvent) => void;
 const listeners = new Set<SyncListener>();
 const syncedListeners = new Set<SyncedListener>();
+export { GameTransport, retryDelay, decodeGameResponse } from '../game/gameTransport';
+
 let flushing = false;
+let gameOwner: string | null = null;
+export function setGameOwner(owner: string | null) { gameOwner = owner; }
 
 export function onSyncStatusChange(listener: SyncListener): () => void {
   listeners.add(listener);
@@ -71,19 +75,20 @@ async function sendOne(action: QueuedAction): Promise<SendOutcome> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const method = action.method ?? 'POST';
+    const method = action.poll && action.type === 'gameCommand' ? 'GET' : action.method ?? 'POST';
     const requestInit: RequestInit = {
       method,
       credentials: 'include',
       signal: controller.signal
     };
 
+    if (isGameAction(action)) requestInit.cache = 'no-store';
     if (method === 'POST') {
       requestInit.headers = { 'Content-Type': 'application/json' };
       requestInit.body = JSON.stringify({ id: action.clientId, ...(action.payload ?? {}) });
     }
 
-    const res = await fetch(action.path, requestInit);
+    const res = await fetch(action.poll && action.type === 'gameCommand' ? `${action.path}/${action.clientId}` : action.path, requestInit);
     clearTimeout(timer);
 
     if (res.status === 401) {
@@ -100,7 +105,20 @@ async function sendOne(action: QueuedAction): Promise<SendOutcome> {
         : body && typeof body === 'object' && 'code' in body
           ? (body as { code?: unknown }).code
           : undefined;
+      if (action.owner !== gameOwner) return {kind:'auth'};
+      if (action.poll && res.status === 404) {
+        const current = await fetch(`/api/game/runs/${action.runId}`, {credentials:'include',cache:'no-store'});
+        const state = await responseBody(current) as {revision?:unknown; status?:unknown} | undefined;
+        if (current.ok && state?.status === 'ACTIVE' && state.revision === action.payload?.expectedRevision) {
+          action.poll = false; await updateAction(action); return {kind:'retry'};
+        }
+        if(action.owner !== gameOwner || current.status === 401)return {kind:'auth'};
+        if(!current.ok && (current.status === 429 || current.status >= 500))return {kind:'retry'};
+        return {kind:'stale',status:res.status};
+      }
       if (res.status === 202) {
+        action.poll = true;
+        await updateAction(action);
         const retryValue = body && typeof body === 'object' && 'retryAfterMs' in body
           ? (body as { retryAfterMs?: unknown }).retryAfterMs
           : undefined;
@@ -129,6 +147,7 @@ async function sendOne(action: QueuedAction): Promise<SendOutcome> {
     return { kind: 'retry' };
   } catch {
     clearTimeout(timer);
+    if (action.type === 'gameCommand') { action.poll = true; await updateAction(action); }
     return { kind: 'retry' };
   }
 }
@@ -145,6 +164,10 @@ export async function flushQueue(): Promise<void> {
       }
       if ((action.notBefore ?? 0) > Date.now()) continue;
 
+      if (isGameAction(action)) {
+        if (!action.owner || action.type === 'gameStart') { await removeAction(action.clientId); continue; }
+        if (action.owner !== gameOwner) continue;
+      }
       action.status = 'syncing';
       await updateAction(action);
 

@@ -25,6 +25,10 @@ Owns HTTP contracts. See [Java standards](java-server.instructions.md) for serve
 - Validate ownership before returning an existing record for a duplicate identifier.
 - Server and client duplicate-detection logic must agree.
 
+Engine starts and gameplay free text are the explicit Spec 28.1 exception to
+durable offline storage: use the shared dispatcher's online, memory-only mode.
+Persist only bounded operation IDs; reconcile uncertain results with GET status.
+
 ## Client-server alignment
 
 - When a contract changes, update both the affected UI code and server code in the same change — never let them drift.

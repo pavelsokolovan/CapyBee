@@ -48,7 +48,7 @@ final class ViewBuilder {
 
         return new View(List.copyOf(scene.blocks()), ended ? List.of() : options,
             new InputSpec(mode, ended ? 0 : scene.maxChars()), status, ended, endReason, objectives, outcome, places,
-            story, characters, result);
+            story, characters, result, !ended && scene.options().isEmpty() && scene.next() != null && !scene.next().isBlank());
     }
 
     private static Option toOption(SceneOption option) {

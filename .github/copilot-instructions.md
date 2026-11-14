@@ -7,7 +7,7 @@ Children's companion app for relocated kids; friendship tracking is private.
 - No third-party analytics, ads, or tracking.
 - Google OAuth2 + server sessions; preserve the existing PWA restore-token flow, never introduce new long-lived client auth tokens.
 - CapyBee's voice is warm, casual, and validates feelings; all user-facing copy is EN/PL.
-- Authenticated data mutations use the offline queue + sync engine.
+- Authenticated data mutations use the offline queue + sync engine. Engine starts and gameplay free text use its online, memory-only mode under Spec 28.1; never persist their payloads.
 - Follow nearby implementations; keep changes focused.
 - Use concise, simple English; summarize changes and checks without repeating code.
 

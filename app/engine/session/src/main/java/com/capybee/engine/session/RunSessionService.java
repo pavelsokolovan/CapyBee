@@ -332,7 +332,8 @@ public final class RunSessionService {
                 .map(pack -> new PackInfoDto(pack.manifest().id().value(), pack.manifest().version().toString(),
                         pack.manifest().locales().stream().map(locale -> locale.value()).toList(),
                         pack.manifest().defaultLocale().value(), pack.manifest().startInputs(),
-                        pack.manifest().features().contains(PackFeature.GENERATION)))
+                        pack.manifest().features().contains(PackFeature.GENERATION),
+                        com.capybee.engine.session.wire.PackSetupDto.from(pack, hint)))
                 .toList();
     }
 

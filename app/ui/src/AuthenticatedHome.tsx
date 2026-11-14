@@ -28,7 +28,7 @@ import missionsTabImage from './assets/honeycomb/missions-tab.png';
 import friendshipsTabImage from './assets/honeycomb/friedships-tab.png';
 import { STAGE_META, type FriendshipStage } from './constants/friendshipStages';
 import { enqueueAction } from './offline/queueStore';
-import { flushQueue, startSyncLoop, onSyncStatusChange } from './offline/syncEngine';
+import { setGameOwner, flushQueue, startSyncLoop, onSyncStatusChange } from './offline/syncEngine';
 import { getSessionToken, clearSessionToken } from './sessionPersistence';
 
 export interface UserProfile {
@@ -1174,13 +1174,15 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   }, []);
 
   useEffect(() => {
+    setGameOwner(user.id ?? null);
     const unsubscribe = onSyncStatusChange(setPendingSync);
     const stopLoop = startSyncLoop();
     return () => {
       unsubscribe();
       stopLoop();
+      setGameOwner(null);
     };
-  }, []);
+  }, [user.id]);
 
   useEffect(() => {
     return () => {

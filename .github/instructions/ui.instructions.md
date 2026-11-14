@@ -32,6 +32,10 @@ Example: missions, check-in responses, empty states, notifications all follow th
 - New create/update actions from authenticated screens must go through the offline queue (`src/offline/queueStore.ts`) and sync engine (`src/offline/syncEngine.ts`), following the optimistic-update pattern already used for check-ins, missions, friendships, and memories.
 - Prefer pure, side-effect-light helper functions for data transforms and queue logic.
 
+Engine starts and gameplay free text use the shared sync dispatcher's online,
+memory-only mode under Spec 28.1. Never persist those payloads. Durable engine
+commands require owner/run identity and status polling before ambiguous retries.
+
 ## Testing expectations
 
 - Any new or modified pure logic outside React components (queue logic, sync engine, session persistence helpers, etc.) must include Vitest unit tests: happy path plus at least one retry/failure/edge case, following the existing `queueStore.test.ts` / `syncEngine.test.ts` pattern (happy-dom, `idb-keyval` mocked/faked).

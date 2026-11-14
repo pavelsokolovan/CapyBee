@@ -13,10 +13,12 @@ vi.mock('./queueStore', () => ({
   removeAction: queueStore.removeAction
 }));
 
-import { flushQueue, onSynced, onSyncStatusChange, startSyncLoop } from './syncEngine';
+import { setGameOwner, flushQueue, onSynced, onSyncStatusChange, startSyncLoop } from './syncEngine';
 
 const createAction = (overrides: Partial<QueuedAction> = {}): QueuedAction => ({
   clientId: 'action-id',
+  owner: 'owner',
+  runId: 'run',
   type: 'checkIn',
   path: '/api/check-ins',
   method: 'POST',
@@ -29,6 +31,7 @@ const createAction = (overrides: Partial<QueuedAction> = {}): QueuedAction => ({
 
 describe('offline sync engine', () => {
   beforeEach(() => {
+    setGameOwner('owner');
     vi.stubGlobal('fetch', vi.fn());
     queueStore.listQueuedActions.mockResolvedValue([]);
     queueStore.updateAction.mockResolvedValue(undefined);
@@ -121,7 +124,7 @@ describe('offline sync engine', () => {
   });
 
   it('delivers successful game response bodies to subscribers', async () => {
-    const action = createAction({ type: 'gameStart', path: '/api/game/runs' });
+    const action = createAction({ type: 'gameCommand', path: '/api/game/runs' });
     const listener = vi.fn();
     const body = { runId: 'run-id', status: 'ACTIVE' };
     const unsubscribe = onSynced(listener);
@@ -161,7 +164,7 @@ describe('offline sync engine', () => {
   });
 
   it('removes terminal game failures without delaying later queue items', async () => {
-    const terminal = createAction({ clientId: 'bad', type: 'gameStart' });
+    const terminal = createAction({ clientId: 'bad', type: 'gameCommand' });
     const next = createAction({ clientId: 'next' });
     queueStore.listQueuedActions.mockResolvedValueOnce([terminal, next]).mockResolvedValueOnce([]);
     vi.mocked(fetch)
@@ -312,4 +315,31 @@ describe('offline sync engine', () => {
     expect(queueStore.listQueuedActions.mock.calls.length).toBeGreaterThan(callsAfterIdleTimeout);
     cleanup();
   });
+});
+
+describe('engine recovery boundaries',()=>{
+ beforeEach(()=>{setGameOwner('owner');vi.stubGlobal('fetch',vi.fn());queueStore.updateAction.mockResolvedValue(undefined);queueStore.removeAction.mockResolvedValue(undefined);});
+ afterEach(()=>{vi.unstubAllGlobals();vi.clearAllMocks();});
+ it('drops ownerless legacy starts and never dispatches another owner',async()=>{
+  queueStore.listQueuedActions.mockResolvedValueOnce([createAction({type:'gameStart',owner:undefined}),createAction({type:'gameCommand',owner:'other'})]).mockResolvedValueOnce([]);
+  await flushQueue();expect(fetch).not.toHaveBeenCalled();expect(queueStore.removeAction).toHaveBeenCalledTimes(1);
+ });
+ it('polls processing command identity instead of posting again',async()=>{
+  const action=createAction({type:'gameCommand',path:'/api/game/runs/run/commands',poll:true});
+  queueStore.listQueuedActions.mockResolvedValueOnce([action]).mockResolvedValueOnce([]);
+  vi.mocked(fetch).mockResolvedValue(new Response('{}',{status:200,headers:{'content-type':'application/json'}}));
+  await flushQueue();expect(fetch).toHaveBeenCalledWith('/api/game/runs/run/commands/action-id',expect.objectContaining({method:'GET'}));
+ });
+ it('reposts only after not-found and exact current revision reconciliation',async()=>{
+  const action=createAction({type:'gameCommand',poll:true,payload:{expectedRevision:4}});
+  queueStore.listQueuedActions.mockResolvedValueOnce([action]).mockResolvedValueOnce([]);
+  vi.mocked(fetch).mockResolvedValueOnce(new Response('{}',{status:404,headers:{'content-type':'application/json'}})).mockResolvedValueOnce(new Response(JSON.stringify({status:'ACTIVE',revision:4}),{headers:{'content-type':'application/json'}}));
+  await flushQueue();expect(action.poll).toBe(false);expect(queueStore.removeAction).not.toHaveBeenCalled();
+ });
+ it('discards a stale revision instead of rebasing',async()=>{
+  const action=createAction({type:'gameCommand',poll:true,payload:{expectedRevision:4}});
+  queueStore.listQueuedActions.mockResolvedValueOnce([action]).mockResolvedValueOnce([]);
+  vi.mocked(fetch).mockResolvedValueOnce(new Response('{}',{status:404,headers:{'content-type':'application/json'}})).mockResolvedValueOnce(new Response(JSON.stringify({status:'ACTIVE',revision:5}),{headers:{'content-type':'application/json'}}));
+  await flushQueue();expect(queueStore.removeAction).toHaveBeenCalledWith(action.clientId);
+ });
 });

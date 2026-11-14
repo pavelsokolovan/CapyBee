@@ -364,7 +364,7 @@ class RunSessionServiceTest {
         var manifest = new PackManifest(1, PACK_ID, PACK_VERSION, "Test", "Test pack",
                 List.of(LOCALE), LOCALE, Set.of(PackFeature.GENERATION), List.of(), List.of(),
                 new ContentPolicy(false, new ContentPolicy.Audience(10, 14), List.of()), List.of());
-        return new Pack(manifest, Map.of());
+        return new Pack(manifest, Map.of("strings/en.json", "{}"));
     }
 
     private static final Executor DIRECT = Runnable::run;

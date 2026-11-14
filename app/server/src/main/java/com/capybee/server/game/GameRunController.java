@@ -40,6 +40,8 @@ import static com.capybee.engine.session.SessionTypes.*;
 @RequestMapping("/api/game")
 public class GameRunController {
     private final RunSessionService sessions;
+    private final com.capybee.engine.session.SessionPorts.PackCatalog catalog;
+    private final java.time.Clock clock;
     private final UserService users;
     private final FamilyProfileRepository profiles;
     private final boolean enabled;
@@ -54,7 +56,9 @@ public class GameRunController {
                              @Value("${capybee.game.generation-enabled:false}") boolean generationEnabled,
                              @Value("${capybee.game.allow-seed:false}") boolean allowSeed,
                              @Value("${capybee.game.sync-wait-ms:8000}") long syncWaitMs,
-                             GameCommandRateLimiter commandRateLimiter) {
+                             GameCommandRateLimiter commandRateLimiter,
+                             com.capybee.engine.session.SessionPorts.PackCatalog catalog, java.time.Clock clock) {
+        this.catalog = catalog; this.clock = clock;
         this.sessions = sessions;
         this.users = users;
         this.profiles = profiles;
@@ -82,6 +86,14 @@ public class GameRunController {
             throw new SessionException(ErrorCode.REQUEST_INVALID);
         }
         boolean generated = Boolean.TRUE.equals(body.generated());
+        if (generated) {
+            var policy = catalog.find(body.packId()).orElseThrow(() -> new SessionException(ErrorCode.REQUEST_INVALID)).manifest().contentPolicy();
+            var child = profiles.findByParentUser_Id(users.getCurrentUser(authentication).getId()).filter(p -> p.isActive());
+            Integer birthYear = child.map(p -> p.getBirthYear()).orElse(null);
+            if (birthYear == null || (policy.audience() != null && !DynamicGameController.audienceEligible(birthYear,
+                    java.time.Year.now(clock).getValue(), policy.audience().minAge(), policy.audience().maxAge())))
+                throw new SessionException(ErrorCode.GENERATION_UNAVAILABLE);
+        }
         if (generated && !generationEnabled) throw new SessionException(ErrorCode.GENERATION_UNAVAILABLE);
         StartAccepted accepted = sessions.start(owner, new StartRequest(body.id(),
                 new com.capybee.engine.pack.PackId(body.packId()),

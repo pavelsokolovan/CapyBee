@@ -565,7 +565,7 @@ final class RunImpl implements Run {
         blocks.add(new Block(BlockKind.NARRATION, null, safeReply, List.of()));
         View replyView = new View(blocks, current.options(), current.input(), current.status(), current.ended(),
                 current.endReason(), current.objectives(), current.outcome(), current.places(), current.story(),
-                current.characters());
+                current.characters(), current.result(), current.canAdvance());
         List<Issue> issues = processedReply.changed()
                 ? List.of(new Issue(Issue.Severity.WARNING, "INPUT_REDACTED", "Personal details were removed from the reply"))
                 : List.of();

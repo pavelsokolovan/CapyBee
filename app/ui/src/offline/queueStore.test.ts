@@ -99,3 +99,29 @@ describe('offline queue store', () => {
     ]);
   });
 });
+describe('engine privacy policy',()=>{
+ beforeEach(()=>storage.clear());
+ it('rejects starts and private text before storage',async()=>{
+  await expect(enqueueAction({...firstAction,type:'gameStart'})).rejects.toThrow();
+  await expect(enqueueAction({...firstAction,type:'gameCommand',owner:'o',runId:'r',payload:{command:{type:'SUBMIT_TEXT',text:'sentinel'}}})).rejects.toThrow();
+  expect(storage.size).toBe(0);
+ });
+ it('requires owner identity and one unresolved command per run',async()=>{
+  await expect(enqueueAction({...firstAction,type:'gameCommand',payload:{command:{type:'CHOOSE'}}})).rejects.toThrow();
+  const action={...firstAction,type:'gameCommand' as const,owner:'o',runId:'r',payload:{expectedRevision:0,command:{type:'CHOOSE',optionId:'choice'}}};
+  await enqueueAction(action);
+  await expect(enqueueAction({...action,clientId:'second'})).rejects.toThrow('GAME_COMMAND_PENDING');
+ });
+});
+
+describe('updates retain the durable command allowlist',()=>{
+ beforeEach(()=>storage.clear());
+ it('rejects private updates and strips extraneous payload properties',async()=>{
+  await expect(updateAction({...firstAction,attempts:0,status:'pending',type:'gameStart'})).rejects.toThrow();
+  await expect(updateAction({...firstAction,attempts:0,status:'pending',type:'gameCommand',payload:{command:{type:'SUBMIT_TEXT',text:'sentinel'}}})).rejects.toThrow();
+  for (const command of [{type:'CHOOSE',optionId:'a',text:'sentinel'},{type:'MOVE',placeId:'b',text:'sentinel'},{type:'ADVANCE',text:'sentinel'}]) {
+    await updateAction({...firstAction,attempts:1,status:'pending',owner:'owner',runId:'run',type:'gameCommand',payload:{expectedRevision:1,command,private:'sentinel'}});
+    expect(JSON.stringify([...storage.values()])).not.toContain('sentinel');
+  }
+ });
+});
