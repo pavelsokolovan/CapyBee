@@ -83,11 +83,15 @@ final class DefaultEngine implements Engine {
         }
         if (generated instanceof BlueprintGenerationResult.GenerationFailed failed && failed.fallback() != null) {
             return new DynamicGameBootstrapResult.FallbackOffered(failed.fallback(),
-                    List.of(dynamicIssue(Issue.Severity.WARNING, "DYNAMIC_BLUEPRINT_FAILED")));
+                    List.of(dynamicIssue(Issue.Severity.WARNING, failed.code())));
         }
-        if (!(generated instanceof BlueprintGenerationResult.CandidateReviewed reviewed)) {
+        if (generated instanceof BlueprintGenerationResult.GenerationFailed failed) return dynamicFailure(failed.code());
+        if (generated instanceof BlueprintGenerationResult.ReviewPending pending) return dynamicFailure(pending.code());
+        if (generated instanceof BlueprintGenerationResult.NeedsInputAction needed) return dynamicFailure(needed.code());
+        if (generated instanceof BlueprintGenerationResult.Cancelled cancelled) return dynamicFailure(cancelled.code());
+        if (generated instanceof BlueprintGenerationResult.InProgress progress) return dynamicFailure(progress.code());
+        if (!(generated instanceof BlueprintGenerationResult.CandidateReviewed reviewed))
             return dynamicFailure("DYNAMIC_BLUEPRINT_FAILED");
-        }
 
         MaterializedGameCompilationResult compiled;
         try {

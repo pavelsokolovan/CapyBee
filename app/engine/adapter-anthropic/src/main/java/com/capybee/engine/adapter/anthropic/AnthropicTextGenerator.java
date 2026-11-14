@@ -48,7 +48,9 @@ public final class AnthropicTextGenerator implements TextGenerator {
     @Override
     public TextGenerationResult generate(StructuredGenerationRequest generationRequest) {
         Objects.requireNonNull(generationRequest, "generationRequest");
-        JsonNode schema = parseObject(generationRequest.outputSchemaJson());
+        boolean blueprint = generationRequest.purpose() == StructuredGenerationRequest.Purpose.GAME_BLUEPRINT;
+        JsonNode schema = blueprint ? null
+                : AnthropicSchemaTransformer.transform(parseObject(generationRequest.outputSchemaJson()));
         JsonNode data = parseObject(generationRequest.untrustedDataJson());
         ObjectNode userEnvelope = MAPPER.createObjectNode();
         userEnvelope.put("taskId", generationRequest.taskId());
@@ -56,6 +58,8 @@ public final class AnthropicTextGenerator implements TextGenerator {
         userEnvelope.set("untrustedData", data);
         String content = MAPPER.writeValueAsString(userEnvelope);
         String system = policy(generationRequest.purpose()) + "\n" + generationRequest.taskInstructions();
+        if (blueprint) system += "\nAuthoritative output JSON Schema (trusted engine contract):\n"
+                + generationRequest.outputSchemaJson();
         if (content.codePointCount(0, content.length()) + system.codePointCount(0, system.length())
             + generationRequest.outputSchemaJson().codePointCount(0, generationRequest.outputSchemaJson().length())
             > MAX_INPUT_CHARACTERS) {
@@ -66,13 +70,18 @@ public final class AnthropicTextGenerator implements TextGenerator {
         body.put("model", config.modelId());
         body.put("max_tokens", generationRequest.maxOutputTokens());
         body.put("system", system);
+        String thinkingMode = thinkingMode(config.modelId());
+        if (thinkingMode != null) body.putObject("thinking").put("type", thinkingMode);
         body.putArray("messages").addObject().put("role", "user").put("content", content);
-        body.putObject("output_config").putObject("format").put("type", "json_schema").set("schema", schema);
+        if (!blueprint)
+            body.putObject("output_config").putObject("format").put("type", "json_schema").set("schema", schema);
         String serializedBody = MAPPER.writeValueAsString(body);
         if (debugEnabled()) {
             System.err.println("[Anthropic debug] model=" + config.modelId());
             System.err.println("[Anthropic debug] endpoint=" + config.endpoint());
             System.err.println("[Anthropic debug] max_tokens=" + generationRequest.maxOutputTokens());
+            System.err.println("[Anthropic debug] schema_mode=" + (blueprint ? "prompt-validated-locally" : "provider-strict"));
+            System.err.println("[Anthropic debug] thinking=" + (thinkingMode == null ? "provider-default" : thinkingMode));
         }
 
         HttpRequest request = HttpRequest.newBuilder(config.endpoint())
@@ -101,15 +110,12 @@ public final class AnthropicTextGenerator implements TextGenerator {
                 throw new TextGenerationException(TextGenerationException.Code.INVALID_RESPONSE);
             }
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                if (debugEnabled()) {
-                    System.err.println("[Anthropic debug] status=" + response.statusCode());
-                }
-                throw new TextGenerationException(response.statusCode() == 400
-                        ? invalidRequestCode(bytes) : errorCode(response.statusCode()));
+                TextGenerationException.Code code = response.statusCode() == 400
+                        ? invalidRequestCode(bytes) : errorCode(response.statusCode());
+                debugResponse(response, code.name(), bytes);
+                throw new TextGenerationException(code);
             }
-            if (debugEnabled()) {
-                System.err.println("[Anthropic debug] status=" + response.statusCode());
-            }
+            debugResponse(response, "OK", null);
             return parseResponse(new String(bytes, StandardCharsets.UTF_8));
         } catch (TextGenerationException exception) {
             throw exception;
@@ -151,20 +157,46 @@ public final class AnthropicTextGenerator implements TextGenerator {
             if (modelId == null || blocks == null || !blocks.isArray()) throw new IllegalArgumentException();
             StringBuilder outputBuilder = new StringBuilder();
             boolean sawText = false;
+            int textBlocks = 0;
             for (JsonNode block : blocks) {
                 if (!"text".equals(text(block, "type"))) continue;
                 String segment = text(block, "text");
                 if (segment == null) throw new IllegalArgumentException();
                 outputBuilder.append(segment);
                 sawText = true;
+                textBlocks++;
             }
             if (!sawText) throw new IllegalArgumentException();
             String output = outputBuilder.toString();
             if (output.length() > MAX_OUTPUT_CHARACTERS) throw new IllegalArgumentException();
+            if (debugEnabled()) System.err.println("[Anthropic debug] stop_reason=" + stopReason
+                    + " text_blocks=" + textBlocks + " output_chars=" + output.length());
             return new TextGenerationResult(output, usage(root.get("usage")), modelId, finishReason);
         } catch (RuntimeException exception) {
             if (exception instanceof TextGenerationException generationException) throw generationException;
+            debugInvalidResponse(json);
             throw new TextGenerationException(TextGenerationException.Code.INVALID_RESPONSE);
+        }
+    }
+
+    private void debugInvalidResponse(String json) {
+        if (!debugEnabled()) return;
+        try {
+            JsonNode root = MAPPER.readTree(json);
+            String type = text(root, "type");
+            String stopReason = text(root, "stop_reason");
+            JsonNode content = root == null ? null : root.get("content");
+            java.util.List<String> blockTypes = new java.util.ArrayList<>();
+            if (content != null && content.isArray()) for (JsonNode block : content) {
+                String blockType = text(block, "type");
+                if (blockType != null && blockType.matches("[A-Za-z0-9_-]{1,64}") && blockTypes.size() < 10)
+                    blockTypes.add(blockType);
+            }
+            System.err.println("[Anthropic debug] invalid_response type=" + (type == null ? "unavailable" : type)
+                    + " stop_reason=" + (stopReason == null ? "unavailable" : stopReason)
+                    + " block_types=" + blockTypes + " response_chars=" + json.length());
+        } catch (RuntimeException ignored) {
+            System.err.println("[Anthropic debug] invalid_response malformed_json response_chars=" + json.length());
         }
     }
 
@@ -233,9 +265,53 @@ public final class AnthropicTextGenerator implements TextGenerator {
         return Boolean.parseBoolean(System.getenv("ANTHROPIC_DEBUG"));
     }
 
+    private void debugResponse(HttpResponse<?> response, String code, byte[] errorBody) {
+        if (!debugEnabled()) return;
+        String requestId = response.headers().firstValue("request-id")
+                .filter(value -> value.matches("[A-Za-z0-9_-]{1,128}"))
+                .orElse("unavailable");
+        System.err.println("[Anthropic debug] status=" + response.statusCode()
+                + " code=" + code + " request_id=" + requestId);
+        String detail = safeErrorDetail(errorBody, config.apiKey());
+        if (detail != null) System.err.println("[Anthropic debug] error=" + detail);
+    }
+
+    static String safeErrorDetail(byte[] body, String apiKey) {
+        if (body == null || body.length == 0) return null;
+        try {
+            JsonNode root = MAPPER.readTree(new String(body, StandardCharsets.UTF_8));
+            JsonNode error = root == null ? null : root.get("error");
+            if (error == null || !error.isObject()) return null;
+            String type = textValue(error, "type");
+            String message = textValue(error, "message");
+            if (type == null && message == null) return null;
+            String safeType = type != null && type.matches("[A-Za-z0-9_-]{1,64}") ? type : "unknown";
+            String safeMessage = message == null ? "unavailable" : message
+                    .replace(apiKey, "[redacted]")
+                    .replaceAll("[\\p{Cntrl}]+", " ")
+                    .replaceAll("\\s+", " ")
+                    .trim();
+            if (safeMessage.length() > 1_000) safeMessage = safeMessage.substring(0, 1_000) + "...";
+            return "type=" + safeType + " message=" + safeMessage;
+        } catch (RuntimeException exception) {
+            return null;
+        }
+    }
+
+    private static String textValue(JsonNode node, String field) {
+        JsonNode value = node == null ? null : node.get(field);
+        return value != null && value.isString() ? value.asString() : null;
+    }
+
     private static String policy(StructuredGenerationRequest.Purpose purpose) {
         return purpose == StructuredGenerationRequest.Purpose.GAME_BLUEPRINT
                 ? BLUEPRINT_POLICY : PRESENTATION_POLICY;
+    }
+
+    private static String thinkingMode(String modelId) {
+        if ("claude-haiku-5-5".equals(modelId)) return "disabled";
+        if ("claude-sonnet-5-5".equals(modelId)) return "between_tools";
+        return null;
     }
 
     private TextGenerationException.Code errorCode(int status) {

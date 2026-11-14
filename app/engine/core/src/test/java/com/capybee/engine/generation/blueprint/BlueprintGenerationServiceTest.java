@@ -48,7 +48,12 @@ class BlueprintGenerationServiceTest {
         assertThat(sent.get().purpose()).isEqualTo(StructuredGenerationRequest.Purpose.GAME_BLUEPRINT);
         assertThat(sent.get().slotKey()).as("existing retrying single-flight wrapper must remain bypassed").isNull();
         assertThat(sent.get().untrustedDataJson()).contains("approvedSuggestion").contains("Ignore limits");
+        assertThat(sent.get().untrustedDataJson()).contains("\"maxSetValues\":1");
+        assertThat(sent.get().untrustedDataJson()).contains("\"maxCounterDelta\":1");
         assertThat(sent.get().taskInstructions()).doesNotContain("Ignore limits");
+        assertThat(sent.get().taskInstructions()).contains("every reachable route")
+                .contains("minStoryTransitions and maxStoryTransitions")
+                .contains("feedback code and JSON pointer");
     }
 
     @Test void semanticRejectionUsesOnlyTheSharedSingleRepair(){
@@ -83,6 +88,31 @@ class BlueprintGenerationServiceTest {
         assertThat(result).isInstanceOfSatisfying(BlueprintGenerationResult.GenerationFailed.class,
                 value->assertThat(value.code()).isEqualTo("BLUEPRINT_INTERNAL_FAILURE"));
         assertThat(result.toString()).doesNotContain("private-secret");assertThat(calls).hasValue(1);
+    }
+
+    @Test void mapsProviderFailuresToSpecificStableCodesWithoutProviderDetails(){
+        Context c=context();
+        var expected=new LinkedHashMap<TextGenerationException.Code,String>();
+        expected.put(TextGenerationException.Code.CONFIGURATION_ERROR,"BLUEPRINT_PROVIDER_CONFIGURATION_ERROR");
+        expected.put(TextGenerationException.Code.UNAVAILABLE,"BLUEPRINT_PROVIDER_UNAVAILABLE");
+        expected.put(TextGenerationException.Code.TIMEOUT,"BLUEPRINT_PROVIDER_TIMEOUT");
+        expected.put(TextGenerationException.Code.RATE_LIMITED,"BLUEPRINT_PROVIDER_RATE_LIMITED");
+        expected.put(TextGenerationException.Code.AUTHENTICATION_FAILED,"BLUEPRINT_PROVIDER_AUTHENTICATION_FAILED");
+        expected.put(TextGenerationException.Code.PERMISSION_DENIED,"BLUEPRINT_PROVIDER_PERMISSION_DENIED");
+        expected.put(TextGenerationException.Code.REQUEST_INVALID,"BLUEPRINT_PROVIDER_REQUEST_INVALID");
+        expected.put(TextGenerationException.Code.BILLING_UNAVAILABLE,"BLUEPRINT_PROVIDER_BILLING_UNAVAILABLE");
+        expected.put(TextGenerationException.Code.STRUCTURED_OUTPUT_UNSUPPORTED,"BLUEPRINT_PROVIDER_STRUCTURED_OUTPUT_UNSUPPORTED");
+        expected.put(TextGenerationException.Code.RESOURCE_NOT_FOUND,"BLUEPRINT_PROVIDER_RESOURCE_NOT_FOUND");
+        expected.put(TextGenerationException.Code.PROVIDER_REJECTED,"BLUEPRINT_PROVIDER_REJECTED");
+        expected.put(TextGenerationException.Code.INVALID_RESPONSE,"BLUEPRINT_OUTPUT_REJECTED");
+        int operation=0;
+        for(var entry:expected.entrySet()){
+            TextGenerator generator=request->{throw new TextGenerationException(entry.getKey());};
+            var result=service(generator).generate(c.request("op-provider-"+(operation++),null,null));
+            assertThat(result).isInstanceOfSatisfying(BlueprintGenerationResult.GenerationFailed.class,
+                    value->assertThat(value.code()).isEqualTo(entry.getValue()));
+            assertThat(result.toString()).doesNotContain("private-provider-body");
+        }
     }
 
     static BlueprintGenerationService service(TextGenerator generator){return new BlueprintGenerationService(generator,

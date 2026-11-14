@@ -274,7 +274,7 @@ final class CertificationCommand {
         if (options.live) {
             manifest.put("requestedModelId", pricing.modelId).put("pricingDigest", sha256(options.pricingFile))
                     .put("apiVersion", "2023-06-01").put("connectTimeout", "PT5S")
-                    .put("responseTimeout", "PT25S");
+                    .put("responseTimeout", "PT2M");
         }
         writeJson(root.resolve("manifest.json"), manifest);
         ObjectNode summary = JSON.createObjectNode();

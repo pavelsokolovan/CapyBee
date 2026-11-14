@@ -36,7 +36,7 @@ public record AnthropicConfig(String modelId, String apiKey, URI endpoint,
         String model = System.getenv("GENERATION_MODEL_ID");
         String key = System.getenv("ANTHROPIC_API_KEY");
         if (model == null || key == null) throw configurationError();
-        return new AnthropicConfig(model, key, DEFAULT_ENDPOINT, Duration.ofSeconds(5), Duration.ofSeconds(25));
+        return new AnthropicConfig(model, key, DEFAULT_ENDPOINT, Duration.ofSeconds(5), Duration.ofMinutes(2));
     }
 
     @Override
@@ -46,7 +46,7 @@ public record AnthropicConfig(String modelId, String apiKey, URI endpoint,
     }
 
     private static void validateTimeout(Duration timeout) {
-        if (timeout.isZero() || timeout.isNegative() || timeout.compareTo(Duration.ofMinutes(1)) > 0) {
+        if (timeout.isZero() || timeout.isNegative() || timeout.compareTo(Duration.ofMinutes(2)) > 0) {
             throw configurationError();
         }
     }

@@ -44,7 +44,12 @@ class BlueprintOutputParserTest {
         var schemas=new BlueprintSchemas();
         assertThat(schemas.baseSchema()).contains("draft/2020-12").contains("additionalProperties");
         String specialized=schemas.specializedSchema(context.profile,context.preferences,context.constraints);
-        assertThat(specialized).contains("\"locale\":\"en\"").contains("FLAG_IS").doesNotContain("COUNTER_ADD").doesNotContain("SET_ADD");
+        assertThat(specialized).contains("\"locale\":\"en\"").contains("\"maxSetValues\":4")
+                .contains("\"maxCounterDelta\":3")
+                .contains("FLAG_IS").doesNotContain("COUNTER_ADD").doesNotContain("SET_ADD");
+        var specializedJson=tools.jackson.databind.json.JsonMapper.builder().build().readTree(specialized);
+        assertThat(specializedJson.at("/$defs/set/properties/values/maxItems").intValue()).isEqualTo(4);
+        assertThat(specializedJson.at("/$defs/set/properties/initial/maxItems").intValue()).isEqualTo(4);
     }
     @Test void rejectsDecodedLoneSurrogate(){
         String json=writer.writeString(proposal()).replace("Signal Path","\\uD800");
@@ -63,7 +68,7 @@ class BlueprintOutputParserTest {
     private static DecisionScene decision(String id,PhaseKind phase,String destination,List<Effect> effects){return new DecisionScene(id,phase,"A careful step","Plan the next action.",List.of("guide"),List.of("finish"),List.of(new Choice("continue","Continue with the plan.",destination,null,effects)));}
     private static Context context(){
         var identity=new ProfileIdentity(new PackId("test-profile"),new PackVersion(1,0,0),"fingerprint");
-        var caps=new ProfileCapabilities(List.of(PhaseKind.values()),"FORWARD_DAG",false,6,12,4,1,4,1,4,2,4,4,12,2,8,0,10,3,4,32,6,100,Set.of("FLAG_IS"),Set.of("FLAG_SET"));
+        var caps=new ProfileCapabilities(List.of(PhaseKind.values()),"FORWARD_DAG",false,6,12,4,1,4,1,4,2,4,4,12,2,4,0,10,3,4,32,6,100,Set.of("FLAG_IS"),Set.of("FLAG_SET"));
         var length=new LengthPreset("short","length.short",5,7,12);
         var challenge=new ChallengePreset("gentle","challenge.gentle",4,12,2,4,6,Set.of("FLAG_IS"),Set.of("FLAG_SET"));
         var policy=new GeneratorProfile.ProfilePolicy(10,14,true,300,Set.of());

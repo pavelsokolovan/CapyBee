@@ -106,6 +106,22 @@ class DynamicBootstrapIntegrationTest {
         assertThat(ids.nextId()).isEqualTo("run-1");
     }
 
+    @Test void preservesStableBlueprintFailureCodeAtTheEngineBoundary() {
+        Engine engine = Engine.builder(new PackRegistry(List.of()))
+                .clock(Clock.systemUTC()).random(Randoms.seeded(1L)).ids(new SequentialIdSource("run"))
+                .dynamicBlueprints(request -> new BlueprintGenerationResult.GenerationFailed(
+                        "BLUEPRINT_PROVIDER_REQUEST_INVALID", List.of(BlueprintGenerationResult.Recovery.CANCEL), null))
+                .build();
+
+        var result = engine.startDynamic(new DynamicGameBootstrapRequest(
+                BlueprintGenerationServiceTest.context().request("dynamic-provider-failure", null,
+                        BlueprintCancellation.NEVER), null));
+
+        assertThat(result).isEqualTo(new DynamicGameBootstrapResult.Failed("BLUEPRINT_PROVIDER_REQUEST_INVALID",
+                List.of(new Issue(Issue.Severity.ERROR, "BLUEPRINT_PROVIDER_REQUEST_INVALID",
+                        "Dynamic game startup could not complete at this stage"))));
+    }
+
     @Test void startIsGeneratedAndLaterScenesRemainLazyUntilPrefetch() {
         var candidate = MaterializedGameCompilerTest.reviewed(MaterializedGameCompilerTest.fixture());
         AtomicInteger calls = new AtomicInteger();

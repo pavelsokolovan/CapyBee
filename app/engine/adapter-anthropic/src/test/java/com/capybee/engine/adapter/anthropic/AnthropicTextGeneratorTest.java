@@ -1,5 +1,6 @@
 package com.capybee.engine.adapter.anthropic;
 
+import com.capybee.engine.generation.blueprint.json.BlueprintSchemas;
 import com.capybee.engine.port.StructuredGenerationRequest;
 import com.capybee.engine.port.TextGenerationException;
 import com.capybee.engine.port.TextGenerationResult;
@@ -73,7 +74,63 @@ class AnthropicTextGeneratorTest {
         });
         assertThat(sent.get().get("max_tokens").intValue()).isEqualTo(6000);
         assertThat(sent.get().get("system").asString()).contains("bounded declarative game blueprint")
-                .contains("Do not emit executable code").doesNotContain("create actions or game rules");
+                .contains("Do not emit executable code")
+                .contains("Authoritative output JSON Schema")
+                .doesNotContain("create actions or game rules");
+        assertThat(sent.get().get("output_config")).isNull();
+    }
+
+    @Test
+    void disablesDefaultThinkingForClaudeHaiku55() throws IOException {
+        AtomicReference<JsonNode> sent = new AtomicReference<>();
+        withServer(exchange -> {
+            sent.set(MAPPER.readTree(exchange.getRequestBody().readAllBytes()));
+            respond(exchange, 200, RESPONSE);
+        }, endpoint -> new AnthropicTextGenerator(new AnthropicConfig("claude-haiku-5-5", API_KEY, endpoint,
+                Duration.ofSeconds(2), Duration.ofSeconds(3))).generate(request()));
+
+        assertThat(sent.get().get("thinking").get("type").asString()).isEqualTo("disabled");
+    }
+
+    @Test
+    void usesBetweenToolsThinkingForClaudeSonnet55() throws IOException {
+        AtomicReference<JsonNode> sent = new AtomicReference<>();
+        withServer(exchange -> {
+            sent.set(MAPPER.readTree(exchange.getRequestBody().readAllBytes()));
+            respond(exchange, 200, RESPONSE);
+        }, endpoint -> new AnthropicTextGenerator(new AnthropicConfig("claude-sonnet-5-5", API_KEY, endpoint,
+                Duration.ofSeconds(2), Duration.ofSeconds(3))).generate(request()));
+
+        assertThat(sent.get().get("thinking").get("type").asString()).isEqualTo("between_tools");
+    }
+
+    @Test
+    void transformsFullBlueprintSchemaToAnthropicSupportedFiniteSubset() {
+        JsonNode transformed = AnthropicSchemaTransformer.transform(
+                MAPPER.readTree(new BlueprintSchemas().baseSchema()));
+        String json = MAPPER.writeValueAsString(transformed);
+
+        assertThat(json).contains("conditionDepth3").contains("additionalProperties");
+        assertThat(json).doesNotContain("\"$schema\"").doesNotContain("\"$id\"")
+                .doesNotContain("\"allOf\"").doesNotContain("\"oneOf\"")
+                .doesNotContain("\"minimum\"").doesNotContain("\"maximum\"")
+                .doesNotContain("\"minLength\"").doesNotContain("\"maxLength\"")
+                .doesNotContain("\"maxItems\"").doesNotContain("\"uniqueItems\"")
+                .doesNotContain("\"prefixItems\"")
+                .doesNotContain("#/$defs/compositeCondition").doesNotContain("#/$defs/notCondition");
+    }
+
+    @Test
+    void removesUnreachableDefinitionsContainingEmptyEnums() {
+        JsonNode transformed = AnthropicSchemaTransformer.transform(MAPPER.readTree("""
+                {"type":"object","properties":{"value":{"$ref":"#/$defs/used"}},"required":["value"],
+                 "$defs":{"used":{"type":"string"},"unused":{"type":"string","enum":[]}}}
+                """));
+        String json = MAPPER.writeValueAsString(transformed);
+
+        assertThat(json).contains("\"used\"")
+                .doesNotContain("\"unused\"")
+                .doesNotContain("\"enum\":[]");
     }
 
     @Test
@@ -179,12 +236,35 @@ class AnthropicTextGeneratorTest {
     }
 
     @Test
+    void debugErrorDetailIsBoundedAndRedactsApiKey() {
+        String body = MAPPER.writeValueAsString(java.util.Map.of("error", java.util.Map.of(
+                "type", "invalid_request_error",
+                "message", "schema problem for " + API_KEY + "\n" + "x".repeat(1_200))));
+
+        String detail = AnthropicTextGenerator.safeErrorDetail(
+                body.getBytes(StandardCharsets.UTF_8), API_KEY);
+
+        assertThat(detail).startsWith("type=invalid_request_error message=schema problem for [redacted] x")
+                .endsWith("...")
+                .doesNotContain(API_KEY)
+                .doesNotContain("\n")
+                .hasSizeLessThanOrEqualTo(1_060);
+    }
+
+    @Test
     void configurationRequiresExplicitModelAndNeverRendersApiKey() {
         var config = config(URI.create("https://api.anthropic.com/v1/messages"));
 
         assertThat(config.toString()).doesNotContain(API_KEY);
+        assertThat(new AnthropicConfig("test-pinned-model", API_KEY,
+                URI.create("https://api.anthropic.com/v1/messages"), Duration.ofSeconds(5), Duration.ofMinutes(2)))
+                .extracting(AnthropicConfig::responseTimeout).isEqualTo(Duration.ofMinutes(2));
         assertThatThrownBy(() -> new AnthropicConfig("", API_KEY,
                 URI.create("https://api.anthropic.com/v1/messages"), Duration.ofSeconds(1), Duration.ofSeconds(1)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Anthropic generation configuration is invalid");
+        assertThatThrownBy(() -> new AnthropicConfig("test-pinned-model", API_KEY,
+                URI.create("https://api.anthropic.com/v1/messages"), Duration.ofSeconds(5), Duration.ofSeconds(121)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Anthropic generation configuration is invalid");
     }
