@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
 import java.sql.DriverManager;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -33,7 +34,8 @@ class PostgresDynamicMigrationTest {
                         """)) {
                     user.setObject(1, userId); user.setString(2, "subject-" + userId);
                     user.setString(3, userId + "@example.invalid"); user.setString(4, "Migration Test");
-                    user.setObject(5, Instant.EPOCH); user.setObject(6, Instant.EPOCH); user.executeUpdate();
+                    user.setTimestamp(5, Timestamp.from(Instant.EPOCH));
+                    user.setTimestamp(6, Timestamp.from(Instant.EPOCH)); user.executeUpdate();
                 }
                 try (var run = connection.prepareStatement("""
                         INSERT INTO game_runs (id, user_id, pack_id, pack_version, locale, status,
@@ -41,7 +43,8 @@ class PostgresDynamicMigrationTest {
                         VALUES (?, ?, 'fixture-minimal', '1.0.0', 'en', 'ACTIVE', ?::jsonb, ?, ?)
                         """)) {
                     run.setObject(1, runId); run.setObject(2, userId); run.setString(3, snapshot);
-                    run.setObject(4, Instant.EPOCH); run.setObject(5, Instant.EPOCH); run.executeUpdate();
+                    run.setTimestamp(4, Timestamp.from(Instant.EPOCH));
+                    run.setTimestamp(5, Timestamp.from(Instant.EPOCH)); run.executeUpdate();
                 }
             }
             migrate(schema, "13");
