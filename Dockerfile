@@ -1,7 +1,7 @@
 FROM node:20-bookworm-slim AS ui-build
 WORKDIR /workspace/app/ui
 COPY app/ui/package*.json ./
-RUN npm install
+RUN npm ci
 COPY app/ui/ ./
 RUN npm run build
 
