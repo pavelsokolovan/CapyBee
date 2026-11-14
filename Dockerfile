@@ -3,6 +3,7 @@ WORKDIR /workspace/app/ui
 COPY app/ui/package*.json ./
 RUN npm ci
 COPY app/ui/ ./
+COPY app/engine/session/src/test/resources/wire/ /workspace/app/engine/session/src/test/resources/wire/
 RUN npm run build
 
 FROM eclipse-temurin:25-jdk AS server-build
