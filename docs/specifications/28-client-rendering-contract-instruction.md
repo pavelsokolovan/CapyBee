@@ -4,7 +4,7 @@
 **Parent:** [Universal game engine intent](intent/01-universal-game-engine.md) and [dynamic game generation intent](intent/02-dynamic-ai-game-generation.md)
 **Depends on:** Specs 22–27.27.5, particularly the source-neutral web session API in Spec 27.27.4
 **Baseline:** Inspected `main` at `48bb38bb1912ed3d64b9dff1ca2a13213d7b2e0f` on 2026-11-14. Source inspection and existing GitHub Actions results only; no application build, provider call or manual gameplay was performed while preparing these specifications.
-**Status:** Draft — split into Specs 28.1–28.4
+**Status:** Implemented — delivered in Specs 28.1–28.4
 **Primary outcome:** A signed-in family can enter the RPG from Play, prepare and explicitly start an available game, read and act on the engine's view, leave and resume safely, and reach an ending through the integrated Spring-served React/PWA client.
 
 ## 1. Delivery boundary
@@ -113,3 +113,16 @@ server persistence or restart recovery.
 After all parts pass, mark this parent and its index entry implemented. Follow
 the repository's `spec <number> is implemented - <short description>` commit rule
 for implementation. Preparing these documents does not implement any part.
+
+
+## Implementation completion — 2026-11-14
+
+Specs 28.1–28.4 implement public contracts, preparation/start, shared gameplay
+and owner/offline/auth/PWA/multitab recovery. Local engine/backend/frontend,
+integrated PostgreSQL/browser and package/offline/compatibility gates passed.
+Historical baseline findings above are retained as the original inspection.
+The operational contract and tested limits are recorded in
+[game-web-client.md](../game-web-client.md) and
+[acceptance evidence](../game-web-client-acceptance.md). Production flags remain
+disabled by default; live-provider/device certification and activation are
+operator actions. Spec 29, rewards and the graphical game map are not implemented.

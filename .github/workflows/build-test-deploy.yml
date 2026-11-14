@@ -81,9 +81,15 @@ jobs:
         working-directory: app/ui
         run: npm run test:coverage
 
-      - name: Build UI
+      - name: Build and sync Spring-served UI
+        shell: pwsh
+        run: ./scripts/dev-workflow.ps1 -Action sync
+
+      - name: Install deterministic browser test runtime
         working-directory: app/ui
-        run: npm run build
+        run: |
+          npx playwright install --with-deps chromium
+          node -e 'console.log("CHROMIUM_EXECUTABLE="+require("playwright").chromium.executablePath())' >> "$GITHUB_ENV"
 
       - name: Lint UI (if available)
         working-directory: app/ui
@@ -96,7 +102,9 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Run backend tests
+      - name: Run backend and integrated browser tests
+        env:
+          CAPYBEE_PREPARATION_BROWSER_CHECK: ${{ github.workspace }}/app/ui/scripts/check-adventure-preparation.mjs
         run: mvn -B -f app/pom.xml -pl server -am verify
 
       - name: Build backend JAR

@@ -1,3 +1,4 @@
+import 'fake-indexeddb/auto';
 import {act} from 'react';
 import {createRoot,type Root} from 'react-dom/client';
 import {beforeEach,afterEach,describe,it,expect,vi} from 'vitest';
@@ -31,7 +32,7 @@ describe('preparation panel',()=>{
   expect(host.textContent).toContain(copy.ideaAdded);
   expect(host.textContent).not.toContain('private-sentinel');expect(JSON.stringify(sessionStorage)).not.toContain('private-sentinel');
   await click(copy.start);expect(h.transport.transient).toHaveBeenCalledWith(expect.anything(),'POST',expect.objectContaining({suggestion:'private-sentinel'}));expect(h.transport.transient).toHaveBeenCalledTimes(1);expect(h.ready).toHaveBeenCalledTimes(1);
-  expect(host.textContent).toContain(copy.ready);
+  await vi.waitFor(async()=>{await act(async()=>{await new Promise(resolve=>setTimeout(resolve,0));});expect(host.textContent).toContain(copy.ready);});
  });
  it('supports keyboard focus and browser Back without abandoning a run',async()=>{
   const h=harness();await act(async()=>root.render(<AdventurePreparation owner="owner" locale="en" onClose={h.close} flow={h.flow}/>));

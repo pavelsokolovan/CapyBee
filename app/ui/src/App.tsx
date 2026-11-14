@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import {forgetGameOwner,migrateOwnerlessGames} from './offline/queueStore';
+import {activateGameOwner} from './game/gameOwner';
+import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { AuthenticatedHome } from './AuthenticatedHome';
 import type { UserProfile } from './AuthenticatedHome';
@@ -122,6 +124,16 @@ function App() {
   const [networkUnavailable, setNetworkUnavailable] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
 
+  const previousGameOwner=useRef<string|null>(null);
+  useEffect(()=>{
+    const next=user?.authenticated?user.id??null:null;
+    if(next&&previousGameOwner.current&&next!==previousGameOwner.current)void forgetGameOwner(previousGameOwner.current);
+    if(next)previousGameOwner.current=next;
+    activateGameOwner(next);
+    if(next)void migrateOwnerlessGames();
+  },[user?.id,user?.authenticated]);
+  useEffect(()=>{const changed=()=>{const outgoing=previousGameOwner.current;if(outgoing)void forgetGameOwner(outgoing);clearSessionToken();setUser(null);setSessionExpired(true);};window.addEventListener('game-session-changed',changed);const expired=()=>{setUser(null);setSessionExpired(true);};window.addEventListener('game-auth-required',expired);return()=>{window.removeEventListener('game-session-changed',changed);window.removeEventListener('game-auth-required',expired);};},[]);
+
   const locale: 'pl' | 'en' = navigator.language.toLowerCase().startsWith('pl') ? 'pl' : 'en';
   const authText = authCopy[locale];
   const t = landingCopy[locale];
@@ -130,6 +142,16 @@ function App() {
     captureSessionTokenFromFragment();
     checkAuthStatus();
   }, []);
+
+  useEffect(()=>{
+    const sessionChanged=(event:StorageEvent)=>{
+      if(event.key!=='capybee.sessionToken'||event.oldValue===event.newValue)return;
+      // A cookie/token change in another tab must hide old account content before rechecking.
+      activateGameOwner(null);setUser(null);setLoading(true);void checkAuthStatus();
+    };
+    window.addEventListener('storage',sessionChanged);
+    return()=>window.removeEventListener('storage',sessionChanged);
+  },[]);
 
   useEffect(() => {
     const syncOnlineStatus = () => setIsOnline(navigator.onLine);
@@ -287,7 +309,7 @@ function App() {
   }
 
   if (user?.authenticated) {
-    return <AuthenticatedHome user={user} />;
+    return <AuthenticatedHome key={user.id} user={user} />;
   }
 
   if (authCheckTimedOut && !user?.authenticated) {

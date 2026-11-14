@@ -1,4 +1,8 @@
-import { listQueuedActions, updateAction, removeAction, type QueuedAction } from './queueStore';
+import {decodeGameResponse} from '../game/gameTransport';
+import {restoreGameSession} from '../game/restoreGameSession';
+import {withGameLock} from '../game/gameLock';
+import {activateGameOwner,notifyGameRevision,watchGameOwner,ownerAllowed} from '../game/gameOwner';
+import { validGameAction,getQueuedAction, listQueuedActions, updateAction, removeAction, type QueuedAction } from './queueStore';
 
 const MAX_ATTEMPTS = 8;
 const MAX_GAME_ATTEMPTS = 12;
@@ -23,7 +27,7 @@ export { GameTransport, retryDelay, decodeGameResponse } from '../game/gameTrans
 
 let flushing = false;
 let gameOwner: string | null = null;
-export function setGameOwner(owner: string | null) { gameOwner = owner; }
+export function setGameOwner(owner: string | null) { gameOwner = owner; activateGameOwner(owner); }
 
 export function onSyncStatusChange(listener: SyncListener): () => void {
   listeners.add(listener);
@@ -37,7 +41,7 @@ export function onSynced(listener: SyncedListener): () => void {
 
 async function notifyListeners() {
   const pending = await listQueuedActions();
-  const count = pending.filter((a) => a.status !== 'failed'
+  const count = pending.filter(a=>!isGameAction(a)||(a.type==='gameCommand'&&a.owner===gameOwner)).filter((a) => a.status !== 'failed'
     || a.attempts < (isGameAction(a) ? MAX_GAME_ATTEMPTS : MAX_ATTEMPTS)).length;
   listeners.forEach((l) => l(count));
 }
@@ -74,6 +78,7 @@ function retryAfterDelay(res: Response): number | undefined {
 
 async function sendOne(action: QueuedAction): Promise<SendOutcome> {
   const controller = new AbortController();
+  const unwatch=watchGameOwner(()=>{if(isGameAction(action)&&!ownerAllowed(action.owner!))controller.abort();});
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
     const method = action.poll && action.type === 'gameCommand' ? 'GET' : action.method ?? 'POST';
@@ -83,16 +88,19 @@ async function sendOne(action: QueuedAction): Promise<SendOutcome> {
       signal: controller.signal
     };
 
-    if (isGameAction(action)) requestInit.cache = 'no-store';
+    if (isGameAction(action)) {requestInit.cache = 'no-store';requestInit.headers={'X-Game-Owner':action.owner!};}
     if (method === 'POST') {
-      requestInit.headers = { 'Content-Type': 'application/json' };
+      requestInit.headers = { ...requestInit.headers,'Content-Type': 'application/json' };
       requestInit.body = JSON.stringify({ id: action.clientId, ...(action.payload ?? {}) });
     }
 
-    const res = await fetch(action.poll && action.type === 'gameCommand' ? `${action.path}/${action.clientId}` : action.path, requestInit);
+    if(isGameAction(action)&&(action.owner!==gameOwner||!ownerAllowed(action.owner!)))return {kind:'auth'};
+    if(action.type==='gameCommand'&&method==='POST'){action.poll=true;action.sent=true;await updateAction(action);}
+    const res = await fetch(method==='GET' && action.type === 'gameCommand' ? `${action.path}/${action.clientId}` : action.path, requestInit);
     clearTimeout(timer);
 
     if (res.status === 401) {
+      if(isGameAction(action)){try{await restoreGameSession(action.owner!);}catch{window.dispatchEvent(new Event('game-auth-required'));}}
       return { kind: 'auth' };
     }
     if (method === 'DELETE' && res.status === 404) {
@@ -106,10 +114,12 @@ async function sendOne(action: QueuedAction): Promise<SendOutcome> {
         : body && typeof body === 'object' && 'code' in body
           ? (body as { code?: unknown }).code
           : undefined;
+      if(errorCode==='GAME_OWNER_CHANGED'){setGameOwner(null);window.dispatchEvent(new Event('game-session-changed'));return {kind:'auth'};}
       if (action.owner !== gameOwner) return {kind:'auth'};
-      if (action.poll && res.status === 404) {
-        const current = await fetch(`/api/game/runs/${action.runId}`, {credentials:'include',cache:'no-store'});
+      if (method==='GET' && res.status === 404) {
+        const current = await fetch(`/api/game/runs/${action.runId}`, {credentials:'include',cache:'no-store',headers:{'X-Game-Owner':action.owner!}});
         const state = await responseBody(current) as {revision?:unknown; status?:unknown} | undefined;
+        if(action.owner !== gameOwner)return {kind:'auth'};
         if (current.ok && state?.status === 'ACTIVE' && state.revision === action.payload?.expectedRevision) {
           action.poll = false; await updateAction(action); return {kind:'retry'};
         }
@@ -134,7 +144,11 @@ async function sendOne(action: QueuedAction): Promise<SendOutcome> {
       if (res.status === 409 && errorCode === 'RUN_BUSY') {
         return { kind: 'retry', afterMs: retryAfterDelay(res) };
       }
-      if (res.ok) return { kind: 'done', status: res.status, body };
+      if (res.ok) {
+        const decoded=decodeGameResponse({status:res.status,body});
+        if(!decoded||typeof decoded!=='object'||!('commandId' in decoded)||decoded.commandId!==action.clientId||!('outcome' in decoded))return {kind:'retry'};
+        return { kind: 'done', status: res.status, body:decoded };
+      }
       if (res.status === 408 || res.status === 429 || res.status >= 500) {
         return { kind: 'retry', afterMs: retryAfterDelay(res) };
       }
@@ -148,13 +162,15 @@ async function sendOne(action: QueuedAction): Promise<SendOutcome> {
     return { kind: 'retry' };
   } catch {
     clearTimeout(timer);
+    if(isGameAction(action)&&(action.owner!==gameOwner||!ownerAllowed(action.owner!)))return {kind:'auth'};
     if (action.type === 'gameCommand') { action.poll = true; await updateAction(action); }
     return { kind: 'retry' };
-  }
+  } finally {unwatch();clearTimeout(timer);}
 }
 
 export async function flushQueue(): Promise<void> {
-  if (flushing) return;
+  if(flushing)return;
+  if(navigator.onLine===false){await notifyListeners();return;}
   flushing = true;
   try {
     const actions = await listQueuedActions();
@@ -166,13 +182,20 @@ export async function flushQueue(): Promise<void> {
       if ((action.notBefore ?? 0) > Date.now()) continue;
 
       if (isGameAction(action)) {
-        if (!action.owner || action.type === 'gameStart') { await removeAction(action.clientId); continue; }
-        if (action.owner !== gameOwner) continue;
+        if (!action.owner || action.type === 'gameStart' || !validGameAction(action)) { await removeAction(action.clientId);sessionStorage.setItem('game-reconfirm','1'); continue; }
+      if (action.owner !== gameOwner) continue;
+      }
+      const process=async()=>{
+      if(isGameAction(action)){
+        const fresh=await getQueuedAction(action.clientId);
+        if(!fresh||fresh.owner!==gameOwner||!ownerAllowed(fresh.owner!))return false;
+        Object.assign(action,fresh);
       }
       action.status = 'syncing';
       await updateAction(action);
 
       const outcome = await sendOne(action);
+      if(isGameAction(action)&&action.owner!==gameOwner)return true;
       if (outcome.kind === 'done' || outcome.kind === 'stale' || outcome.kind === 'terminal') {
         await removeAction(action.clientId);
         if (isGameAction(action)) {
@@ -182,18 +205,25 @@ export async function flushQueue(): Promise<void> {
             status: outcome.status,
             outcome: outcome.kind
           };
+          notifyGameRevision(action.owner!,action.runId!,typeof (event.body as {revision?:unknown})?.revision==='number'?(event.body as {revision:number}).revision:0);
           syncedListeners.forEach((listener) => listener(event));
         }
       } else if (outcome.kind === 'auth') {
         action.status = 'pending';
         await updateAction(action);
-        break;
+        return true;
       } else {
         action.attempts += 1;
         action.status = action.attempts >= maxAttempts ? 'failed' : 'pending';
         action.notBefore = Date.now() + (outcome.afterMs ?? backoffDelay(action.attempts));
         await updateAction(action);
       }
+      return false;
+      };
+      if(isGameAction(action)){
+        try{if(await withGameLock(action.owner!,action.runId!,process))break;}
+        catch{/* Unsafe coordination pauses game dispatch; unrelated actions still sync. */}
+      }else if(await process())break;
     }
   } finally {
     flushing = false;

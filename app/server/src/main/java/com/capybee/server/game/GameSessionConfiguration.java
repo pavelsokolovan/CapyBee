@@ -173,11 +173,12 @@ public class GameSessionConfiguration {
             @Value("${capybee.game.limits.global-calls-per-day:1500}") int globalCalls,
             @Value("${capybee.game.limits.run-calls:24}") int runCalls,
             @Value("${capybee.game.day-zone:UTC}") String dayZone,
+            @Value("${capybee.game.generation-enabled:false}") boolean generationEnabled,
             @Value("${capybee.game.prefetch.profile-reserve:8}") int profileReserve,
             @Value("${capybee.game.prefetch.global-reserve:100}") int globalReserve,
             @Value("${capybee.game.prefetch.run-reserve:4}") int runReserve) {
         return (owner, runId, priority) -> {
-            TextGenerator provider = generators.getIfAvailable();
+            TextGenerator provider = generationEnabled ? generators.getIfAvailable() : null;
             var builder = Engine.builder(registry).clock(gameSessionClock)
                     .random(Randoms.seeded(runId.getMostSignificantBits() ^ runId.getLeastSignificantBits()))
                     .ids(new UuidIdSource());

@@ -27,6 +27,15 @@ class DynamicStartOperationServiceTest {
         assertThat(((DynamicStartOperationService.Terminal)service.status(owner,id)).result()).isInstanceOf(DynamicStartCoordinator.Cancelled.class);
         assertThat(service.exists(owner,id)).isTrue();
     }
+    @Test void restartDoesNotRecreateUnpublishedPaidWork() {
+        var coordinator=mock(DynamicStartCoordinator.class);
+        var first=new DynamicStartOperationService(coordinator,task->{},Duration.ofSeconds(5));
+        var owner=new OwnerRef("owner");var id=UUID.randomUUID();
+        first.submit(owner,id,mock(ConfirmedDynamicPreparation.class),null,null,Duration.ZERO);
+        var restarted=new DynamicStartOperationService(coordinator,task->{},Duration.ofSeconds(5));
+        assertThat(restarted.status(owner,id)).isNull();assertThat(restarted.cancel(owner,id)).isFalse();
+        verifyNoInteractions(coordinator);
+    }
     @Test void audienceUsesTheWholeBirthYearInterval() {
         assertThat(DynamicGameController.audienceEligible(2014,2026,10,14)).isTrue();
         assertThat(DynamicGameController.audienceEligible(2016,2026,10,14)).isFalse();

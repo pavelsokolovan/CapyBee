@@ -1,3 +1,4 @@
+import {ownerAllowed,watchGameOwner} from '../../game/gameOwner';
 import {useEffect,useLayoutEffect,useRef,useState,useSyncExternalStore} from 'react';
 import type {GameRunSummaryDto,SetupInput} from '../../game/gameApi';
 import {GameTransport} from '../../offline/syncEngine';
@@ -11,6 +12,7 @@ type Props={owner:string;locale:'en'|'pl';onClose:()=>void;onRunReady?:(run:Game
 export function AdventurePreparation({owner,locale,onClose,onRunReady,flow:provided}:Props) {
  const [flow]=useState(()=>provided??new AdventureStart(owner,locale,new GameTransport(()=>owner,()=>restoreGameSession(owner)),onRunReady));
  const state=useSyncExternalStore(flow.subscribe,flow.getSnapshot),copy=adventureCopy[locale];
+ useEffect(()=>watchGameOwner(()=>{if(!ownerAllowed(owner)){flow.dispose();onClose();}}),[flow,owner,onClose]);
  const [online,setOnline]=useState(navigator.onLine);
  useEffect(()=>{const update=()=>setOnline(navigator.onLine);window.addEventListener('online',update);window.addEventListener('offline',update);return()=>{window.removeEventListener('online',update);window.removeEventListener('offline',update);};},[]);
  const [wish,setWish]=useState(''),[invalid,setInvalid]=useState(false),[composing,setComposing]=useState(false);
@@ -79,6 +81,7 @@ export function AdventurePreparation({owner,locale,onClose,onRunReady,flow:provi
   }}>
   <div className="adventure-panel">
    <header><h2 id="adventure-title" tabIndex={-1} ref={heading}>{copy.title}</h2><button type="button" onClick={close}>{copy.close}</button></header>
+   {sessionStorage.getItem('game-reconfirm')?<p>{locale==='pl'?'Sprawdź zapisaną grę. Potwierdź ponownie przed rozpoczęciem.':'Check the saved game. Confirm again before starting.'}</p>:null}
    {state.message?<p role="status">{copy[state.message]}</p>:null}
    {state.loading?<p role="status">{copy.loading}</p>:null}
    {state.message==='signin'?<a href="/oauth2/authorization/google">{copy.signInAction}</a>:null}

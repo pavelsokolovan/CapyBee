@@ -8,20 +8,23 @@ import {adventureCopy} from '../../game/adventureCopy';
 import {runCopy} from './runCopy';
 import './gameRun.css';
 export function GameRun({run,owner,locale,onAnother,controller:provided}:{run:GameRunSummaryDto;owner:string;locale:'en'|'pl';onAnother:()=>void;controller?:RunController}){
+ const [initialized,setInitialized]=useState(false);
  const [controller]=useState(()=>provided??new RunController(run,new GameTransport(()=>owner,()=>restoreGameSession(owner)),owner));
  const state=useSyncExternalStore(controller.subscribe,controller.getSnapshot),c=runCopy[locale],view=state.run.view;
  const heading=useRef<HTMLHeadingElement>(null),abandon=useRef<HTMLButtonElement>(null),dialog=useRef<HTMLDialogElement>(null);
- useEffect(()=>{void controller.check();return()=>controller.detach();},[controller]);
+ useEffect(()=>{let alive=true;void controller.initialize().then(()=>{if(alive)setInitialized(true);}).catch(()=>{});return()=>{alive=false;controller.detach();};},[controller]);
  useLayoutEffect(()=>{heading.current?.focus();},[state.run.revision]);
  const ended=!!view?.ended||state.run.status==='ENDED';
  const unsupported=!view||typeof view.canAdvance!=='boolean'||!!(view.input?.mode==='TEXT'&&view.options.some(o=>o.enabled))||!!(view.places?.availableMoves.some(id=>!view.places?.places.some(p=>p.id===id)));
- const locked=state.pending||state.run.status!=='ACTIVE'||!!view?.ended||unsupported;
+ const locked=!initialized||state.pending||state.run.status!=='ACTIVE'||!!view?.ended||unsupported;
  const submit=controller.submit.bind(controller);
  const cancel=()=>{dialog.current?.close();abandon.current?.focus();};
  return <section className="game-run" lang={state.run.locale}><h3 tabIndex={-1} ref={heading}>{view&&'story' in view?view.story?.title??c.scene:c.scene}</h3>
- {state.message==='saved'?<p>{adventureCopy[locale].ready}</p>:null}<p role="status" aria-live="polite">{c[state.message]}</p>{unsupported?<p>{c.unsupported}</p>:null}{state.run.status!=='ACTIVE'&&!ended?<p>{c.unavailable}</p>:null}
- {view?<><SceneBlocks view={view} locale={locale}/>{!locked||state.pending?<SceneActions key={state.run.revision} view={view} locale={locale} locked={locked} selection={state.selection} submit={submit}/>:null}
+ {initialized&&state.message==='saved'?<p>{adventureCopy[locale].ready}</p>:null}<p role="status" aria-live="polite">{initialized?c[state.message]:c.checking}</p>{unsupported?<p>{c.unsupported}</p>:null}{state.run.status!=='ACTIVE'&&!ended?<p>{c.unavailable}</p>:null}
+ {view?<><SceneBlocks view={view} locale={locale}/>{initialized&&(!locked||state.pending)?<SceneActions key={state.run.revision} view={view} locale={locale} locked={locked} selection={state.selection} submit={submit}/>:null}
  <ScenePanels view={view} locale={locale} locked={locked} submit={submit}/>{ended?<SceneResult view={view} locale={locale}/>:null}</>:null}
+ {state.retryable?<button type="button" onClick={()=>void controller.retryUnsent()}>{c.retry}</button>:null}
+ {state.cancellable?<button type="button" onClick={()=>void controller.removeUnsent()}>{c.remove}</button>:null}
  {state.pending?<button type="button" onClick={()=>void controller.check()}>{c.check}</button>:null}
  {ended?<button type="button" onClick={onAnother}>{c.newGame}</button>:null}
  {state.run.status==='ACTIVE'?<button type="button" ref={abandon} disabled={locked} onClick={()=>dialog.current?.showModal()}>{c.abandon}</button>:null}

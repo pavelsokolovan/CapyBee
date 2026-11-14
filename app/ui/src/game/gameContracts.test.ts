@@ -2,7 +2,7 @@ import contracts from './fixtures/contracts.json';
 import golden from '../../../engine/session/src/test/resources/wire/run-summary.json';
 import {describe,it,expect,vi,afterEach} from 'vitest';
 import {decodeSummary,decodeOperation,decodeView,decodeProfile} from './gameDecoders';
-import {GameTransport,retryDelay,assertDurableCommand} from './gameTransport';
+import {GameTransport,retryDelay,assertDurableCommand,decodeGameResponse} from './gameTransport';
 const view={blocks:[],options:[],status:[],objectives:[],characters:[],ended:false,canAdvance:false};
 const run={runId:'run',status:'ACTIVE',revision:0,locale:'en',updatedAt:'2026-11-14',viewSchema:2,view,
   source:{kind:'DYNAMIC',profileId:'generic-adventure',profileVersion:'1.0.0',gameFingerprint:'fingerprint'},packId:null,packVersion:null};
@@ -71,4 +71,13 @@ describe('operation recovery',()=>{
   await vi.advanceTimersByTimeAsync(1000);await pending;
   expect(fetch).toHaveBeenCalledTimes(2);expect(accept).toHaveBeenCalledTimes(2);
  });
+});
+it('keeps checking a durable identity through a missing acknowledgement without POST',async()=>{
+ vi.useFakeTimers();vi.stubGlobal('fetch',vi.fn().mockResolvedValueOnce(new Response('{"error":{"code":"COMMAND_NOT_FOUND"}}',{status:404,headers:{'content-type':'application/json'}})).mockResolvedValueOnce(new Response(JSON.stringify(contracts.pack),{headers:{'content-type':'application/json'}})));
+ const t=new GameTransport(()=> 'owner',async()=>{}),accept=vi.fn();const pending=t.poll('/api/game/runs/run/commands/id',new AbortController().signal,accept,true);
+ await vi.advanceTimersByTimeAsync(1000);await pending;expect(fetch).toHaveBeenCalledTimes(2);expect(accept).toHaveBeenCalledTimes(2);expect(vi.mocked(fetch).mock.calls.every(call=>!call[1]?.method||call[1].method==='GET')).toBe(true);vi.useRealTimers();vi.unstubAllGlobals();
+});
+
+it('normalizes stale-owner errors without exposing server messages or private details',()=>{
+ expect(decodeGameResponse({status:409,body:contracts.ownerChanged})).toEqual({error:{code:'GAME_OWNER_CHANGED'}});expect(()=>assertDurableCommand(contracts.durableCommand as import('./gameApi').GameCommandRequest)).not.toThrow();
 });

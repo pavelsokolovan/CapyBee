@@ -57,7 +57,7 @@ class DynamicStartCoordinatorTest {
     }
 
     @Test void cancellationAndPublicationHaveAnOrderedWinner() throws Exception {
-        for (boolean cancelDuringGeneration : List.of(true, false)) {
+        for (int cancelAt : List.of(0,1,2,3)) {
             var store = new InMemorySessionStore(CLOCK);
             SessionPorts.PackCatalog catalog = new SessionPorts.PackCatalog() {
                 public List<Pack> all() { return List.of(); }
@@ -70,7 +70,7 @@ class DynamicStartCoordinatorTest {
             var cancellation = new DynamicStartCoordinator.Cancellation();
             String blueprint = Files.readString(Path.of("..", "certification", "dynamic-v1", "blueprint.json"));
             TextGenerator provider = request -> {
-                if (cancelDuringGeneration) cancellation.cancel();
+                if(cancelAt==1||cancelAt==2&&request.purpose()==com.capybee.engine.port.StructuredGenerationRequest.Purpose.PRESENTATION)cancellation.cancel();
                 return new com.capybee.engine.port.TextGenerationResult(
                         request.purpose() == com.capybee.engine.port.StructuredGenerationRequest.Purpose.GAME_BLUEPRINT ? blueprint : "{}",
                         new com.capybee.engine.port.TextGenerationResult.TokenUsage(1,1,0,0), "fixture",
@@ -81,8 +81,9 @@ class DynamicStartCoordinatorTest {
             var profile = profile();
             var resolved = new PreparationPresetResolver().resolve(profile,Map.of(),profile.profile().defaultLocale(),HostGenerationCeilings.none());
             var preparation = new ConfirmedDynamicPreparation(profile,resolved.preferences().orElseThrow(),resolved.constraints().orElseThrow(),1,null);
+            if(cancelAt==0)cancellation.cancel();
             var result = coordinator.startDynamic(new OwnerRef("owner"),UUID.randomUUID(),preparation,7L,null,Duration.ofMinutes(1),cancellation);
-            if (cancelDuringGeneration) {
+            if (cancelAt<3) {
                 assertThat(result).isInstanceOf(DynamicStartCoordinator.Cancelled.class);
                 org.assertj.core.api.Assertions.assertThatThrownBy(() -> sessions.current(new OwnerRef("owner"))).isInstanceOf(SessionException.class);
             } else {

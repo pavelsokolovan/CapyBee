@@ -1,6 +1,9 @@
+import contracts from '../game/fixtures/contracts.json';
+vi.mock('../game/gameLock',()=>({withGameLock:async(_owner:string,_run:string,work:()=>Promise<unknown>)=>work()}));
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { QueuedAction } from './queueStore';
 
+const live=vi.hoisted(()=>new Map<string,QueuedAction>());
 const queueStore = vi.hoisted(() => ({
   listQueuedActions: vi.fn(),
   updateAction: vi.fn(),
@@ -8,7 +11,9 @@ const queueStore = vi.hoisted(() => ({
 }));
 
 vi.mock('./queueStore', () => ({
-  listQueuedActions: queueStore.listQueuedActions,
+  listQueuedActions: async()=>{const actions=await queueStore.listQueuedActions();for(const action of actions) live.set(action.clientId,action);return actions;},
+  getQueuedAction:async(id:string)=>live.get(id),
+  validGameAction:(a:QueuedAction)=>a.type==='gameCommand',
   updateAction: queueStore.updateAction,
   removeAction: queueStore.removeAction
 }));
@@ -126,7 +131,7 @@ describe('offline sync engine', () => {
   it('delivers successful game response bodies to subscribers', async () => {
     const action = createAction({ type: 'gameCommand', path: '/api/game/runs' });
     const listener = vi.fn();
-    const body = { runId: 'run-id', status: 'ACTIVE' };
+    const body = {commandId:'action-id',outcome:'APPLIED',accepted:true,appliedRevision:1,revision:1,status:'ACTIVE',view:contracts.pack.view,viewSchema:2,events:[],issues:[]};
     const unsubscribe = onSynced(listener);
     queueStore.listQueuedActions.mockResolvedValueOnce([action]).mockResolvedValueOnce([]);
     vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(body), {
@@ -342,4 +347,13 @@ describe('engine recovery boundaries',()=>{
   vi.mocked(fetch).mockResolvedValueOnce(new Response('{}',{status:404,headers:{'content-type':'application/json'}})).mockResolvedValueOnce(new Response(JSON.stringify({status:'ACTIVE',revision:5}),{headers:{'content-type':'application/json'}}));
   await flushQueue();expect(queueStore.removeAction).toHaveBeenCalledWith(action.clientId);
  });
+});
+it('does not dispatch while offline',async()=>{
+ vi.stubGlobal('fetch',vi.fn());vi.spyOn(navigator,'onLine','get').mockReturnValue(false);await flushQueue();expect(fetch).not.toHaveBeenCalled();vi.restoreAllMocks();vi.unstubAllGlobals();
+});
+it('ignores an acknowledged command after the owner changes',async()=>{
+ setGameOwner('owner');const action=createAction({type:'gameCommand',poll:true,payload:{expectedRevision:4}});
+ queueStore.listQueuedActions.mockResolvedValueOnce([action]).mockResolvedValueOnce([]);
+ vi.stubGlobal('fetch',vi.fn(async()=>{setGameOwner('other');return new Response('{}',{status:200,headers:{'content-type':'application/json'}});}));
+ await flushQueue();expect(queueStore.removeAction).not.toHaveBeenCalled();vi.unstubAllGlobals();
 });

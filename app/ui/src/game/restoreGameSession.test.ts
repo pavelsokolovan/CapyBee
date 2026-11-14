@@ -1,3 +1,4 @@
+import 'fake-indexeddb/auto';
 import {afterEach,beforeEach,it,expect,vi} from 'vitest';
 import {restoreGameSession} from './restoreGameSession';
 import * as session from '../sessionPersistence';
@@ -14,4 +15,8 @@ it('rejects restoration into a different owner',async()=>{
 it('clears expired tokens without inventing another authentication mechanism',async()=>{
  vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response('{}',{status:401})));
  await expect(restoreGameSession('owner')).rejects.toThrow('UNAUTHENTICATED');expect(session.clearSessionToken).toHaveBeenCalled();
+});
+it('shares one restoration across foreground and background callers',async()=>{
+ vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(JSON.stringify({authenticated:true,id:'owner',sessionToken:'rotated'}),{headers:{'content-type':'application/json'}})));
+ await Promise.all([restoreGameSession('owner'),restoreGameSession('owner')]);expect(fetch).toHaveBeenCalledTimes(1);
 });

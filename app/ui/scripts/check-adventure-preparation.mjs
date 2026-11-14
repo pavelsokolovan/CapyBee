@@ -1,3 +1,4 @@
+import {checkRecovery} from './game-recovery.mjs';
 import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
 const base=process.argv[2];
@@ -15,7 +16,7 @@ try {
  await page.getByRole('button',{name:'Next',exact:true}).click();
  await page.getByRole('button',{name:'Next',exact:true}).click();
  await page.getByRole('button',{name:'Next',exact:true}).click();
- const privateIdea='A fictional woodland journey';
+ const privateIdea='setup-private-'+crypto.randomUUID();
  await page.locator('textarea').fill(privateIdea);
  await page.getByRole('button',{name:'Review',exact:true}).click();
  assert.equal(await page.locator('textarea').count(),0);
@@ -99,5 +100,7 @@ try {
  await page.goBack();await page.locator('[role=dialog]').waitFor({state:'detached'});
  await page.waitForFunction(()=>document.activeElement?.textContent?.includes('Adventures'));
  assert.equal(requests.length,finalRequests);assert.deepEqual(errors,[]);
+ await page.getByRole('button',{name:/Adventures/}).click();await page.getByRole('button',{name:'Continue',exact:true}).count().then(async count=>{if(count)await page.getByRole('button',{name:'Continue',exact:true}).click();});
+ await checkRecovery({page,context,base,requests,logs});
  console.log('PASS: Spring-served preparation, private review, 360px/desktop, explicit start, reload/continue, browser Back and storage');
-}catch(error){console.error('GAME DIAGNOSTIC',await page.locator('[role=dialog]').first().innerText({timeout:1000}).catch(()=>''));throw error;}finally{await browser.close();}
+}catch(error){console.error('Browser acceptance assertion failed; story and request bodies omitted.');console.error('Status:',await page.locator('.game-run [role=status]').textContent({timeout:1000}).catch(()=>null));console.error('Queue metadata:',await page.evaluate(async()=>{const r=indexedDB.open('keyval-store');const db=await new Promise(resolve=>r.onsuccess=()=>resolve(r.result));if(!db.objectStoreNames.contains('keyval'))return [];const values=await new Promise(resolve=>{const r=db.transaction('keyval').objectStore('keyval').getAll();r.onsuccess=()=>resolve(r.result);});db.close();return values.filter(v=>v?.type==='gameCommand').map(v=>({id:v.clientId,poll:v.poll,status:v.status,attempts:v.attempts,notBefore:v.notBefore}));}));throw error;}finally{await browser.close();}

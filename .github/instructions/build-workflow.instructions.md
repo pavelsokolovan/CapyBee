@@ -33,3 +33,13 @@ Owns development commands and final application gates. Reuse the [workflow scrip
 ## Deployment
 - The [Dockerfile](../../Dockerfile) builds UI assets, embeds them in the Spring Boot JAR, then runs one container. [fly.toml](../../fly.toml) selects the `fly` Spring profile.
 - Keep Fly-specific Spring settings in `application-fly.yml`; supply credentials through environment/secrets, never hardcode them.
+
+## Web adventure recovery
+- Game reads/writes/errors must remain `no-store`; preserve the service worker's
+  API NetworkOnly rules and auth/API navigation exclusions.
+- Use the existing sync loop for typed owner-scoped non-text game actions. Never
+  queue starts, suggestions or text, or rebase a stale command to a new revision.
+- Changes to game queue/auth/coordination require the Spring/PostgreSQL browser
+  acceptance command in `docs/game-web-client.md`, including storage sentinels.
+- Keep fixture authentication/providers under test sources. Never enable paid
+  generation as a side effect of tests or rollout documentation.

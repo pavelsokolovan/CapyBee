@@ -54,7 +54,17 @@ import static org.assertj.core.api.Assertions.*;
  "capybee.game.dynamic.starts-per-hour=100","spring.session.jdbc.initialize-schema=never"})
 @org.springframework.test.annotation.DirtiesContext(classMode=org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 @Import(PreparationHttpIntegrationTest.FixtureConfiguration.class)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class PreparationHttpIntegrationTest {
+    static volatile boolean RESTARTED;
+    static String persistedRun, persistedView, persistedFingerprint;
+    static long persistedRevision;
+    static int callsBeforeRestart;
+    @AfterAll static void cleanupSchema() throws Exception {
+        try(var connection=java.sql.DriverManager.getConnection("jdbc:postgresql://localhost:5432/capybee","capybee","capybee");var statement=connection.createStatement()) {
+            statement.execute("DROP SCHEMA IF EXISTS "+SCHEMA+" CASCADE");
+        }
+    }
     static final int HTTP_PORT=freePort();
     static int freePort(){try(var socket=new java.net.ServerSocket(0)){return socket.getLocalPort();}catch(IOException failure){throw new IllegalStateException("FIXTURE_PORT_UNAVAILABLE",failure);}}
     static final String SCHEMA="prep_http_"+UUID.randomUUID().toString().replace("-", "");
@@ -70,19 +80,22 @@ class PreparationHttpIntegrationTest {
     static TextGenerator provider() throws IOException {
         String blueprint=Files.readString(Path.of("../engine/certification/dynamic-v1/blueprint.json"));
         return request->{
+            if(RESTARTED)throw new AssertionError("PROVIDER_CALLED_AFTER_RESTART");
             if(request.purpose()==StructuredGenerationRequest.Purpose.GAME_BLUEPRINT){
                 BLUEPRINT_CALLS.incrementAndGet();entered.countDown();
                 try{if(!release.await(10,TimeUnit.SECONDS))throw new IllegalStateException("FIXTURE_TIMEOUT");}
                 catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new IllegalStateException("FIXTURE_INTERRUPTED");}
             }
-            return new TextGenerationResult(request.purpose()==StructuredGenerationRequest.Purpose.GAME_BLUEPRINT?blueprint:"{}",
+            return new TextGenerationResult(request.purpose()==StructuredGenerationRequest.Purpose.GAME_BLUEPRINT?blueprint:request.taskId().equals("INPUT_RESOLUTION")?"{\"resolution\":\"SHORT_REPLY\",\"text\":\"A careful thought.\"}":"{}",
                     new TextGenerationResult.TokenUsage(1,1,0,0),"preparation-fixture",TextGenerationResult.FinishReason.COMPLETE);
         };
     }
-    static PackRegistry packs(){return new PackRegistry(List.of("fixture-minimal","fixture-text-dungeon").stream().map(id -> new PackLoader(Engine.sectionValidators()).load(
+    static PackRegistry packs(){return new PackRegistry(List.of("fixture-minimal","fixture-text-dungeon","fixture-text-input","fixture-generated").stream().map(id -> new PackLoader(Engine.sectionValidators()).load(
             new PackId(id),new DirectoryPackSource(Path.of("../engine/fixtures/game-packs/"+id)))).toList());}
     @DynamicPropertySource static void database(DynamicPropertyRegistry properties){
         properties.add("server.port",()->HTTP_PORT);
+        properties.add("capybee.game.dynamic.enabled",()->!RESTARTED);
+        properties.add("capybee.game.generation-enabled",()->!RESTARTED);
         properties.add("app.cors.allowed-origins",()->"http://localhost:5173,http://127.0.0.1:"+HTTP_PORT);
         properties.add("spring.datasource.url",()->"jdbc:postgresql://localhost:5432/capybee?currentSchema="+SCHEMA);
         properties.add("spring.datasource.username",()->"capybee");properties.add("spring.datasource.password",()->"capybee");
@@ -110,7 +123,9 @@ class PreparationHttpIntegrationTest {
         var builder=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+path)).timeout(Duration.ofSeconds(15))
                 .header("X-Preparation-Fixture","fixture").header("Origin","http://localhost:5173").header("Content-Type","application/json");
         builder.method(method,body==null?HttpRequest.BodyPublishers.noBody():HttpRequest.BodyPublishers.ofString(SessionJson.encode(body)));
-        return HttpClient.newBuilder().build().send(builder.build(),HttpResponse.BodyHandlers.ofString());
+        var response=HttpClient.newBuilder().build().send(builder.build(),HttpResponse.BodyHandlers.ofString());
+        assertThat(response.headers().firstValue("Cache-Control")).contains("no-store");
+        return response;
     }
     tools.jackson.databind.JsonNode awaitStatus(String path,String terminal) throws Exception {
         for(int i=0;i<200;i++){
@@ -121,7 +136,9 @@ class PreparationHttpIntegrationTest {
         }
         throw new AssertionError("HTTP fixture did not reach terminal state");
     }
-    @Test void startsPersistsPollsReplaysAndCancelsThroughHttp() throws Exception {
+    @Test @org.junit.jupiter.api.Order(1)
+    @org.springframework.test.annotation.DirtiesContext(methodMode=org.springframework.test.annotation.DirtiesContext.MethodMode.AFTER_METHOD)
+    void startsPersistsPollsReplaysAndCancelsThroughHttp() throws Exception {
         var user=new UserAccount();user.setGoogleSubject("preparation-fixture");user.setEmail("fixture@example.invalid");user.setDisplayName("Fixture");user.setAvatarUrl("");user=users.saveAndFlush(user);
         var child=new FamilyProfile();child.setParentUser(user);child.setNickname("Fixture");child.setBirthYear(Year.now().getValue()-12);child.setPreferredLocale("en");child.setHasSeenOnboarding(true);profiles.saveAndFlush(child);
         try{
@@ -151,7 +168,7 @@ class PreparationHttpIntegrationTest {
             assertThat(offlineEngine.resume(restored.snapshot()).ok()).isTrue();
             assertThat(restored.snapshot().dynamic().bundle().gameFingerprint()).isEqualTo(saved.path("source").path("gameFingerprint").asString());
             assertThat(BLUEPRINT_CALLS.get()).isEqualTo(1);
-            assertThat(jdbc.queryForObject("SELECT snapshot::text FROM game_runs WHERE id = ?",String.class,UUID.fromString(runId))).doesNotContain("A fictional woodland journey");
+            assertThat(jdbc.queryForObject("SELECT snapshot::text FROM game_runs WHERE id = ?",String.class,UUID.fromString(runId)).contains("A fictional woodland journey")).as("private setup is not persisted").isFalse();
             entered=new CountDownLatch(1);release=new CountDownLatch(1);String cancelledId=UUID.randomUUID().toString();
             start.put("requestId",cancelledId);start.put("expectedCurrentRunId",runId);
             assertThat(request("POST","/api/game/dynamic-starts",start).statusCode()).isEqualTo(202);assertThat(entered.await(5,TimeUnit.SECONDS)).isTrue();
@@ -161,13 +178,49 @@ class PreparationHttpIntegrationTest {
             String browser=System.getenv("CAPYBEE_PREPARATION_BROWSER_CHECK");
             if(browser!=null){
                 var process=new ProcessBuilder("node",browser,"http://127.0.0.1:"+port).redirectErrorStream(true).start();
-                boolean finished=process.waitFor(90,TimeUnit.SECONDS);
+                boolean finished=process.waitFor(180,TimeUnit.SECONDS);
                 if(!finished)process.destroyForcibly();
                 assertThat(finished).as("Browser fixture timeout").isTrue();
                 String diagnostic=new String(process.getInputStream().readNBytes(8192),java.nio.charset.StandardCharsets.UTF_8);
                 assertThat(process.exitValue()).withFailMessage("Browser fixture failed: %s",diagnostic).isZero();
                 assertThat(diagnostic).contains("PASS:");
             }
-        }finally{release.countDown();jdbc.execute("DROP SCHEMA IF EXISTS "+SCHEMA+" CASCADE");}
+            // Keep an ACTIVE published dynamic game across an actual HTTP-host restart.
+            start.put("requestId",UUID.randomUUID().toString());
+            var currentResponse=request("GET","/api/game/runs/current",null);
+            if(currentResponse.statusCode()==200)start.put("expectedCurrentRunId",SessionJson.tree(currentResponse.body()).path("runId").asString());else start.remove("expectedCurrentRunId");
+            assertThat(request("POST","/api/game/dynamic-starts",start).statusCode()).isEqualTo(202);
+            var finalStart=awaitStatus("/api/game/dynamic-starts/"+start.get("requestId"),"STARTED");
+            runId=finalStart.path("run").path("runId").asString();
+            var retained=SessionJson.tree(request("GET","/api/game/runs/"+runId,null).body());
+            persistedRun=runId;persistedView=retained.path("view").toString();persistedRevision=retained.path("revision").asLong();
+            persistedFingerprint=retained.path("source").path("gameFingerprint").asString();callsBeforeRestart=BLUEPRINT_CALLS.get();
+        }finally{release.countDown();RESTARTED=true;}
     }
+    @Test @org.junit.jupiter.api.Order(2) void freshHttpHostReadsExactPublishedRunWithStartsAndProviderDisabled() throws Exception {
+        assertThat(persistedRun).isNotNull();
+        var restored=SessionJson.tree(request("GET","/api/game/runs/"+persistedRun,null).body());
+        assertThat(restored.path("revision").asLong()).isEqualTo(persistedRevision);
+        assertThat(restored.path("view").toString().equals(persistedView)).as("accepted view survived restart").isTrue();
+        assertThat(restored.path("source").path("gameFingerprint").asString()).isEqualTo(persistedFingerprint);
+        assertThat(BLUEPRINT_CALLS.get()).isEqualTo(callsBeforeRestart);
+        assertThat(SessionJson.tree(request("GET","/api/game/capabilities",null).body()).path("dynamicStartEnabled").asBoolean()).isFalse();
+        String option=restored.path("view").path("options").get(0).path("id").asString();
+        String command=UUID.randomUUID().toString();
+        assertThat(request("POST","/api/game/runs/"+persistedRun+"/commands",Map.of("id",command,"expectedRevision",persistedRevision,"command",Map.of("type","CHOOSE","optionId",option))).statusCode()).isIn(200,202);
+        for(int attempt=0;attempt<200;attempt++){
+            var response=request("GET","/api/game/runs/"+persistedRun+"/commands/"+command,null);
+            if(response.statusCode()==200){assertThat(SessionJson.tree(response.body()).path("accepted").asBoolean()).isTrue();break;}
+            assertThat(response.statusCode()).isEqualTo(202);Thread.sleep(25);
+        }
+        assertThat(SessionJson.tree(request("GET","/api/game/runs/"+persistedRun,null).body()).path("revision").asLong()).isEqualTo(persistedRevision+1);
+        assertThat(BLUEPRINT_CALLS.get()).isEqualTo(callsBeforeRestart);
+        // Stale account hints cannot execute an ABANDON under a different cookie owner.
+        var mismatch=HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/game/runs/"+persistedRun+"/commands"))
+                .header("X-Preparation-Fixture","fixture").header("X-Game-Owner","other-owner").header("Content-Type","application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(SessionJson.encode(Map.of("id",UUID.randomUUID(),"expectedRevision",persistedRevision,"command",Map.of("type","ABANDON"))))).build(),HttpResponse.BodyHandlers.ofString());
+        assertThat(mismatch.statusCode()).isEqualTo(409);assertThat(mismatch.body()).contains("GAME_OWNER_CHANGED");
+        assertThat(mismatch.headers().firstValue("Cache-Control")).contains("no-store");
+    }
+
 }

@@ -1,3 +1,5 @@
+vi.mock('../../game/gameLock',()=>({withGameLock:async(_owner:string,_run:string,work:()=>Promise<unknown>)=>work()}));
+import 'fake-indexeddb/auto';
 import {act} from 'react';
 import {createRoot,type Root} from 'react-dom/client';
 import {beforeEach,afterEach,it,expect,vi} from 'vitest';
@@ -49,17 +51,17 @@ it('shows safe reading-only state for unsupported controls',async()=>{
 });
 function harness(){const r=run();let resolve!:(v:unknown)=>void;
  const t={setLanguage:vi.fn(),detach:vi.fn(),transient:vi.fn(()=>new Promise(r=>{resolve=r;})),read:vi.fn(async()=>({status:200,body:{...r,revision:r.revision+1}})),poll:vi.fn(async()=>{})};
- const controller=new RunController(r,t as unknown as GameTransport,'owner');return{controller,t,r,resolve:(v:unknown)=>resolve(v)};}
+ const controller=new RunController(r,t as unknown as GameTransport,'owner');return{controller,t,r,resolve:async(v:unknown)=>{await vi.waitFor(()=>expect(resolve).toBeTypeOf('function'));resolve(v);}};}
 it('locks all commands until accepted summary, reconciles rejected and replayed results',async()=>{
- for(const outcome of ['APPLIED','REPLAYED','REJECTED']){const h=harness();const pending=h.controller.submit({type:'ADVANCE'});await h.controller.submit({type:'ABANDON'});expect(h.t.transient).toHaveBeenCalledTimes(1);expect(h.controller.getSnapshot().pending).toBe(true);
- const marker=h.t.transient.mock.calls[0] as unknown as [{id:string}];h.resolve({status:200,body:{commandId:marker[0].id,outcome}});await pending;expect(h.controller.getSnapshot().pending).toBe(false);expect(h.controller.getSnapshot().run.revision).toBe(h.r.revision+1);expect(sessionStorage.length).toBe(0);}
+ for(const outcome of ['APPLIED','REPLAYED','REJECTED']){const h=harness();const pending=h.controller.submit({type:'SUBMIT_TEXT',text:'fictional text'});await h.controller.submit({type:'ABANDON'});await vi.waitFor(()=>expect(h.t.transient).toHaveBeenCalledTimes(1));expect(h.controller.getSnapshot().pending).toBe(true);
+ await vi.waitFor(()=>expect(h.t.transient).toHaveBeenCalled());const marker=h.t.transient.mock.calls[0] as unknown as [{id:string}];h.resolve({status:200,body:{commandId:marker[0].id,outcome}});await pending;expect(h.controller.getSnapshot().pending).toBe(false);expect(h.controller.getSnapshot().run.revision).toBe(h.r.revision+1);expect(sessionStorage.length).toBe(0);}
 });
 it('ignores responses after Leave and never rolls revision backward',async()=>{
- const h=harness();const pending=h.controller.submit({type:'ADVANCE'});h.controller.detach();h.resolve({status:200,body:{}});await pending;expect(h.t.read).not.toHaveBeenCalled();
- const other=harness();other.t.read.mockResolvedValue({status:200,body:{...other.r,revision:0}});const task=other.controller.submit({type:'ADVANCE'});const marker=other.t.transient.mock.calls[0] as unknown as [{id:string}];other.resolve({status:200,body:{commandId:marker[0].id,outcome:'REPLAYED'}});await task;expect(other.controller.getSnapshot().run.revision).toBe(other.r.revision);expect(other.controller.getSnapshot().pending).toBe(true);
+ const h=harness();const pending=h.controller.submit({type:'SUBMIT_TEXT',text:'fictional text'});await vi.waitFor(()=>expect(h.t.transient).toHaveBeenCalled());h.controller.detach();h.resolve({status:200,body:{}});await pending;expect(h.t.read).not.toHaveBeenCalled();
+ const other=harness();other.t.read.mockResolvedValue({status:200,body:{...other.r,revision:0}});const task=other.controller.submit({type:'SUBMIT_TEXT',text:'fictional text'});await vi.waitFor(()=>expect(other.t.transient).toHaveBeenCalled());const marker=other.t.transient.mock.calls[0] as unknown as [{id:string}];other.resolve({status:200,body:{commandId:marker[0].id,outcome:'REPLAYED'}});await task;expect(other.controller.getSnapshot().run.revision).toBe(other.r.revision);expect(other.controller.getSnapshot().pending).toBe(true);
 });
 it('reconciles conflicts without retargeting the original choice',async()=>{
- const h=harness();const task=h.controller.submit({type:'CHOOSE',optionId:'old-choice'});h.resolve({status:409,body:{error:{code:'REVISION_CONFLICT'}}});await task;
+ const h=harness();const task=h.controller.submit({type:'SUBMIT_TEXT',text:'fictional text'});h.resolve({status:409,body:{error:{code:'REVISION_CONFLICT'}}});await task;
  expect(h.controller.getSnapshot().message).toBe('changed');expect(h.t.transient).toHaveBeenCalledTimes(1);
 });
 it('restores a body-free pending marker and polls its original ID',async()=>{
@@ -79,7 +81,7 @@ it('accepts the public place envelope with absent descriptions',()=>{
 });
 it('keeps controls locked when a replay summary has not reached appliedRevision',async()=>{
  vi.useFakeTimers();try{
-  const h=harness();const task=h.controller.submit({type:'ADVANCE'});const marker=h.t.transient.mock.calls[0] as unknown as [{id:string}];h.resolve({status:200,body:{commandId:marker[0].id,outcome:'REPLAYED',appliedRevision:h.r.revision+2,revision:h.r.revision+2}});await task;
+  const h=harness();const task=h.controller.submit({type:'SUBMIT_TEXT',text:'fictional text'});await vi.waitFor(()=>expect(h.t.transient).toHaveBeenCalled());const marker=h.t.transient.mock.calls[0] as unknown as [{id:string}];h.resolve({status:200,body:{commandId:marker[0].id,outcome:'REPLAYED',appliedRevision:h.r.revision+2,revision:h.r.revision+2}});await task;
   expect(h.controller.getSnapshot().pending).toBe(true);expect(h.controller.getSnapshot().run.revision).toBe(h.r.revision);h.controller.detach();
  }finally{vi.useRealTimers();}
 });

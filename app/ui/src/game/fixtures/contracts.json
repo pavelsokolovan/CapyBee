@@ -487,5 +487,19 @@
         "notice": "This optional idea may be sent to an external service after confirmation."
       }
     ]
+  },
+  "ownerChanged": {
+    "error": {
+      "code": "GAME_OWNER_CHANGED",
+      "message": "Sign in again.",
+      "details": {}
+    }
+  },
+  "durableCommand": {
+    "id": "5403753b-10b0-4390-8db5-cb2b34fa155e",
+    "expectedRevision": 4,
+    "command": {
+      "type": "ADVANCE"
+    }
   }
 }

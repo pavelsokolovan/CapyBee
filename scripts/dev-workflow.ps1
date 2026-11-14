@@ -32,7 +32,8 @@ function Invoke-UiBuild {
   Write-Host '[sync] Building UI...'
   Push-Location $uiPath
   try {
-    & npm.cmd run build
+    $npmExecutable = if ($env:OS -eq 'Windows_NT') { 'npm.cmd' } else { 'npm' }
+    & $npmExecutable run build
     if ($LASTEXITCODE -ne 0) {
       throw "UI build failed with exit code $LASTEXITCODE"
     }
@@ -72,18 +73,14 @@ function Copy-BuildArtifacts {
   New-DirectoryIfMissing -Path $serverStaticResourcePath
   New-DirectoryIfMissing -Path $serverStaticClassesPath
 
-  Write-Host '[sync] Copying UI dist -> server src resources static...'
-  $null = & robocopy $uiDistPath $serverStaticResourcePath /E /IS /IT
-  $copy1Code = $LASTEXITCODE
-  if ($copy1Code -ge 8) {
-    throw "robocopy to resources/static failed with code $copy1Code"
-  }
-
-  Write-Host '[sync] Copying UI dist -> server target/classes static...'
-  $null = & robocopy $uiDistPath $serverStaticClassesPath /E /IS /IT
-  $copy2Code = $LASTEXITCODE
-  if ($copy2Code -ge 8) {
-    throw "robocopy to target/classes/static failed with code $copy2Code"
+  foreach ($destination in @($serverStaticResourcePath, $serverStaticClassesPath)) {
+    Write-Host "[sync] Copying UI dist -> $destination"
+    if ($env:OS -eq 'Windows_NT') {
+      $null = & robocopy $uiDistPath $destination /E /IS /IT
+      if ($LASTEXITCODE -ge 8) { throw "Static copy failed with code $LASTEXITCODE" }
+    } else {
+      Get-ChildItem -LiteralPath $uiDistPath -Force | Copy-Item -Destination $destination -Recurse -Force -ErrorAction Stop
+    }
   }
 
   Write-Host '[sync] Static files are in sync.'

@@ -1,3 +1,4 @@
+vi.mock('../game/gameLock',()=>({withGameLock:async(_owner:string,_run:string,work:()=>Promise<unknown>)=>work()}));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const storage = new Map<string, unknown>();
@@ -14,7 +15,7 @@ vi.mock('idb-keyval', () => ({
 }));
 
 import {
-  enqueueAction,
+  forgetGameOwner,migrateOwnerlessGames,getQueuedAction,enqueueAction,
   listQueuedActions,
   removeAction,
   updateAction,
@@ -124,4 +125,22 @@ describe('updates retain the durable command allowlist',()=>{
     expect(JSON.stringify([...storage.values()])).not.toContain('sentinel');
   }
  });
+});
+
+it('migrates ownerless game records and preserves unrelated offline work',async()=>{
+ storage.set('queued-action:legacy',{clientId:'legacy',type:'gameCommand'});
+ storage.set('queued-action:start',{clientId:'start',type:'gameStart',owner:'owner'});
+ storage.set('queued-action:memory',{clientId:'memory',type:'memory'});
+ expect(await migrateOwnerlessGames()).toBe(true);expect(sessionStorage.getItem('game-reconfirm')).toBe('1');
+ expect(await getQueuedAction('legacy')).toBeUndefined();expect(await getQueuedAction('memory')).toBeTruthy();expect(await migrateOwnerlessGames()).toBe(false);
+});
+it('cleans only the outgoing owner game records and markers',async()=>{
+ storage.set('queued-action:a',{clientId:'a',type:'gameCommand',owner:'a'});storage.set('queued-action:b',{clientId:'b',type:'gameCommand',owner:'b'});
+ storage.set('queued-action:memory',{clientId:'memory',type:'memory',owner:'a'});
+ sessionStorage.setItem('game-operation:a:id','identity');sessionStorage.setItem('game-operation:b:id','identity');
+ await forgetGameOwner('a');expect(await getQueuedAction('a')).toBeUndefined();expect(await getQueuedAction('b')).toBeTruthy();expect(await getQueuedAction('memory')).toBeTruthy();expect(sessionStorage.getItem('game-operation:a:id')).toBeNull();expect(sessionStorage.getItem('game-operation:b:id')).toBe('identity');
+});
+it('rejects legacy private or malformed typed game records on update',async()=>{
+ await expect(updateAction({clientId:'legacy',owner:'owner',runId:'run',type:'gameCommand',path:'/api/arbitrary',method:'POST',createdAt:1,attempts:0,status:'pending',payload:{expectedRevision:0,command:{type:'SUBMIT_TEXT',text:'private'}}})).rejects.toThrow('GAME_TRANSIENT_REQUIRED');
+ expect(storage.has('queued-action:legacy')).toBe(false);
 });

@@ -1,3 +1,5 @@
+import {notifyGameLogout} from './game/gameOwner';
+import {forgetGameOwner} from './offline/queueStore';
 import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { CapyBeeAvatar, CapyBeeBubble, capyBeeAvatar, sameCalendarDay } from './capybee';
@@ -2169,7 +2171,9 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
             href="/logout"
             className="secondary-button logout-button"
             aria-label={text.logout}
-            onClick={() => {
+            onClick={async event => {
+              event.preventDefault();setGameOwner(null);if(user.id)notifyGameLogout(user.id);
+              if(user.id)await forgetGameOwner(user.id);
               const token = getSessionToken();
               clearSessionToken();
               if (token) {
@@ -2181,6 +2185,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
                   body: JSON.stringify({ token })
                 });
               }
+              window.location.assign('/logout');
             }}
           >
             <span className="logout-label-full">{text.logout}</span>
