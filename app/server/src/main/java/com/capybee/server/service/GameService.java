@@ -35,6 +35,9 @@ public class GameService {
         if (request.gameKey() == null || request.gameKey().isBlank()) {
             throw new IllegalArgumentException("Game key is required");
         }
+        if (com.capybee.server.game.GameCompletionPolicy.RESULT_KEY.equals(request.gameKey())) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST,"RPG results require a persisted run");
+        }
         if (request.durationMs() == null || request.durationMs() < 0) {
             throw new IllegalArgumentException("Duration must be non-negative");
         }
@@ -48,6 +51,9 @@ public class GameService {
                 GameResult found = existing.get();
                 if (!found.getUserAccount().getId().equals(user.getId())) {
                     throw new IllegalArgumentException("Id already used by another account");
+                }
+                if (com.capybee.server.game.GameCompletionPolicy.RESULT_KEY.equals(found.getGameKey())) {
+                    throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST,"RPG results require a persisted run");
                 }
                 return toResponse(found);
             }
@@ -74,7 +80,8 @@ public class GameService {
                 ? gameResultRepository.findAllByUserAccount_IdOrderByCompletedAtDesc(user.getId())
                 : gameResultRepository.findAllByUserAccount_IdAndGameKeyOrderByCompletedAtDesc(user.getId(), gameKey);
 
-        return results.stream().limit(Math.max(0, limit)).map(this::toResponse).toList();
+        return results.stream().filter(entry -> !com.capybee.server.game.GameCompletionPolicy.RESULT_KEY.equals(entry.getGameKey())
+                || entry.getRpgRunId() != null).limit(Math.max(0, limit)).map(this::toResponse).toList();
     }
 
     private void validateMetrics(Map<String, Object> metrics) {

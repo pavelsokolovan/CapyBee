@@ -14,7 +14,8 @@ import java.io.IOException;
 @Order(Ordered.HIGHEST_PRECEDENCE + 20)
 public class GameNoStoreFilter extends OncePerRequestFilter {
     @Override protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !request.getRequestURI().startsWith(request.getContextPath() + "/api/game/");
+        return !request.getRequestURI().startsWith(request.getContextPath() + "/api/game/")
+                && !request.getRequestURI().startsWith(request.getContextPath() + "/api/games/");
     }
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
             FilterChain chain) throws ServletException, IOException {

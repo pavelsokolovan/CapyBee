@@ -7,6 +7,7 @@ import {SceneBlocks,SceneActions,ScenePanels,SceneResult} from './GameScene';
 import {adventureCopy} from '../../game/adventureCopy';
 import {runCopy} from './runCopy';
 import './gameRun.css';
+import {GameCompletion} from './GameCompletion';
 export function GameRun({run,owner,locale,onAnother,controller:provided}:{run:GameRunSummaryDto;owner:string;locale:'en'|'pl';onAnother:()=>void;controller?:RunController}){
  const [initialized,setInitialized]=useState(false);
  const [controller]=useState(()=>provided??new RunController(run,new GameTransport(()=>owner,()=>restoreGameSession(owner)),owner));
@@ -26,6 +27,7 @@ export function GameRun({run,owner,locale,onAnother,controller:provided}:{run:Ga
  {state.retryable?<button type="button" onClick={()=>void controller.retryUnsent()}>{c.retry}</button>:null}
  {state.cancellable?<button type="button" onClick={()=>void controller.removeUnsent()}>{c.remove}</button>:null}
  {state.pending?<button type="button" onClick={()=>void controller.check()}>{c.check}</button>:null}
+ {ended&&view?.endReason==='COMPLETED'?<GameCompletion owner={owner} runId={state.run.runId} revision={state.run.revision} locale={locale}/>:null}
  {ended?<button type="button" onClick={onAnother}>{c.newGame}</button>:null}
  {state.run.status==='ACTIVE'?<button type="button" ref={abandon} disabled={locked} onClick={()=>dialog.current?.showModal()}>{c.abandon}</button>:null}
  <dialog onKeyDown={e=>e.stopPropagation()} ref={dialog} aria-labelledby="game-abandon-title" onCancel={e=>{e.preventDefault();cancel();}}><h4 id="game-abandon-title">{c.confirm}</h4><button type="button" onClick={cancel}>{c.cancel}</button><button type="button" disabled={locked} onClick={()=>{cancel();void submit({type:'ABANDON'});}}>{c.abandon}</button></dialog></section>;

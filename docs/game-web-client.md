@@ -3,8 +3,9 @@
 The Play entry uses one renderer and the existing authenticated sync loop for
 Pack and dynamic adventures. The engine owns mechanics, legal commands,
 accepted story text, objectives, places and results. The source-neutral place
-map is implemented by Spec 29.3. The CapyBee Polish Pack (29.1) and product
-Mission/reward integration (29.4) remain separate dependencies.
+map is implemented by Spec 29.3. The host Mission/daily-cell bridge is documented in
+[Spec 29.4 acceptance](game-completion-bridge.md). The CapyBee Polish Pack (29.1)
+remains a separate dependency.
 
 ## Public place map
 

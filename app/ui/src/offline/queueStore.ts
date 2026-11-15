@@ -10,6 +10,7 @@ export type QueueActionType =
   | 'gameStart'
   | 'gameCommand'
   | 'gameResult'
+  | 'gameCompletion'
   | 'checkInDelete'
   | 'missionCompletionDelete'
   | 'friendshipDelete'
@@ -18,6 +19,7 @@ export type QueueActionType =
 export interface QueuedAction {
   clientId: string;
   owner?: string;
+  completedAt?: string;
   runId?: string;
   poll?: boolean;
   sent?: boolean;
@@ -36,6 +38,13 @@ const admissions = new Set<string>();
 
 export async function enqueueAction(action: Omit<QueuedAction, 'attempts' | 'status'>): Promise<void> {
   if (action.type === 'gameStart') throw new Error('GAME_TRANSIENT_REQUIRED');
+  if(action.type==='gameCompletion') {
+    const safe=completionAction({...action,attempts:0,status:'pending'});
+    if(!ownerAllowed(safe.owner!))throw new Error('GAME_OWNER_CHANGED');
+    await set(KEY_PREFIX+safe.clientId,safe);
+    if(!ownerAllowed(safe.owner!)){await removeAction(safe.clientId);throw new Error('GAME_OWNER_CHANGED');}
+    return;
+  }
   let key: string | undefined;
   if (action.type === 'gameCommand') {
     const command = action.payload?.command as Record<string, unknown> | undefined;
@@ -93,6 +102,7 @@ export async function updateAction(action: QueuedAction): Promise<void> {
         ? {type:'CHOOSE',optionId:command.optionId} : command.type === 'MOVE'
         ? {type:'MOVE',placeId:command.placeId} : {type:command.type}}};
   }
+  if(action.type==='gameCompletion')action=completionAction(action);
   await set(KEY_PREFIX + action.clientId, action);
 }
 
@@ -102,19 +112,32 @@ export async function removeAction(clientId: string): Promise<void> {
 
 /** Explicit logout/account replacement only; temporary auth expiry preserves safe work. */
 export async function forgetGameOwner(owner:string){
- for(const action of await listQueuedActions())if((action.type==='gameStart'||action.type==='gameCommand')&&action.owner===owner)await removeAction(action.clientId);
+ for(const action of await listQueuedActions())if((action.type==='gameStart'||action.type==='gameCommand'||action.type==='gameCompletion')&&action.owner===owner)await removeAction(action.clientId);
  for(const key of Object.keys(sessionStorage))if(key.startsWith('game-operation:'+owner+':'))sessionStorage.removeItem(key);
 }
 export async function migrateOwnerlessGames():Promise<boolean>{
- let removed=false;for(const action of await listQueuedActions())if((action.type==='gameStart'||action.type==='gameCommand')&&(!action.owner||action.type==='gameStart')){await removeAction(action.clientId);removed=true;}
+ let removed=false;for(const action of await listQueuedActions())if((action.type==='gameStart'||action.type==='gameCommand'||action.type==='gameCompletion')&&(!action.owner||action.type==='gameStart')){await removeAction(action.clientId);removed=true;}
  if(removed)sessionStorage.setItem('game-reconfirm','1');return removed;
 }
 
 export const getQueuedAction=(id:string)=>get<QueuedAction>(KEY_PREFIX+id);
 
 export function validGameAction(action:QueuedAction):boolean {
+ if(action.type==='gameCompletion'){try{return completionAction(action).path===action.path&&action.method==='POST';}catch{return false;}}
  const command=action.payload?.command as Record<string,unknown>|undefined;
  return !!command&&['CHOOSE','ADVANCE','MOVE','ABANDON'].includes(String(command.type))
   && [action.owner,action.runId,action.clientId,command.type==='CHOOSE'?command.optionId:command.type==='MOVE'?command.placeId:'ok'].every(value=>typeof value==='string'&&/^[A-Za-z0-9_-]{1,256}$/.test(value))
   &&Number.isSafeInteger(action.payload?.expectedRevision)&&Number(action.payload?.expectedRevision)>=0;
+}
+
+function completionAction(action:QueuedAction):QueuedAction {
+ const p=action.payload;
+ if(![action.owner,action.runId,action.clientId].every(v=>typeof v==='string'&&/^[A-Za-z0-9_-]{1,256}$/.test(v))
+   || !['CELL','MISSION'].includes(String(p?.kind)) || !Number.isSafeInteger(p?.expectedRevision)||Number(p?.expectedRevision)<0
+   || !Number.isSafeInteger(p?.suggestionVersion)||Number(p?.suggestionVersion)<1)throw new Error('GAME_COMPLETION_INVALID');
+ if(action.completedAt!==undefined&&!Number.isFinite(Date.parse(action.completedAt)))throw new Error('GAME_COMPLETION_INVALID');
+ return {clientId:action.clientId,owner:action.owner,runId:action.runId,completedAt:action.completedAt===undefined?undefined:new Date(action.completedAt).toISOString(),type:'gameCompletion',method:'POST',
+   path:`/api/game/runs/${action.runId}/completion/${String(p!.kind).toLowerCase()}`,
+   payload:{expectedRevision:p!.expectedRevision,suggestionVersion:p!.suggestionVersion,kind:p!.kind},
+   createdAt:action.createdAt,attempts:action.attempts,status:action.status,notBefore:action.notBefore};
 }

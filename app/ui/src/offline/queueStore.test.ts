@@ -144,3 +144,24 @@ it('rejects legacy private or malformed typed game records on update',async()=>{
  await expect(updateAction({clientId:'legacy',owner:'owner',runId:'run',type:'gameCommand',path:'/api/arbitrary',method:'POST',createdAt:1,attempts:0,status:'pending',payload:{expectedRevision:0,command:{type:'SUBMIT_TEXT',text:'private'}}})).rejects.toThrow('GAME_TRANSIENT_REQUIRED');
  expect(storage.has('queued-action:legacy')).toBe(false);
 });
+
+it('admits owner-scoped completion choices with only non-text versioned linkage',async()=>{
+ storage.clear();
+ const action={clientId:'completion',owner:'owner',runId:'run',type:'gameCompletion' as const,path:'/evil',method:'POST' as const,createdAt:100,
+  completedAt:'2026-11-15T12:00:00Z',payload:{kind:'MISSION',expectedRevision:3,suggestionVersion:1,text:'private-sentinel',missionId:'untrusted'}};
+ await enqueueAction(action);
+ const stored=(await listQueuedActions())[0];
+ expect(stored.path).toBe('/api/game/runs/run/completion/mission');expect(stored.completedAt).toBe('2026-11-15T12:00:00.000Z');
+ expect(stored.payload).toEqual({kind:'MISSION',expectedRevision:3,suggestionVersion:1});
+ expect(JSON.stringify(stored)).not.toContain('private-sentinel');
+ await updateAction({...stored,payload:{...stored.payload,extra:'private-sentinel'}});
+ expect(JSON.stringify(await listQueuedActions())).not.toContain('private-sentinel');
+ await forgetGameOwner('owner');expect(await listQueuedActions()).toEqual([]);
+});
+it('rejects ownerless, text-bearing kinds and invalid completion versions',async()=>{
+ storage.clear();
+ const action={clientId:'completion',owner:'owner',runId:'run',type:'gameCompletion' as const,path:'',method:'POST' as const,createdAt:100,payload:{kind:'CELL',expectedRevision:3,suggestionVersion:1}};
+ for(const bad of [{...action,owner:undefined},{...action,completedAt:'private-sentinel'},{...action,payload:{...action.payload,kind:'TEXT'}},{...action,payload:{...action.payload,suggestionVersion:0}}])await expect(enqueueAction(bad)).rejects.toThrow();
+ storage.set('queued-action:completion',{...action,owner:undefined});
+ expect(await migrateOwnerlessGames()).toBe(true);expect(await listQueuedActions()).toEqual([]);
+});

@@ -51,6 +51,13 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
     /** Calls made before a dynamic run is atomically published; never contains request content. */
     private final ConcurrentHashMap<UUID, Integer> provisionalRunCalls = new ConcurrentHashMap<>();
 
+    public record CompletedRunSaved(UUID runId) {}
+    private org.springframework.context.ApplicationEventPublisher events;
+    @org.springframework.beans.factory.annotation.Autowired
+    public JdbcSessionStore(JdbcTemplate jdbc, PlatformTransactionManager transactionManager, Clock clock,
+            org.springframework.context.ApplicationEventPublisher events) {
+        this(jdbc,transactionManager,clock);this.events=events;
+    }
     public JdbcSessionStore(JdbcTemplate jdbc, PlatformTransactionManager transactionManager, Clock clock) {
         this.jdbc = jdbc;
         this.transaction = new TransactionTemplate(transactionManager);
@@ -220,6 +227,7 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
                 snapshot.state().endReason() == null ? null : snapshot.state().endReason().name(),
                 encodeSnapshot(snapshot), timestamp(now), snapshot.state().ended() ? "ENDED" : "ACTIVE",
                 timestamp(now), runId, lease.token(), expectedRevision);
+        if (changed==1 && snapshot.state().ended() && events!=null) events.publishEvent(new CompletedRunSaved(runId));
         return changed == 1;
     }
 

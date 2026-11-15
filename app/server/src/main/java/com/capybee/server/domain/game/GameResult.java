@@ -43,6 +43,11 @@ public class GameResult {
     @Column(name = "completed_at", nullable = false)
     private Instant completedAt;
 
+    @Column(name = "rpg_run_id")
+    private UUID rpgRunId;
+
+    public UUID getRpgRunId() { return rpgRunId; }
+
     @PrePersist
     void onCreate() {
         if (id == null) {

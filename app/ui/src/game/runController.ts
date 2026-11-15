@@ -25,7 +25,7 @@ export class RunController {
  async initialize(){
   const epoch=this.epoch;
   this.cleanups.push(watchGameOwner(()=>{if(!ownerAllowed(this.owner)){this.detach();this.update({run:{...this.state.run,view:null},pending:true,message:'unavailable'});}}));
-  this.cleanups.push(onSynced(event=>{if(event.action.owner===this.owner&&event.action.runId===this.state.run.runId&&ownerAllowed(this.owner)){
+  this.cleanups.push(onSynced(event=>{if(event.action.type==='gameCommand'&&event.action.owner===this.owner&&event.action.runId===this.state.run.runId&&ownerAllowed(this.owner)){
    this.queuedId=undefined;void this.refresh(this.epoch,event.outcome==='stale'?'changed':event.outcome==='terminal'?'unavailable':(event.body as {accepted?:boolean})?.accepted===false?'rejected':'saved',Number((event.body as {revision?:number})?.revision??this.state.run.revision));
   }}));
   const reconcile=()=>{if(!ownerAllowed(this.owner))return;if(this.queuedId)void this.checkQueued();else if(this.marker)void this.check();else if(navigator.onLine)void this.refresh(this.epoch,'saved');else this.update({message:'offline'});};

@@ -29,7 +29,7 @@ public class GameErrorAdvice {
         return response.body(new ErrorDto(new ErrorDto.Error(code.name(), message(code), exception.details())));
     }
 
-    @ExceptionHandler({HttpMessageNotReadableException.class, IllegalArgumentException.class})
+    @ExceptionHandler({HttpMessageNotReadableException.class, IllegalArgumentException.class, org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class})
     public ResponseEntity<ErrorDto> invalidRequest(Exception ignored) {
         return error(HttpStatus.BAD_REQUEST, ErrorCode.REQUEST_INVALID.name(),
                 "The request is invalid.", Map.of());

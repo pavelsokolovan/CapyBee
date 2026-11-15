@@ -52,6 +52,7 @@ function getCellColors(cell: HoneycombCellData) {
 function getCellIcon(type: HoneycombCellData['type'], gameKey?: string): string {
   if (type === 'game') {
     const icons: Record<string, string> = {
+      capybee_rpg: '🗺️',
       pollen_match: '🌼'
     };
     return icons[gameKey ?? ''] ?? '🧩';

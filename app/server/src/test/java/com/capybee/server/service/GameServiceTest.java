@@ -161,4 +161,23 @@ class GameServiceTest {
         assertEquals("pollen_match", responses.get(0).gameKey());
         verify(gameResultRepository, times(1)).findAllByUserAccount_IdAndGameKeyOrderByCompletedAtDesc(testUserId, "pollen_match");
     }
+
+    @Test void rejectsReservedRpgKeyAndCannotReplayItsIdThroughMiniGameRoute() {
+        when(userService.getCurrentUser(oauth2Token)).thenReturn(testUser);
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,()->gameService.createGameResult(oauth2Token,
+                new CreateGameResultRequest(null,"capybee_rpg",0,Map.of())));
+        var rpg=new GameResult();rpg.setId(gameResultId);rpg.setUserAccount(testUser);rpg.setGameKey("capybee_rpg");
+        when(gameResultRepository.findById(gameResultId)).thenReturn(Optional.of(rpg));
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,()->gameService.createGameResult(oauth2Token,
+                new CreateGameResultRequest(gameResultId,"pollen_match",0,Map.of())));
+        verify(gameResultRepository,never()).save(any());
+    }
+    @Test void hidesLegacyUntrustedRpgRowsButKeepsVerifiedAndMiniGameHistory() {
+        when(userService.getCurrentUser(oauth2Token)).thenReturn(testUser);
+        var legacy=mock(GameResult.class);when(legacy.getGameKey()).thenReturn("capybee_rpg");
+        var trusted=mock(GameResult.class);when(trusted.getGameKey()).thenReturn("capybee_rpg");when(trusted.getRpgRunId()).thenReturn(UUID.randomUUID());
+        var mini=mock(GameResult.class);when(mini.getGameKey()).thenReturn("hive_builder_tap");
+        when(gameResultRepository.findAllByUserAccount_IdOrderByCompletedAtDesc(testUserId)).thenReturn(List.of(legacy,trusted,mini));
+        assertEquals(2,gameService.getMyGameResults(oauth2Token,null,20).size());
+    }
 }

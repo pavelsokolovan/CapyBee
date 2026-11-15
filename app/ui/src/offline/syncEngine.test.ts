@@ -13,7 +13,7 @@ const queueStore = vi.hoisted(() => ({
 vi.mock('./queueStore', () => ({
   listQueuedActions: async()=>{const actions=await queueStore.listQueuedActions();for(const action of actions) live.set(action.clientId,action);return actions;},
   getQueuedAction:async(id:string)=>live.get(id),
-  validGameAction:(a:QueuedAction)=>a.type==='gameCommand',
+  validGameAction:(a:QueuedAction)=>a.type==='gameCommand'||a.type==='gameCompletion',
   updateAction: queueStore.updateAction,
   removeAction: queueStore.removeAction
 }));
@@ -356,4 +356,28 @@ it('ignores an acknowledged command after the owner changes',async()=>{
  queueStore.listQueuedActions.mockResolvedValueOnce([action]).mockResolvedValueOnce([]);
  vi.stubGlobal('fetch',vi.fn(async()=>{setGameOwner('other');return new Response('{}',{status:200,headers:{'content-type':'application/json'}});}));
  await flushQueue();expect(queueStore.removeAction).not.toHaveBeenCalled();vi.unstubAllGlobals();
+
+});
+
+describe('completion recovery',()=>{
+ beforeEach(()=>{setGameOwner('owner');vi.clearAllMocks();queueStore.listQueuedActions.mockReset();queueStore.updateAction.mockResolvedValue(undefined);queueStore.removeAction.mockResolvedValue(undefined);});
+ afterEach(()=>{vi.unstubAllGlobals();vi.clearAllMocks();});
+
+ it('retries an uncertain completion choice by owner/run and original version without text or command polling',async()=>{
+  setGameOwner('owner');
+  const action=createAction({type:'gameCompletion',path:'/api/game/runs/run/completion/mission',payload:{kind:'MISSION',expectedRevision:3,suggestionVersion:1}});
+  queueStore.listQueuedActions.mockResolvedValueOnce([action]).mockResolvedValueOnce([]);
+  vi.stubGlobal('fetch',vi.fn().mockRejectedValueOnce(new Error('offline')));
+  await flushQueue();expect(action.poll).toBeUndefined();expect(action.status).toBe('pending');
+  action.notBefore=0;
+  queueStore.listQueuedActions.mockResolvedValueOnce([action]).mockResolvedValueOnce([]);
+  vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({runId:'run',revision:3,completedAt:'2026-11-15T12:00:00Z',suggestionKey:'rest',suggestionVersion:1,mission:null,missionAccepted:true,cellAdded:false}),{status:200,headers:{'Content-Type':'application/json'}}));
+  await flushQueue();
+  const options=vi.mocked(fetch).mock.calls[1][1]!;
+  expect(options.cache).toBe('no-store');expect(options.headers).toEqual({'Content-Type':'application/json','X-Game-Owner':'owner'});
+  expect(JSON.parse(String(options.body))).toEqual({id:'action-id',expectedRevision:3,suggestionVersion:1});
+  expect(queueStore.removeAction).toHaveBeenCalledWith('action-id');
+ });
+
+
 });

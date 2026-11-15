@@ -31,7 +31,21 @@ export async function checkRecovery({page,context,base,requests,logs}){
  await page.getByText('Waiting for connection',{exact:true}).waitFor();
  let queued=[];for(let attempt=0;attempt<100;attempt++){queued=(await records(page)).filter(v=>v?.type==='gameCommand');if(queued.length)break;await page.waitForTimeout(25);}assert.equal(queued.length,1);assert.equal(queued[0].poll,undefined);const id=queued[0].clientId;
  assert.equal(await page.locator('.game-run').innerText().then(s=>s.includes('Stoisz')),true);
- await context.setOffline(false);await page.reload();await page.getByRole('button',{name:'Play',exact:true}).click();await page.getByRole('button',{name:/Adventures/}).click();await page.getByRole('button',{name:'Continue',exact:true}).click();
+ // Hold the acknowledgement only after the server receives the original UUID.
+ // Reload can then deterministically prove status recovery, rather than racing
+ // a navigation-cancelled, provably unsent request (which may safely be retried).
+ let received=false,releaseOfflineAck;
+ const offlineAck=new Promise(resolve=>{releaseOfflineAck=resolve;});
+ await context.route('**/api/game/runs/*/commands',async route=>{
+  if(route.request().method()==='POST'&&route.request().postDataJSON()?.id===id){
+   const response=await route.fetch();received=true;await offlineAck;await route.fulfill({response}).catch(()=>{});
+  }else await route.continue();
+ });
+ await context.setOffline(false);
+ for(let attempt=0;attempt<200&&!received;attempt++)await page.waitForTimeout(25);
+ assert.equal(received,true,'original offline UUID did not reach the server');
+ await page.reload();releaseOfflineAck();await context.unroute('**/api/game/runs/*/commands');
+ await page.getByRole('button',{name:'Play',exact:true}).click();await page.getByRole('button',{name:/Adventures/}).click();await page.getByRole('button',{name:'Continue',exact:true}).click();
  await page.waitForFunction(()=>['Saved','The adventure changed. Check the saved scene.'].includes(document.querySelector('.game-run [role=status]')?.textContent),null,{timeout:60000});
  assert.equal(requests.filter(r=>r.url.endsWith('/commands')&&r.body.id===id).length,1,'offline intent was replayed as another POST');
  assert.equal((await records(page)).some(v=>v?.type==='gameCommand'),false);

@@ -1,3 +1,4 @@
+import {decodeCompletion} from '../game/gameCompletion';
 import {decodeGameResponse} from '../game/gameTransport';
 import {restoreGameSession} from '../game/restoreGameSession';
 import {withGameLock} from '../game/gameLock';
@@ -41,7 +42,7 @@ export function onSynced(listener: SyncedListener): () => void {
 
 async function notifyListeners() {
   const pending = await listQueuedActions();
-  const count = pending.filter(a=>!isGameAction(a)||(a.type==='gameCommand'&&a.owner===gameOwner)).filter((a) => a.status !== 'failed'
+  const count = pending.filter(a=>!isGameAction(a)||((a.type==='gameCommand'||a.type==='gameCompletion')&&a.owner===gameOwner)).filter((a) => a.status !== 'failed'
     || a.attempts < (isGameAction(a) ? MAX_GAME_ATTEMPTS : MAX_ATTEMPTS)).length;
   listeners.forEach((l) => l(count));
 }
@@ -57,7 +58,7 @@ type SendOutcome =
   | { kind: 'retry'; afterMs?: number }
   | { kind: 'auth' };
 
-const isGameAction = (action: QueuedAction) => action.type === 'gameStart' || action.type === 'gameCommand';
+const isGameAction = (action: QueuedAction) => action.type === 'gameStart' || action.type === 'gameCommand' || action.type === 'gameCompletion';
 
 async function responseBody(res: Response): Promise<unknown> {
   const contentType = res.headers.get('content-type') ?? '';
@@ -91,7 +92,9 @@ async function sendOne(action: QueuedAction): Promise<SendOutcome> {
     if (isGameAction(action)) {requestInit.cache = 'no-store';requestInit.headers={'X-Game-Owner':action.owner!};}
     if (method === 'POST') {
       requestInit.headers = { ...requestInit.headers,'Content-Type': 'application/json' };
-      requestInit.body = JSON.stringify({ id: action.clientId, ...(action.payload ?? {}) });
+      requestInit.body = JSON.stringify(action.type==='gameCompletion'
+        ? {id:action.clientId,expectedRevision:action.payload?.expectedRevision,suggestionVersion:action.payload?.suggestionVersion}
+        : { id: action.clientId, ...(action.payload ?? {}) });
     }
 
     if(isGameAction(action)&&(action.owner!==gameOwner||!ownerAllowed(action.owner!)))return {kind:'auth'};
@@ -128,8 +131,7 @@ async function sendOne(action: QueuedAction): Promise<SendOutcome> {
         return {kind:'stale',status:res.status};
       }
       if (res.status === 202) {
-        action.poll = true;
-        await updateAction(action);
+        if(action.type==='gameCommand'){action.poll = true;await updateAction(action);}
         const retryValue = body && typeof body === 'object' && 'retryAfterMs' in body
           ? (body as { retryAfterMs?: unknown }).retryAfterMs
           : undefined;
@@ -145,6 +147,13 @@ async function sendOne(action: QueuedAction): Promise<SendOutcome> {
         return { kind: 'retry', afterMs: retryAfterDelay(res) };
       }
       if (res.ok) {
+        if(action.type==='gameCompletion') {
+          const accepted=decodeCompletion(body);
+          if(accepted.runId!==action.runId||accepted.revision!==action.payload?.expectedRevision
+            ||accepted.suggestionVersion!==action.payload?.suggestionVersion
+            ||(action.payload?.kind==='MISSION'?!accepted.missionAccepted:!accepted.cellAdded))return {kind:'retry'};
+          return {kind:'done',status:res.status,body:accepted};
+        }
         const decoded=decodeGameResponse({status:res.status,body});
         if(!decoded||typeof decoded!=='object'||!('commandId' in decoded)||decoded.commandId!==action.clientId||!('outcome' in decoded))return {kind:'retry'};
         return { kind: 'done', status: res.status, body:decoded };

@@ -29,6 +29,6 @@ public class GameOwnerGuard implements WebMvcConfigurer {
                 }
                 return true;
             }
-        }).addPathPatterns("/api/game/**");
+        }).addPathPatterns("/api/game/**", "/api/games/**");
     }
 }

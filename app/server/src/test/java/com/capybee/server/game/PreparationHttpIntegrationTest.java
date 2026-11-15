@@ -51,7 +51,7 @@ import static org.assertj.core.api.Assertions.*;
  properties={"server.address=127.0.0.1","capybee.game.enabled=true","capybee.game.web-client-enabled=true",
  "capybee.game.generation-enabled=true","capybee.game.dynamic.enabled=true","capybee.game.dynamic.profile-ids=generic-adventure",
  "capybee.game.command-hmac-key=preparation-fixture-key-32-bytes-long","capybee.game.sync-wait-ms=0",
- "capybee.game.dynamic.starts-per-hour=100","spring.session.jdbc.initialize-schema=never"})
+ "capybee.game.completion.enabled=true","capybee.game.dynamic.starts-per-hour=100","spring.session.jdbc.initialize-schema=never"})
 @org.springframework.test.annotation.DirtiesContext(classMode=org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 @Import(PreparationHttpIntegrationTest.FixtureConfiguration.class)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -60,6 +60,7 @@ class PreparationHttpIntegrationTest {
     static String persistedRun, persistedView, persistedFingerprint;
     static long persistedRevision;
     static int callsBeforeRestart;
+    static int archivedCompletionsBeforeRestart;
     @AfterAll static void cleanupSchema() throws Exception {
         try(var connection=java.sql.DriverManager.getConnection("jdbc:postgresql://localhost:5432/capybee","capybee","capybee");var statement=connection.createStatement()) {
             statement.execute("DROP SCHEMA IF EXISTS "+SCHEMA+" CASCADE");
@@ -77,6 +78,16 @@ class PreparationHttpIntegrationTest {
     @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
     @TestBean(name="gameTextGenerator",methodName="provider") TextGenerator generator;
     @TestBean(name="gamePackRegistry",methodName="packs") PackRegistry registry;
+    @TestBean(name="gameCompletionPolicy",methodName="completionPolicy") GameCompletionPolicy completionPolicy;
+    static GameCompletionPolicy completionPolicy(){return new GameCompletionPolicy(){
+        @Override public Optional<Suggestion> suggest(String pack,String version,String outcome,String scene){
+            if("fixture-minimal".equals(pack)&&"1.0.0".equals(version)){
+                if("island".equals(scene))return Optional.of(new Suggestion("say_thank_you_helper",1));
+                if("calm-end".equals(scene))return Optional.of(new Suggestion(REST,1));
+            }
+            return super.suggest(pack,version,outcome,scene);
+        }
+    };}
     static TextGenerator provider() throws IOException {
         String blueprint=Files.readString(Path.of("../engine/certification/dynamic-v1/blueprint.json"));
         return request->{
@@ -195,6 +206,7 @@ class PreparationHttpIntegrationTest {
                 assertThat(process.exitValue()).withFailMessage("Browser fixture failed: %s",diagnostic).isZero();
                 assertThat(diagnostic).contains("PASS:");
             }
+            archivedCompletionsBeforeRestart=jdbc.queryForObject("SELECT count(*) FROM game_run_completions WHERE archived=true",Integer.class);
             // Keep an ACTIVE published dynamic game across an actual HTTP-host restart.
             start.put("requestId",UUID.randomUUID().toString());
             var currentResponse=request("GET","/api/game/runs/current",null);
@@ -209,6 +221,8 @@ class PreparationHttpIntegrationTest {
     }
     @Test @org.junit.jupiter.api.Order(2) void freshHttpHostReadsExactPublishedRunWithStartsAndProviderDisabled() throws Exception {
         assertThat(persistedRun).isNotNull();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM game_run_completions WHERE archived=true",Integer.class)).isEqualTo(archivedCompletionsBeforeRestart);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM game_results WHERE rpg_run_id IN (SELECT run_id FROM game_run_completions WHERE archived=true)",Integer.class)).isZero();
         var restored=SessionJson.tree(request("GET","/api/game/runs/"+persistedRun,null).body());
         assertThat(restored.path("revision").asLong()).isEqualTo(persistedRevision);
         assertThat(restored.path("view").toString().equals(persistedView)).as("accepted view survived restart").isTrue();

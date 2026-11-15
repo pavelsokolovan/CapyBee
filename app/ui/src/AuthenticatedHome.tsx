@@ -13,6 +13,10 @@ import { OnboardingTutorial } from './components/OnboardingTutorial';
 import { HomeIcon, MissionsIcon, FriendshipsIcon, MemoriesIcon, PlayIcon, ProfileIcon } from './components/NavIcons';
 import { createPollenMatchBoard, evaluateTurn, type PollenMatchTile } from './hooks/usePollenMatchGame';
 import { createHiveBuilderTapSequence, type HiveBuilderTapTile } from './hooks/useHiveBuilderTapGame';
+import {GameProductContext} from './components/game/GameProductContext';
+import {hasGameCellOnDay} from './game/dailyGameCells';
+import {usePendingGameCell} from './hooks/usePendingGameCell';
+import {useLocalCalendar} from './hooks/useLocalCalendar';
 import { AdventureEntry } from './components/game/AdventureEntry';
 import { HiveBuilderTapGame } from './components/HiveBuilderTapGame';
 import {
@@ -30,8 +34,8 @@ import newWorldTabImage from './assets/honeycomb/new-world-tab.png';
 import missionsTabImage from './assets/honeycomb/missions-tab.png';
 import friendshipsTabImage from './assets/honeycomb/friedships-tab.png';
 import { STAGE_META, type FriendshipStage } from './constants/friendshipStages';
-import { enqueueAction } from './offline/queueStore';
-import { setGameOwner, flushQueue, startSyncLoop, onSyncStatusChange } from './offline/syncEngine';
+import { enqueueAction,listQueuedActions } from './offline/queueStore';
+import { setGameOwner, flushQueue, startSyncLoop, onSyncStatusChange,onSynced } from './offline/syncEngine';
 import { getSessionToken, clearSessionToken } from './sessionPersistence';
 
 export interface UserProfile {
@@ -64,6 +68,7 @@ interface ChildProfile {
 type MissionCategoryKey = 'all' | 'social' | 'new_world' | 'old_world' | 'reflection' | 'exploration';
 
 interface Mission {
+  fromAdventure?: boolean;
   id: string;
   code: string;
   title: string;
@@ -347,6 +352,7 @@ function MissionAccordionRow({
           <span className="mission-accordion-title">
             {localizeMissionTitle(mission.code, mission.title, locale)}
           </span>
+          {mission.fromAdventure?<small>{text.missionFromAdventure}</small>:null}
         </div>
         <span className="mission-accordion-time-pill">{formatMissionTimeHintCompact(mission.timeHint)}</span>
         <ChevronIcon expanded={isExpanded} />
@@ -498,6 +504,7 @@ const copy = {
     reactionOkay: 'Okay is something. Good job showing up.',
     reactionGood: "That's great! I'm happy with you.",
     missionSuggestion: 'I have a small mission for you today ->',
+    missionFromAdventure: 'Chosen in an adventure',
     missionEmpty: 'No missions right now - check back tomorrow!',
     missionEmptyCategory: 'Nothing here right now - try another group, or tap All.',
     missionCategoryAll: 'All',
@@ -631,6 +638,7 @@ const copy = {
     reactionOkay: 'To, że jest po prostu okej, też się liczy. Dobra robota.',
     reactionGood: 'To świetnie! Cieszę się razem z tobą.',
     missionSuggestion: 'Mam dla ciebie małą misję na dziś ->',
+    missionFromAdventure: 'Wybrana w przygodzie',
     missionEmpty: 'Teraz nie ma nowych misji. Zajrzyj jutro!',
     missionEmptyCategory: 'Nic tu teraz nie ma - spróbuj innej grupy albo kliknij Wszystkie.',
     missionCategoryAll: 'Wszystkie',
@@ -1053,7 +1061,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   };
 
   const savePollenMatchResult = async () => {
-    if (!pollenMatchStartedAt || pollenMatchSaved) return;
+    if (!pollenMatchStartedAt || pollenMatchSaved || hasPendingRpgCell || hasGameCellOnDay(gameResults,new Date())) return;
 
     const resultId = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `pollen-match-${Date.now()}`;
     const durationMs = Date.now() - pollenMatchStartedAt;
@@ -1129,7 +1137,7 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   };
 
   const saveHiveBuilderTapResult = async () => {
-    if (!hiveBuilderTapStartedAt || hiveBuilderTapSaved) return;
+    if (!hiveBuilderTapStartedAt || hiveBuilderTapSaved || hasPendingRpgCell || hasGameCellOnDay(gameResults,new Date())) return;
 
     const resultId = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `hive-builder-${Date.now()}`;
     const durationMs = Date.now() - hiveBuilderTapStartedAt;
@@ -1175,6 +1183,10 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   useEffect(() => {
     initialize();
   }, []);
+
+  useEffect(()=>onSynced(event=>{
+    if(event.action.type==='gameCompletion'&&event.action.owner===user.id){void fetchMissions();void fetchGameResults();}
+  }),[user.id,locale]);
 
   useEffect(() => {
     setGameOwner(user.id ?? null);
@@ -1334,9 +1346,11 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const homeGreeting = capybeePhrases.homeGreeting[homeGreetingIndex] ?? capybeePhrases.homeGreeting[0];
   const homeAvatar = hasCheckInToday ? capyBeeAvatar.default : capyBeeAvatar.waving;
   const homeAvatarBubble = locale === 'pl' ? (homeGreeting?.pl ?? homeGreeting?.en ?? '') : (homeGreeting?.en ?? homeGreeting?.pl ?? '');
+  const gameCalendarNow=useLocalCalendar();
+  const hasPendingRpgCell=usePendingGameCell(user.id??null,()=>fetchGameResults(),gameCalendarNow);
   const hasGameResultToday = useMemo(
-    () => gameResults.some((entry) => entry.gameKey === 'pollen_match' && sameCalendarDay(new Date(entry.completedAt), new Date())),
-    [gameResults]
+    () => hasPendingRpgCell||hasGameCellOnDay(gameResults,gameCalendarNow),
+    [gameResults,gameCalendarNow,hasPendingRpgCell]
   );
 
   const homeHoneycombCells = useHoneycombCells({
@@ -1435,7 +1449,8 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const fetchMissions = async () => {
     try {
       const data = await request<Mission[]>(`/api/missions?active=true&locale=${locale}`);
-      setMissions(data);
+      const selected=user.id?await request<string[]>('/api/game/mission-selections',{headers:{'X-Game-Owner':user.id}}):[];
+      setMissions(data.map(m=>({...m,fromAdventure:selected.includes(m.id)})).sort((a,b)=>Number(b.fromAdventure)-Number(a.fromAdventure)));
     } catch (error) {
       console.error(error);
     }
@@ -1481,7 +1496,9 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
   const fetchGameResults = async () => {
     try {
       const data = await request<GameResultEntry[]>('/api/games/results');
-      setGameResults(data);
+      const pending=(await listQueuedActions()).filter(a=>a.type==='gameResult');
+      const optimistic=pending.filter(a=>!data.some(row=>row.id===a.clientId)).map(a=>({id:a.clientId,gameKey:String(a.payload?.gameKey),durationMs:Number(a.payload?.durationMs??0),flips:0,pairsTotal:0,completedAt:new Date(a.createdAt).toISOString()}));
+      setGameResults([...data,...optimistic]);
     } catch (error) {
       console.error(error);
     }
@@ -2435,7 +2452,10 @@ export function AuthenticatedHome({ user }: { user: UserProfile }) {
               </div>
 
               <div className="play-list">
-                {user.id ? <AdventureEntry owner={user.id} locale={locale} /> : null}
+                {user.id ? <GameProductContext.Provider value={{games:gameResults,pendingCell:hasPendingRpgCell,refresh:()=>{void fetchGameResults();void fetchMissions();},openMission:id=>{
+                  setExpandedMissionId(current=>current??id);setMissionCategory('all');
+                  if(history.state?.adventure)history.back();changeTab('missions');
+                }}}><AdventureEntry owner={user.id} locale={locale}/></GameProductContext.Provider> : null}
                 <button
                   type="button"
                   className="play-game-row"
