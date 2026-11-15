@@ -501,7 +501,7 @@ final class RunImpl implements Run {
         if (inputDecision == null || inputDecision.action() == null || inputDecision.action() == InputSafetyAction.UNAVAILABLE) {
             return reject("INPUT_GUARD_UNAVAILABLE", "Text safety checks are unavailable");
         }
-        if (inputDecision.action() == InputSafetyAction.BLOCK) return reject("INPUT_BLOCKED", "Text input was not accepted");
+        if (inputDecision.action() == InputSafetyAction.BLOCK) return reject(inputDecision.reasonCode()!=null && java.util.Set.of("INPUT_SUPPORT","INPUT_EMERGENCY").contains(inputDecision.reasonCode())?inputDecision.reasonCode():"INPUT_BLOCKED", "Text input was not accepted");
         if (inputDecision.action() == InputSafetyAction.NEEDS_CLARIFICATION) {
             return reject("INPUT_NEEDS_CLARIFICATION", "Text input needs clarification");
         }

@@ -135,6 +135,26 @@ public class JdbcSessionStore implements SessionPorts.RunRepository, SessionPort
         }
     }
 
+    /** Publishes only accepted Pack content; the wish and pending preparation never enter JDBC. */
+    public void publishPreparedPack(OwnerRef owner,UUID runId,UUID expectedCurrent,RunSnapshot snapshot) {
+        if(snapshot.dynamicGame()||snapshot.pack()==null||!runId.toString().equals(snapshot.runId()))throw new IllegalArgumentException("PACK_SNAPSHOT_INVALID");
+        transaction.executeWithoutResult(status->{
+            if(find(runId,owner).isPresent())return;
+            if(expectedCurrent!=null){
+                var current=jdbc.query("SELECT id FROM game_runs WHERE id=? AND user_id=? AND status='ACTIVE' FOR UPDATE",(rs,n)->rs.getObject(1,UUID.class),expectedCurrent,ownerId(owner));
+                if(current.isEmpty())throw new com.capybee.engine.session.SessionException(ErrorCode.REVISION_CONFLICT);
+                jdbc.update("UPDATE game_runs SET status='SUSPENDED',updated_at=? WHERE id=?",timestamp(clock.instant()),expectedCurrent);
+            }
+            jdbc.update("""
+                INSERT INTO game_runs(id,user_id,source_kind,pack_id,pack_version,locale,status,revision,generation_calls,snapshot,created_at,updated_at)
+                VALUES(?,?,'PACK',?,?,?,'ACTIVE',0,?,?::jsonb,?,?)
+                """,runId,ownerId(owner),snapshot.pack().id().value(),snapshot.pack().version().toString(),snapshot.locale().value(),
+                provisionalRunCalls.getOrDefault(runId,0),encodeSnapshot(snapshot),timestamp(snapshot.createdAt()),timestamp(clock.instant()));
+        });
+        provisionalRunCalls.remove(runId);
+    }
+    public void forgetProvisional(UUID runId){provisionalRunCalls.remove(runId);}
+
     private CreateOutcome insertDynamic(OwnerRef owner, UUID runId, RunSnapshot snapshot, Instant createdAt) {
         var identity = snapshot.dynamic().bundle().definition().profileIdentity();
         Instant now = createdAt == null ? clock.instant() : createdAt;

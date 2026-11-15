@@ -13,13 +13,15 @@ class AuthoredPackResourceTest {
     @Test void packagedPolishResourcesMatchCanonicalPackAndRequireExplicitAllowlisting() throws Exception {
         var id=new PackId("capybee-new-hive");var loader=new PackLoader(Engine.sectionValidators());
         var canonical=loader.load(id,new DirectoryPackSource(Path.of("../engine/reference-game-packs",id.value())));
-        var classpath=new ClasspathPackSource(getClass().getClassLoader(),"game-packs/"+id.value());
+        var classpath=new ClasspathPackSource(getClass().getClassLoader(),"game-packs/"+id.value()+"/retained/1.0.0");
         var packaged=loader.load(id,classpath);
         assertThat(packaged.manifest()).isEqualTo(canonical.manifest());assertThat(packaged.files()).isEqualTo(canonical.files());
         assertThat(classpath.read("pack.json")).hasValue(Files.readString(Path.of("../engine/reference-game-packs",id.value(),"pack.json"),StandardCharsets.UTF_8));
         assertThat(packaged.manifest().locales()).containsExactly(new LocaleTag("pl"));
         assertThat(packaged.manifest().features()).doesNotContain(PackFeature.GENERATION);
         var configuration=new GameSessionConfiguration();assertThat(configuration.gamePackRegistry("").all()).isEmpty();
-        assertThat(configuration.gamePackRegistry(id.value()).all()).hasSize(1);
+        var registry=configuration.gamePackRegistry(id.value());assertThat(registry.all()).hasSize(1);
+        assertThat(registry.find(id).orElseThrow().manifest().version().toString()).isEqualTo("1.1.0");
+        assertThat(registry.find(id,new PackVersion(1,0,0))).contains(packaged);
     }
 }

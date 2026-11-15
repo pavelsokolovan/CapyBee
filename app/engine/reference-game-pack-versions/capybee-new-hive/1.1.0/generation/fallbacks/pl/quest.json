@@ -1,0 +1,29 @@
+{
+  "objectives": [
+    {
+      "objectiveId": "prepare-rail",
+      "title": "Przygotuj poręcz, jeśli chcesz ruszyć na wyprawę",
+      "description": "Zwiąż wstążkę w warsztacie, aby bezpiecznie przejść przez baśniowy mostek."
+    },
+    {
+      "objectiveId": "carry-memory",
+      "title": "Opcjonalnie: zabierz światło wspomnienia",
+      "description": "Latarnia może pomóc zachować miejsce dla dawnego domu."
+    },
+    {
+      "objectiveId": "listen-mela",
+      "title": "Opcjonalnie: wysłuchaj Meli",
+      "description": "Mela odpoczywa na cichej łące; możesz usiąść obok i posłuchać."
+    },
+    {
+      "objectiveId": "help-borys",
+      "title": "Opcjonalnie: pomóż Borysowi przy trzcinie",
+      "description": "Borys układa trzcinę nad strumieniem i chętnie przyjmie pomoc."
+    },
+    {
+      "objectiveId": "mark-luna-rest",
+      "title": "Opcjonalnie: zaznacz miejsce odpoczynku dla Luny",
+      "description": "Liście pod wierzbą mogą wskazać Lunie spokojny zakątek."
+    }
+  ]
+}

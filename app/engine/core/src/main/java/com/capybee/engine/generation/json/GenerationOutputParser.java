@@ -163,7 +163,7 @@ public final class GenerationOutputParser {
     }
 
     private boolean fullGame(GenerationCatalog catalog) {
-        return catalog.runContract() != null && catalog.runContract().kind() == com.capybee.engine.generation.RunContractKind.FULL_GAME;
+        return catalog.runContract() != null;
     }
 
     private Result storyPlan(JsonNode root, GenerationCatalog catalog) {

@@ -1,3 +1,4 @@
+import {checkPolishGeneration} from './polish-generated-pack.mjs';
 import {checkPolishPack} from './polish-authored-pack.mjs';
 import {checkCompletion} from './game-completion.mjs';
 import {checkHexMap} from './game-hex-map.mjs';
@@ -11,6 +12,7 @@ const context=await browser.newContext({viewport:{width:360,height:800},extraHTT
 const page=await context.newPage();
 const requests=[];
 page.on('request',request=>{if(request.method()==='POST' && request.url().includes('/api/game/'))requests.push({url:request.url(),body:request.postDataJSON()});});
+const statuses=[];page.on('response',response=>{if(response.url().includes('/api/game/'))statuses.push({path:new URL(response.url()).pathname,status:response.status()});});
 const errors=[],logs=[];page.on('pageerror',()=>errors.push('browser exception'));page.on('console',entry=>logs.push(entry.text()));
 try {
  await page.goto(base);await page.getByRole('button',{name:'Play',exact:true}).click();
@@ -19,7 +21,7 @@ try {
  await page.getByRole('button',{name:'Next',exact:true}).click();
  await page.getByRole('button',{name:'Next',exact:true}).click();
  await page.getByRole('button',{name:'Next',exact:true}).click();
- const privateIdea='setup-private-'+crypto.randomUUID();
+ const privateIdea='setup-private-'+crypto.randomUUID().replace(/[0-9]/g,d=>String.fromCharCode(107+Number(d)));
  await page.locator('textarea').fill(privateIdea);
  await page.getByRole('button',{name:'Review',exact:true}).click();
  assert.equal(await page.locator('textarea').count(),0);
@@ -107,6 +109,7 @@ try {
  await checkHexMap({page,context,base,requests});
  await checkCompletion({page,context,base,requests});
  await checkPolishPack({page,context,base,requests});
+ await checkPolishGeneration({page,context,base,requests,logs});
  await checkRecovery({page,context,base,requests,logs});
  console.log('PASS: Spring-served preparation, private review, 360px/desktop, explicit start, reload/continue, browser Back and storage');
-}catch(error){console.error('Browser acceptance assertion failed; story and request bodies omitted.');console.error('Status:',await page.locator('.game-run [role=status]').textContent({timeout:1000}).catch(()=>null));console.error('Queue metadata:',await page.evaluate(async()=>{const r=indexedDB.open('keyval-store');const db=await new Promise(resolve=>r.onsuccess=()=>resolve(r.result));if(!db.objectStoreNames.contains('keyval'))return [];const values=await new Promise(resolve=>{const r=db.transaction('keyval').objectStore('keyval').getAll();r.onsuccess=()=>resolve(r.result);});db.close();return values.filter(v=>v?.type==='gameCommand').map(v=>({id:v.clientId,poll:v.poll,status:v.status,attempts:v.attempts,notBefore:v.notBefore}));}));throw error;}finally{await browser.close();}
+}catch(error){console.error('Browser acceptance assertion failed; story and request bodies omitted.');console.error('Phase:',await page.locator('[data-preparation-phase]').getAttribute('data-preparation-phase').catch(()=>null));console.error('HTTP metadata:',JSON.stringify(statuses.slice(-8)));console.error('Status:',await page.locator('.game-run [role=status]').textContent({timeout:1000}).catch(()=>null));console.error('Queue metadata:',await page.evaluate(async()=>{const r=indexedDB.open('keyval-store');const db=await new Promise(resolve=>r.onsuccess=()=>resolve(r.result));if(!db.objectStoreNames.contains('keyval'))return [];const values=await new Promise(resolve=>{const r=db.transaction('keyval').objectStore('keyval').getAll();r.onsuccess=()=>resolve(r.result);});db.close();return values.filter(v=>v?.type==='gameCommand').map(v=>({id:v.clientId,poll:v.poll,status:v.status,attempts:v.attempts,notBefore:v.notBefore}));}));throw error;}finally{await browser.close();}

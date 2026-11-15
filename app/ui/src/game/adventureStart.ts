@@ -1,7 +1,7 @@
 import type { GameCapabilities, GamePackInfoDto, GameRunSummaryDto, GeneratorProfile } from './gameApi';
-import { decodeCapabilities, decodeProfile, decodeSummary, object } from './gameDecoders';
+import { decodeCapabilities, decodePack, decodeProfile, decodeSummary, object } from './gameDecoders';
 import { type GameReply, type OperationMarker } from '../offline/syncEngine';
-import { compatible, compatibleAnswers, initialAnswers, startBody, type Adventure, type Answers } from './preparation';
+import { compatible, compatibleAnswers, transientPack, initialAnswers, startBody, type Adventure, type Answers } from './preparation';
 import type { AdventureMessage } from './adventureCopy';
 export type StartPhase='catalog'|'setup'|'review'|'waiting'|'ready'|'unknown'|'needsInput'|'fallback'|'cancelled'|'failed'|'signin';
 export interface StartState {
@@ -36,7 +36,7 @@ export function storedStart(owner:string):OperationMarker|undefined {
   const key=sessionStorage.key(i);if(!key?.startsWith(`game-operation:${owner}:`))continue;
   try {const v=JSON.parse(sessionStorage.getItem(key)!);
    if(v.owner===owner && typeof v.id==='string' && /^[a-zA-Z0-9_-]+$/.test(v.id)
-      && ['/api/game/runs','/api/game/dynamic-starts'].includes(v.path) && typeof v.createdAt==='number')found.push(v);
+      && ['/api/game/runs','/api/game/dynamic-starts','/api/game/pack-starts'].includes(v.path) && typeof v.createdAt==='number')found.push(v);
   } catch { /* An invalid marker cannot authorize a write. */ }
  }
  return found.sort((a,b)=>b.createdAt-a.createdAt)[0];
@@ -88,7 +88,7 @@ export class AdventureStart {
  select(game:Adventure) {
   if(this.sending || this.value.phase==='waiting' || !compatible(game))return;
   if(this.value.current?.status==='PREPARING'){this.update({message:'waitHint'});return;}
-  if(game.kind==='PACK' && this.value.current && ['ACTIVE','PREPARING'].includes(this.value.current.status)){this.update({message:'packConflict'});return;}
+  if(game.kind==='PACK' && !transientPack(game) && this.value.current && ['ACTIVE','PREPARING'].includes(this.value.current.status)){this.update({message:'packConflict'});return;}
   this.generation++;this.pollAbort?.abort();this.forget();this.update({selected:game,answers:initialAnswers(game,this.locale),generated:false,replacement:false,step:0,phase:'setup',message:undefined,clearIdea:this.value.clearIdea+1});
  }
  answer(id:string,values:string[]) {if(this.sending)return;this.update({answers:{...this.value.answers,[id]:values},phase:'setup'});}
@@ -115,7 +115,7 @@ export class AdventureStart {
   if(this.sending || this.value.phase!=='review' || !navigator.onLine)return;
   const selected=this.value.selected,caps=this.value.caps;if(!selected||!caps)return;
   if(!caps.viewFeatures.includes('canAdvance') || !caps.supportedViewSchemas.includes(2)){this.update({message:'unsupported'});return;}
-  if(selected.kind==='DYNAMIC' && this.value.current?.status==='ACTIVE' && !this.value.replacement){this.update({message:'confirmReplace'});return;}
+  if((selected.kind==='DYNAMIC'||transientPack(selected)&&this.value.generated) && this.value.current?.status==='ACTIVE' && !this.value.replacement){this.update({message:'confirmReplace'});return;}
   const epoch=this.generation;this.sending=true;this.update({loading:true});
   try {
    // Refresh public identity/disclosure before allocating a paid-attempt ID.
@@ -128,12 +128,20 @@ export class AdventureStart {
     if(profile.fingerprint!==selected.profile.fingerprint || fresh.disclosureRevision!==caps.disclosureRevision) {
      const game:Adventure={kind:'DYNAMIC',profile};this.update({caps:fresh,selected:game,answers:compatibleAnswers(game,this.value.answers),phase:'setup',message:'stale',clearIdea:this.value.clearIdea+1});return;
     }
-   } else if(fresh.disclosureRevision!==caps.disclosureRevision) {this.update({caps:fresh,phase:'setup',message:'stale',clearIdea:this.value.clearIdea+1});return;}
+   } else {
+    const list=successful(await this.transport.read('/api/game/packs'));
+    if(epoch!==this.generation)return;
+    const pack=Array.isArray(list)?list.map(decodePack).find(p=>p.id===selected.pack.id):undefined;
+    if(!pack)throw new Error('REQUEST_INVALID');
+    if(pack.version!==selected.pack.version || pack.setup?.preparationFingerprint!==selected.pack.setup?.preparationFingerprint || pack.setup?.transientTextSupported!==selected.pack.setup?.transientTextSupported || fresh.disclosureRevision!==caps.disclosureRevision){
+     const game:Adventure={kind:'PACK',pack};this.update({caps:fresh,selected:game,answers:compatibleAnswers(game,this.value.answers),generated:pack.generated&&pack.setup?.transientTextSupported?this.value.generated:false,phase:'setup',message:'stale',clearIdea:this.value.clearIdea+1});return;
+    }
+   }
    this.forget();
    const id=crypto.randomUUID();
    const body=startBody(selected,this.value.answers,wish,fresh,id,this.value.generated,
      this.value.replacement ? this.value.current?.runId : undefined);
-   const marker={owner:this.owner,id,path:selected.kind==='DYNAMIC'?'/api/game/dynamic-starts':'/api/game/runs',createdAt:Date.now()};
+   const marker={owner:this.owner,id,path:selected.kind==='DYNAMIC'?'/api/game/dynamic-starts':transientPack(selected)&&this.value.generated?'/api/game/pack-starts':'/api/game/runs',createdAt:Date.now()};
    this.remember(marker);this.update({phase:'waiting',message:undefined,clearIdea:this.value.clearIdea+1});
    try {const reply=await this.transport.transient(marker,'POST',body);if(epoch===this.generation){await this.accept(reply);if(this.getSnapshot().phase==='waiting')this.watch(marker);}}
    catch {if(epoch===this.generation)await this.check();}
@@ -165,7 +173,7 @@ export class AdventureStart {
   }
   if(['NEEDS_INPUT','FALLBACK_OFFERED','FAILED'].includes(String(value.status))){
    const phase=value.status==='NEEDS_INPUT'?'needsInput':value.status==='FALLBACK_OFFERED'?'fallback':'failed';
-   this.forget();await this.refreshCurrent();if(epoch!==this.generation)return;this.update({phase,message:phase,clearIdea:this.value.clearIdea+1});return;
+   this.forget();await this.refreshCurrent();if(epoch!==this.generation)return;this.update({phase,message:value.code==='INPUT_SUPPORT'?'support':value.code==='INPUT_EMERGENCY'?'emergency':phase,clearIdea:this.value.clearIdea+1});return;
   }
   if(reply.status===404){await this.refreshCurrent();if(epoch!==this.generation)return;this.update({phase:'unknown',message:'unknown',clearIdea:this.value.clearIdea+1});return;}
   if(reply.status>=400){const code=String(value.error && object(value.error).code || value.code || reply.status);
@@ -190,10 +198,10 @@ export class AdventureStart {
    if(this.pollAbort===abort)this.pollAbort=undefined;
   });
  }
- async cancel() {const marker=this.marker;if(!marker||marker.path!=='/api/game/dynamic-starts')return;
+ async cancel() {const marker=this.marker;if(!marker||!['/api/game/dynamic-starts','/api/game/pack-starts'].includes(marker.path))return;
   this.pollAbort?.abort();const epoch=this.generation;
   try{const reply=await this.transport.cancel(marker);if(epoch===this.generation)await this.accept(reply);}catch{await this.check();}}
- canCancel(){return this.marker?.path==='/api/game/dynamic-starts';}
+ canCancel(){return !!this.marker&&['/api/game/dynamic-starts','/api/game/pack-starts'].includes(this.marker.path);}
  async resume() {const epoch=this.generation,current=this.value.current;if(!current)return;
   try{const reply=await this.transport.read(`/api/game/runs/${current.runId}`);if(epoch!==this.generation)return;if(reply.status===200){const run=decodeSummary(reply.body);if(run.status==='PREPARING'){
     this.remember({owner:this.owner,id:run.runId,runId:run.runId,path:'/api/game/runs',createdAt:Date.now()});await this.check();

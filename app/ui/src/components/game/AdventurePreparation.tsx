@@ -4,7 +4,7 @@ import type {GameRunSummaryDto,SetupInput} from '../../game/gameApi';
 import {GameTransport} from '../../offline/syncEngine';
 import {AdventureStart} from '../../game/adventureStart';
 import {adventureCopy} from '../../game/adventureCopy';
-import {compatible,effective,inputsOf,localesOf,titleOf,validation,codePoints,type Adventure} from '../../game/preparation';
+import {compatible,transientPack,effective,inputsOf,localesOf,titleOf,validation,codePoints,type Adventure} from '../../game/preparation';
 import {GameRun} from './GameRun';
 import {restoreGameSession} from '../../game/restoreGameSession';
 
@@ -35,10 +35,12 @@ export function AdventurePreparation({owner,locale,onClose,onRunReady,flow:provi
  const select=(game:Adventure)=>{setWish('');setInvalid(false);flow.select(game);};
  const selected=state.selected;
  const allInputs=selected?inputsOf(selected):[];
+ const canWish=selected?.kind==='DYNAMIC'||!!selected&&transientPack(selected)&&state.generated;
+ const canReplace=selected?.kind==='DYNAMIC'||!!selected&&transientPack(selected)&&state.generated;
  const steps=selected?.kind==='DYNAMIC'?selected.profile.steps:selected?.pack.setup?.steps??[];
- const visibleSteps=steps.filter(step=>step.inputIds.some(id=>allInputs.find(i=>i.id===id)?.kind!=='FREE_TEXT' || selected?.kind==='DYNAMIC'));
+ const visibleSteps=steps.filter(step=>step.inputIds.some(id=>allInputs.find(i=>i.id===id)?.kind!=='FREE_TEXT' || canWish));
  const currentStep=visibleSteps[state.step];
- const currentInputs=currentStep?allInputs.filter(i=>currentStep.inputIds.includes(i.id) && (i.kind!=='FREE_TEXT'||selected?.kind==='DYNAMIC')):[];
+ const currentInputs=currentStep?allInputs.filter(i=>currentStep.inputIds.includes(i.id) && (i.kind!=='FREE_TEXT'||canWish)):[];
  const generated=selected?.kind==='DYNAMIC'||state.generated;
  const problems=selected?validation(selected,state.answers,wish):[];
  const next=()=>{
@@ -52,7 +54,7 @@ export function AdventurePreparation({owner,locale,onClose,onRunReady,flow:provi
    <legend>{input.label}{input.required?' *':''}</legend><p id={helpId}>{input.help}</p>
    {input.kind==='FREE_TEXT'?<>
     <p>{copy.disclosure}</p><p>{input.notice}</p><p>{copy.privacy}</p>
-    <textarea aria-label={input.label} value={wish} onChange={e=>setWish(e.target.value)}
+    <textarea disabled={!online} aria-label={input.label} value={wish} onChange={e=>setWish(e.target.value)}
       onCompositionStart={()=>setComposing(true)} onCompositionEnd={()=>setComposing(false)} autoComplete="off" spellCheck={false}/>
     <small>{codePoints(wish)} / {input.maxCodePoints}</small>
    </>:<>
@@ -69,7 +71,7 @@ export function AdventurePreparation({owner,locale,onClose,onRunReady,flow:provi
   </fieldset>;
  };
  const activeCurrent=state.caps?.gameEnabled&&state.current&&['ACTIVE','PREPARING'].includes(state.current.status);
- return <div className="adventure-overlay" role="dialog" aria-modal="true" aria-labelledby="adventure-title" ref={panel}
+ return <div className="adventure-overlay" role="dialog" data-preparation-phase={state.phase} aria-modal="true" aria-labelledby="adventure-title" ref={panel}
   onKeyDown={event=>{
    if(event.key==='Escape'&&!composing){event.preventDefault();close();}
    if(event.key==='Tab'){
@@ -102,8 +104,8 @@ export function AdventurePreparation({owner,locale,onClose,onRunReady,flow:provi
     {!allInputs.some(i=>i.id==='game-locale')?<label className="adventure-field">{copy.locale}<select value={state.answers['game-locale']?.[0]} onChange={e=>flow.answer('game-locale',[e.target.value])}>
       {localesOf(selected).map(l=><option value={l} key={l}>{l==='pl'?'Polski':l==='en'?'English':l}</option>)}
     </select></label>:null}
-    {selected.kind==='PACK'&&allInputs.some(i=>i.kind==='FREE_TEXT')?<p>{copy.optionalUnavailable}</p>:null}
-    {selected.kind==='PACK'&&selected.pack.generated&&state.caps?.packGenerationEnabled?<label className="adventure-option"><input type="checkbox" checked={state.generated} onChange={e=>flow.generated(e.target.checked)}/>{copy.generated}</label>:null}
+    {selected.kind==='PACK'&&!canWish&&allInputs.some(i=>i.kind==='FREE_TEXT')?<p>{copy.optionalUnavailable}</p>:null}
+    {selected.kind==='PACK'&&selected.pack.generated&&state.caps?.packGenerationEnabled?<label className="adventure-option"><input type="checkbox" checked={state.generated} onChange={e=>{setWish('');flow.generated(e.target.checked);}}/>{copy.generated}</label>:null}
     {state.generated?<p>{copy.packGenerated}</p>:null}
     <div className="adventure-actions"><button type="button" onClick={()=>{setInvalid(false);flow.back();}}>{copy.back}</button>
     <button type="button" className="primary-button" disabled={state.loading||composing} onClick={next}>{state.step+1<visibleSteps.length?copy.next:copy.review}</button></div>
@@ -116,10 +118,10 @@ export function AdventurePreparation({owner,locale,onClose,onRunReady,flow:provi
     <p>{wish.trim()?copy.ideaAdded:copy.ideaNone}</p>
     {wish?<button type="button" onClick={()=>{setWish('');flow.back();}}>{copy.remove}</button>:null}
     {generated?<p>{copy.disclosure}</p>:null}
-    {selected.kind==='DYNAMIC'&&activeCurrent?<><p>{copy.replacementNotice}</p><label className="adventure-option"><input type="checkbox" disabled={state.loading} checked={state.replacement} onChange={e=>flow.replacement(e.target.checked)}/>{copy.replace}</label></>:null}
+    {canReplace&&activeCurrent?<><p>{copy.replacementNotice}</p><label className="adventure-option"><input type="checkbox" disabled={state.loading} checked={state.replacement} onChange={e=>flow.replacement(e.target.checked)}/>{copy.replace}</label></>:null}
     {!online?<p>{copy.offline}</p>:null}
     <div className="adventure-actions"><button type="button" onClick={()=>flow.back()} disabled={state.loading}>{copy.edit}</button>
-     <button type="button" className="primary-button" disabled={state.loading||!online||problems.length>0||!!(selected.kind==='DYNAMIC'&&activeCurrent&&!state.replacement)}
+     <button type="button" className="primary-button" disabled={state.loading||!online||problems.length>0||!!(canReplace&&activeCurrent&&!state.replacement)}
       onClick={()=>{const idea=wish;setWish('');void flow.confirm(idea);}}>{copy.start}</button></div>
    </>:null}
    {state.phase==='waiting'?<><p role="status">{copy.waiting}</p><p>{copy.waitHint}</p>

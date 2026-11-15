@@ -5,7 +5,8 @@ import java.util.*;
 
 /** Public display metadata only; never generation prompts or mechanics. */
 public record PackSetupDto(int schemaVersion, String metadataLocale, String title, String description,
-        boolean transientTextSupported, List<Step> steps, List<Input> inputs) {
+        boolean transientTextSupported, List<Step> steps, List<Input> inputs, String preparationFingerprint) {
+    public PackSetupDto(int schemaVersion, String metadataLocale, String title, String description, boolean transientTextSupported, List<Step> steps, List<Input> inputs) { this(schemaVersion, metadataLocale, title, description, transientTextSupported, steps, inputs, null); }
     public record Step(String id, String title, List<String> inputIds) {}
     public record Option(String id, String label) {}
     public record Input(String id, String kind, String label, String help, boolean required,
@@ -32,7 +33,7 @@ public record PackSetupDto(int schemaVersion, String metadataLocale, String titl
             return new Input(input.id(), input instanceof StartInputDef.FreeTextInput ? "FREE_TEXT" : input instanceof StartInputDef.EnumSetInput ? "ENUM_SET" : "ENUM",
                     strings.path(input.labelKey()).asString(input.id()), question == null ? "" : strings.path(question.path("helpKey").asString()).asString(""),
                     input.required(), input instanceof StartInputDef.EnumSetInput set ? set.maxItems() : 1,
-                    input instanceof StartInputDef.FreeTextInput text ? text.maxChars() : null, defaults, options, null);
+                    input instanceof StartInputDef.FreeTextInput text ? text.maxChars() : null, defaults, options, question == null || question.path("freeTextNoticeKey").isMissingNode() ? null : strings.path(question.path("freeTextNoticeKey").asString()).asString(""));
         }).toList();
         return new PackSetupDto(1, locale, manifest.name(), manifest.description(), false,
                 inputs.isEmpty() ? List.of() : List.of(new Step("setup", manifest.name(), inputs.stream().map(Input::id).toList())), inputs);

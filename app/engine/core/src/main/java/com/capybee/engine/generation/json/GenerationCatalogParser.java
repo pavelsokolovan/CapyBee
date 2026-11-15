@@ -120,7 +120,7 @@ public final class GenerationCatalogParser {
                     "minimumStoryTransitions", "maximumStoryTransitions");
             int min = integer(lengthNode.get("minimumStoryTransitions"));
             int max = integer(lengthNode.get("maximumStoryTransitions"));
-            if (min < 4 || min > 31 || max < min || max > 32)
+            if (min < (kind == RunContractKind.AUTHORED_GRAPH ? 0 : 4) || min > 31 || max < min || max > 32)
                 error(context, "PACK_RUN_LENGTH_INVALID", CATALOG_FILE, "/runContract/length", "Invalid story transition bounds");
             length = new RunLength(min, max);
         }
@@ -150,7 +150,7 @@ public final class GenerationCatalogParser {
         }
         Map<String,String> qualityResources = new LinkedHashMap<>();
         JsonNode qualityNode = node.get("qualityResources");
-        if (kind == RunContractKind.FULL_GAME && (qualityNode == null || !qualityNode.isObject())) {
+        if (kind != null && (qualityNode == null || !qualityNode.isObject())) {
             error(context, "PACK_QUALITY_RESOURCE_MISSING", CATALOG_FILE, "/runContract/qualityResources", "Full games require one quality resource per locale");
         } else if (qualityNode != null && qualityNode.isObject()) {
             qualityNode.properties().forEach(entry -> {
@@ -170,7 +170,7 @@ public final class GenerationCatalogParser {
     private static GenerationSetup parseSetup(Pack pack, RunContract contract,
                                                List<GenerationCatalog.StageDefinition> stages,
                                                PackValidationContext context) {
-        boolean full = contract != null && contract.kind() == RunContractKind.FULL_GAME;
+        boolean full = contract != null;
         if (!full && (contract == null || contract.setupResource() == null)) return null;
         if (contract == null || contract.setupResource() == null) {
             error(context, "PACK_SETUP_REQUIRED", CATALOG_FILE, "/runContract/setupResource",

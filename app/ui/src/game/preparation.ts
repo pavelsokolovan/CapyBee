@@ -1,6 +1,7 @@
-import type { DynamicStartRequest, GameCapabilities, GamePackInfoDto, GameStartRequest, GeneratorProfile, SetupInput } from './gameApi';
+import type { PackPreparationRequest, DynamicStartRequest, GameCapabilities, GamePackInfoDto, GameStartRequest, GeneratorProfile, SetupInput } from './gameApi';
 
 export type Adventure = {kind:'DYNAMIC'; profile:GeneratorProfile} | {kind:'PACK'; pack:GamePackInfoDto};
+export function transientPack(game:Adventure):boolean {return game.kind==='PACK' && game.pack.setup?.transientTextSupported===true && typeof game.pack.setup.preparationFingerprint==='string';}
 export type Answers = Record<string, string[]>;
 export function inputsOf(game:Adventure):SetupInput[] { return game.kind==='DYNAMIC' ? game.profile.inputs : game.pack.setup?.inputs ?? []; }
 export function identityOf(game:Adventure) { return game.kind==='DYNAMIC' ? game.profile.id : game.pack.id; }
@@ -24,7 +25,7 @@ export function compatible(game:Adventure):boolean {
 export function validation(game:Adventure, answers:Answers, wish:string):string[] {
   if(!compatible(game))return ['metadata'];
   const errors=inputsOf(game).filter(i=>{
-    if(i.kind==='FREE_TEXT')return game.kind==='DYNAMIC' && codePoints(wish)>(i.maxCodePoints ?? 0);
+    if(i.kind==='FREE_TEXT')return (game.kind==='DYNAMIC'||transientPack(game)) && codePoints(wish)>(i.maxCodePoints ?? 0);
     const values=effective(i,answers);
     return i.required && values.length===0 || values.length>i.maxItems || new Set(values).size!==values.length || values.some(v=>!i.options.some(o=>o.id===v));
   }).map(i=>i.id);
@@ -42,11 +43,16 @@ export function compatibleAnswers(game:Adventure, answers:Answers):Answers {
   return result;
 }
 export function startBody(game:Adventure, answers:Answers, wish:string, caps:GameCapabilities,
-  id:string, generated:boolean, replacement?:string):DynamicStartRequest|GameStartRequest {
+  id:string, generated:boolean, replacement?:string):DynamicStartRequest|GameStartRequest|PackPreparationRequest {
   if(validation(game,answers,wish).length)throw new Error('PREPARATION_INVALID');
   const locale=answers['game-locale']?.[0];
   if(!localesOf(game).includes(locale))throw new Error('PREPARATION_INVALID');
   if(game.kind==='PACK') {
+    if(generated && transientPack(game)){
+      const selections:Answers={};for(const i of inputsOf(game))if(i.kind!=='FREE_TEXT')selections[i.id]=effective(i,answers);
+      return {requestId:id,packId:game.pack.id,packVersion:game.pack.version,packFingerprint:game.pack.setup!.preparationFingerprint!,locale,selections,
+        ...(wish.trim()?{suggestion:wish}:{}),disclosureRevision:caps.disclosureRevision,confirmed:true,...(replacement?{expectedCurrentRunId:replacement}:{})};
+    }
     const startInputs:Record<string,string>={};
     for(const i of inputsOf(game))if(i.kind!=='FREE_TEXT')startInputs[i.id]=effective(i,answers).join(',');
     return {id,packId:game.pack.id,locale,generated,startInputs};

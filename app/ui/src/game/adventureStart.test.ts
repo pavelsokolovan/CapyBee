@@ -115,3 +115,29 @@ it('clears a previously active current run when the server reports none after an
  vi.mocked(h.transport.read).mockImplementation(async(path:string)=>({status:path.endsWith('/current')?404:200,body:path.endsWith('/capabilities')?caps:path.endsWith('/packs')?[pack]:[profile]}));
  await h.flow.load(false);expect(h.flow.getSnapshot().current).toBeNull();h.flow.select({kind:'PACK',pack});expect(h.flow.getSnapshot().phase).toBe('setup');h.flow.dispose();
 });
+
+describe('transient Pack preparation',()=>{
+ const preparedPack:GamePackInfoDto={...pack,version:'1.1.0',setup:{...pack.setup!,transientTextSupported:true,preparationFingerprint:'reviewed-resources',inputs:[...pack.setup!.inputs,{id:'story-wish',kind:'FREE_TEXT',label:'Fictional wish',help:'Optional',required:false,maxItems:1,maxCodePoints:240,defaults:[],options:[],notice:null}],steps:[{id:'setup',title:'Choices',inputIds:['tone','interests','story-wish']}]}};
+ it('uses a reviewed version identity and transient request, never a durable Pack start',()=>{
+  const game:Adventure={kind:'PACK',pack:preparedPack};
+  expect(startBody(game,{'game-locale':['en']},'private',caps,'uuid',true,'old')).toMatchObject({requestId:'uuid',packVersion:'1.1.0',packFingerprint:'reviewed-resources',suggestion:'private',expectedCurrentRunId:'old',confirmed:true});
+  expect(startBody(game,{'game-locale':['en']},'private',caps,'uuid',false)).not.toHaveProperty('suggestion');
+  expect(validation(game,{'game-locale':['en']},'😀'.repeat(241))).toContain('story-wish');
+ });
+ it('recovers an uncertain Pack start without repeating the body, and rechecks changed resources',async()=>{
+  const {flow,transport}=harness();
+  vi.mocked(transport.read).mockImplementation(async path=>({status:path.endsWith('/current')?404:200,body:path.endsWith('/capabilities')?caps:path.endsWith('/packs')?[preparedPack]:path.endsWith('/generator-profiles')?[]:contracts.started}));
+  await flow.load();flow.select({kind:'PACK',pack:preparedPack});flow.generated(true);flow.review();
+  vi.mocked(transport.transient).mockRejectedValue(new Error('lost'));await flow.confirm('private-pack-sentinel');
+  expect(transport.transient).toHaveBeenCalledTimes(1);expect(transport.transient).toHaveBeenCalledWith(expect.objectContaining({path:'/api/game/pack-starts'}),'POST',expect.anything());
+  expect(transport.read).toHaveBeenCalledWith(expect.stringMatching(/pack-starts\//));expect(JSON.stringify(flow.getSnapshot())).not.toContain('private-pack-sentinel');
+  const changed={...preparedPack,setup:{...preparedPack.setup!,preparationFingerprint:'changed'}};
+  flow.catalog();flow.select({kind:'PACK',pack:preparedPack});flow.generated(true);flow.replacement(true);flow.review();
+  vi.mocked(transport.read).mockImplementation(async path=>({status:200,body:path.endsWith('/capabilities')?caps:[changed]}));
+  await flow.confirm('private');expect(transport.transient).toHaveBeenCalledTimes(1);expect(flow.getSnapshot()).toMatchObject({phase:'setup',message:'stale'});
+ });
+ it('recovers Pack operation markers with GET only after reload',async()=>{
+  sessionStorage.setItem('game-operation:owner:request',JSON.stringify({owner:'owner',id:'request',path:'/api/game/pack-starts',createdAt:1}));
+  const {flow,transport}=harness();await flow.load();expect(flow.getSnapshot().phase).toBe('ready');expect(transport.transient).not.toHaveBeenCalled();
+ });
+});

@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "startPlace": "hive-square",
+  "layout": {
+    "kind": "HEX"
+  },
+  "places": [
+    {
+      "id": "hive-square",
+      "labelKey": "place.hive-square",
+      "descriptionKey": "description.hive-square",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "old-lantern",
+      "labelKey": "place.old-lantern",
+      "descriptionKey": "description.old-lantern",
+      "position": {
+        "x": -1,
+        "y": 0
+      }
+    },
+    {
+      "id": "quiet-meadow",
+      "labelKey": "place.quiet-meadow",
+      "descriptionKey": "description.quiet-meadow",
+      "position": {
+        "x": 0,
+        "y": -1
+      }
+    },
+    {
+      "id": "reed-bank",
+      "labelKey": "place.reed-bank",
+      "descriptionKey": "description.reed-bank",
+      "position": {
+        "x": 1,
+        "y": -1
+      }
+    },
+    {
+      "id": "willow-glen",
+      "labelKey": "place.willow-glen",
+      "descriptionKey": "description.willow-glen",
+      "position": {
+        "x": 1,
+        "y": 0
+      }
+    },
+    {
+      "id": "hive-workshop",
+      "labelKey": "place.hive-workshop",
+      "descriptionKey": "description.hive-workshop",
+      "position": {
+        "x": 0,
+        "y": 1
+      }
+    },
+    {
+      "id": "small-crossing",
+      "labelKey": "place.small-crossing",
+      "descriptionKey": "description.small-crossing",
+      "position": {
+        "x": 1,
+        "y": 1
+      }
+    }
+  ],
+  "links": [
+    {
+      "from": "hive-square",
+      "to": "old-lantern",
+      "bidirectional": true
+    },
+    {
+      "from": "hive-square",
+      "to": "quiet-meadow",
+      "bidirectional": true
+    },
+    {
+      "from": "hive-square",
+      "to": "reed-bank",
+      "bidirectional": true
+    },
+    {
+      "from": "hive-square",
+      "to": "willow-glen",
+      "bidirectional": true
+    },
+    {
+      "from": "hive-square",
+      "to": "hive-workshop",
+      "bidirectional": true
+    },
+    {
+      "from": "quiet-meadow",
+      "to": "reed-bank",
+      "bidirectional": true
+    },
+    {
+      "from": "hive-workshop",
+      "to": "small-crossing",
+      "bidirectional": true
+    },
+    {
+      "from": "willow-glen",
+      "to": "small-crossing",
+      "bidirectional": true
+    }
+  ]
+}

@@ -5,7 +5,7 @@ import {withGameLock} from './gameLock';
 import {GameTransport, type OperationMarker, type GameReply} from './gameTransport';
 import {decodeSummary,object} from './gameDecoders';
 import type {GameRunSummaryDto,GameCommand} from './gameApi';
-export type RunState={run:GameRunSummaryDto;pending:boolean;message:'saved'|'checking'|'rejected'|'changed'|'unavailable'|'waiting'|'offline'|'attention';selection?:string;cancellable?:boolean;retryable?:boolean};
+export type RunState={run:GameRunSummaryDto;pending:boolean;message:'support'|'emergency'|'saved'|'checking'|'rejected'|'changed'|'unavailable'|'waiting'|'offline'|'attention';selection?:string;cancellable?:boolean;retryable?:boolean};
 /** Owns one run's command identity. No command body or story is persisted here. */
 export class RunController {
  private state:RunState; private listeners=new Set<()=>void>(); private epoch=0; private poll?:AbortController;
@@ -88,7 +88,9 @@ export class RunController {
   if(['RUN_UNRECOVERABLE','RUN_QUARANTINED','RUN_ARCHIVED','RUN_TRASHED'].includes(objectCode(body))){this.update({message:'unavailable'});return;}
   if(reply.status===202||reply.status===429||reply.status>=500||objectCode(body)==='RUN_BUSY'){void this.check();return;}
   if(body.commandId===this.marker?.id&&['APPLIED','REPLAYED','REJECTED'].includes(String(body.outcome))){
-   await this.refresh(epoch,body.outcome==='REJECTED'?'rejected':'saved',Math.max(Number(body.appliedRevision??0),Number(body.revision??0)));return;
+   const issues=Array.isArray(body.issues)?body.issues:[];
+   const support=issues.some(i=>object(i).code==='INPUT_EMERGENCY')?'emergency':issues.some(i=>object(i).code==='INPUT_SUPPORT')?'support':undefined;
+   await this.refresh(epoch,support??(body.outcome==='REJECTED'?'rejected':'saved'),Math.max(Number(body.appliedRevision??0),Number(body.revision??0)));return;
   }
   if(['REVISION_CONFLICT','RUN_NOT_ACTIVE'].includes(objectCode(body))) {await this.refresh(epoch,'changed');return;}
   // A definite rejection has no accepted effects; still reconcile the saved view.

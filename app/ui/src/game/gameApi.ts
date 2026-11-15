@@ -112,7 +112,7 @@ export interface GamePackInfoDto {
   startInputs: unknown[];
   generated: boolean;
   setup?: {schemaVersion:1; metadataLocale:string; title:string; description:string|null;
-    transientTextSupported:false; steps:Array<{id:string; title:string; inputIds:string[]}>; inputs:SetupInput[]};
+    transientTextSupported:boolean; preparationFingerprint?:string|null; steps:Array<{id:string; title:string; inputIds:string[]}>; inputs:SetupInput[]};
 }
 
 export type GameSource = { kind: 'PACK'; packId: string; packVersion: string }
@@ -138,6 +138,10 @@ export interface DynamicStartRequest {
   requestId: string; profileId: string; profileVersion: string; profileFingerprint: string;
   locale: string; lengthPreset: string; challengePreset: string; selections: Record<string, string[]>;
   suggestion?: string; disclosureRevision: number; confirmed: true; expectedCurrentRunId?: string;
+}
+export interface PackPreparationRequest {
+ requestId:string; packId:string; packVersion:string; packFingerprint:string; locale:string; selections:Record<string,string[]>;
+ suggestion?:string; disclosureRevision:number; confirmed:true; expectedCurrentRunId?:string;
 }
 export interface DynamicOperation {
   status: 'PROCESSING' | 'STARTED' | 'NEEDS_INPUT' | 'FALLBACK_OFFERED' | 'CANCELLED' | 'FAILED';

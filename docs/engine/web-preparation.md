@@ -84,3 +84,20 @@ history. Previously entering a later scene could shift that window, replace an
 accepted artifact and lose its provider-call evidence, causing subsequent
 snapshot resume to fail. Visited artifacts are now stable; tests cover each
 scene's snapshot round trip and a provider-free read before advancing.
+
+## Authored presentation graphs (29.2)
+
+A Pack may declare `runContract.kind=AUTHORED_GRAPH` (catalog 2, contract 1) to
+use the same strict generated presentation/quality/fallback schemas on an
+authored graph with optional revisits and equally classified endings. It can
+also start with `generated=false`; FULL_GAME's existing generation requirement
+is unchanged. `length=0/0` makes no linear route bound promise. Structural
+reachability and exact authored IDs still validate. The generic Pack registry
+retains exact versions for resume while discovery selects the newest version.
+
+`PackSetupDto` adds nullable `preparationFingerprint`; its SDK factory still
+sets transientTextSupported=false. A host may enable transient text only with
+a separate, audited in-memory start boundary. CapyBee's Pack operation request,
+consent, safety, defaults-off operator approval and persistence audit are in
+[Polish theme generation](../polish-theme-generation.md). No private input may
+enter pending_start just because a Pack declares FREE_TEXT.

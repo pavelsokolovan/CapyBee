@@ -1,0 +1,32 @@
+{
+  "title": "Polana Nowego Ula",
+  "narration": "Na Polanie Nowego Ula wybierasz następny przystanek. Każde spotkanie jest dobrowolne. Możesz wracać, obejrzeć planszę albo zakończyć wyprawę odpoczynkiem.",
+  "dialogue": [],
+  "choices": [
+    {
+      "id": "visit-lantern",
+      "label": "Zaglądam do Latarni Wspomnień"
+    },
+    {
+      "id": "meet-mela",
+      "label": "Odwiedzam Melę na Cichej Łące"
+    },
+    {
+      "id": "meet-borys",
+      "label": "Odwiedzam Borysa nad trzciną"
+    },
+    {
+      "id": "meet-luna",
+      "label": "Odwiedzam Lunę pod wierzbą"
+    },
+    {
+      "id": "visit-workshop",
+      "label": "Idę do Warsztatu Plastra"
+    },
+    {
+      "id": "rest-now",
+      "label": "Na dziś wybieram odpoczynek"
+    }
+  ],
+  "continuityFacts": []
+}

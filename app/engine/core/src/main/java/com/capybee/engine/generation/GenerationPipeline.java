@@ -613,6 +613,7 @@ public final class GenerationPipeline {
         } else if (stage == GenerationCatalog.Stage.CAST || stage == GenerationCatalog.Stage.QUEST) {
             context.put("storyPlan", stageArtifacts.get(GenerationCatalog.Stage.SCENARIO).payload());
         } else if (stage == GenerationCatalog.Stage.SCENARIO) {
+            if (stageArtifacts.containsKey(GenerationCatalog.Stage.THEME)) context.put("theme", stageArtifacts.get(GenerationCatalog.Stage.THEME).payload());
             context.put("phases", catalog.runContract().phases().stream().map(p -> Map.of("phaseId", p.id(),
                     "kind", p.kind().name(), "slots", catalog.sceneSlots().stream().filter(s -> p.id().equals(s.phaseId())).toList())).toList());
         }
@@ -721,7 +722,7 @@ public final class GenerationPipeline {
     }
 
     private String schema(GenerationCatalog.Stage stage) { return outputParser.schema(stage, fullGame()); }
-    private boolean fullGame() { return catalog.runContract() != null && catalog.runContract().kind() == RunContractKind.FULL_GAME; }
+    private boolean fullGame() { return catalog.runContract() != null; }
 
     private TextGenerationResult.TokenUsage mergeUsage(TextGenerationResult.TokenUsage left,
                                                         TextGenerationResult.TokenUsage right) {

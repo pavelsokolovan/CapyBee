@@ -1,5 +1,6 @@
 export const adventureCopy = {
  en: {
+  support:'You can pause here. If you want, talk with a trusted adult about how you feel.',emergency:'Pause the story. If you may hurt yourself or are in danger, ask a trusted adult nearby for help now. You can contact local emergency help.',
   title:'Adventures',signInAction:'Sign in',blurb:'Prepare a story of your own.',close:'Back to Play',back:'Back',next:'Next',review:'Review',
   loading:'Checking your adventures…',empty:'There are no new adventures to choose from right now.',disabled:'Adventures are unavailable right now. Your saved progress has not been deleted.',
   offline:'Connect to the internet to start or check an adventure.',unavailable:'We could not check everything. Try again when you are ready.',signin:'Sign in again to continue.',retry:'Check again',
@@ -8,7 +9,7 @@ export const adventureCopy = {
   textTooLong:'Your idea is too long. Shorten it before continuing.',
   optionalUnavailable:'Optional story text is unavailable for this reviewed game.',locale:'Story language',required:'Choose an answer before continuing.',limit:'Choose no more than',clear:'Clear this choice',
   privacy:'Use a fictional idea. Do not enter real names, contacts, school details, exact places or secrets.',
-  disclosure:'Your presets, choices and optional fictional idea may be sent to an external AI service. The accepted adventure is saved. Your raw idea is not stored for resubmission.',
+  disclosure:'Your presets, choices and optional fictional idea may be sent to an external AI service. Reviewed Polish fallback may be used when AI is unavailable. The accepted adventure is saved. Your raw idea is not stored for resubmission.',
   ideaAdded:'Idea added',ideaNone:'No idea added',edit:'Edit',remove:'Remove idea',start:'Start adventure',reviewTitle:'Your adventure',
   replace:'Start a new adventure and pause my current one only if the new start succeeds.',
   replacementNotice:'Your current adventure stays available if the new start fails. A list for switching back to older paused games is not available here.',
@@ -22,6 +23,7 @@ export const adventureCopy = {
   selected:'Selected',notSelected:'No preference',confirmReplace:'Choose whether to replace your current adventure.',status:'Adventure status',
  },
  pl: {
+  support:'Możesz zrobić przerwę. Jeśli chcesz, porozmawiaj z zaufaną dorosłą osobą o tym, co czujesz.',emergency:'Zrób przerwę w historii. Jeśli możesz zrobić sobie krzywdę lub jesteś w niebezpieczeństwie, poproś teraz zaufaną dorosłą osobę obok o pomoc. Możesz skontaktować się z lokalną pomocą alarmową.',
   title:'Przygody',signInAction:'Zaloguj się',blurb:'Przygotuj własną historię.',close:'Wróć do gier',back:'Wstecz',next:'Dalej',review:'Sprawdź',
   loading:'Sprawdzamy twoje przygody…',empty:'Na razie nie ma nowych przygód do wyboru.',disabled:'Przygody są teraz niedostępne. Twoje zapisane postępy nie zostały usunięte.',
   offline:'Połącz się z internetem, aby rozpocząć lub sprawdzić przygodę.',unavailable:'Nie udało się wszystkiego sprawdzić. Spróbuj ponownie, gdy chcesz.',signin:'Zaloguj się ponownie, aby kontynuować.',retry:'Sprawdź ponownie',
@@ -30,7 +32,7 @@ export const adventureCopy = {
   textTooLong:'Twój pomysł jest za długi. Skróć go, zanim przejdziesz dalej.',
   optionalUnavailable:'Opcjonalny tekst jest niedostępny w tej przygotowanej grze.',locale:'Język historii',required:'Wybierz odpowiedź, zanim przejdziesz dalej.',limit:'Wybierz nie więcej niż',clear:'Wyczyść ten wybór',
   privacy:'Wpisz fikcyjny pomysł. Nie podawaj prawdziwych nazwisk, kontaktów, szkoły, dokładnych miejsc ani sekretów.',
-  disclosure:'Twoje wybory i opcjonalny fikcyjny pomysł mogą zostać wysłane do zewnętrznej usługi AI. Przyjęta przygoda jest zapisywana. Twój surowy pomysł nie jest przechowywany do ponownego wysłania.',
+  disclosure:'Twoje wybory i opcjonalny fikcyjny pomysł mogą zostać wysłane do zewnętrznej usługi AI. Gdy AI jest niedostępne, gra może użyć przygotowanego polskiego tekstu. Przyjęta przygoda jest zapisywana. Twój surowy pomysł nie jest przechowywany do ponownego wysłania.',
   ideaAdded:'Dodano pomysł',ideaNone:'Nie dodano pomysłu',edit:'Edytuj',remove:'Usuń pomysł',start:'Rozpocznij przygodę',reviewTitle:'Twoja przygoda',
   replace:'Rozpocznij nową przygodę i wstrzymaj obecną dopiero po udanym starcie.',
   replacementNotice:'Jeśli nowy start się nie uda, obecna przygoda pozostaje dostępna. Nie ma tu listy do przełączania się na starsze wstrzymane gry.',

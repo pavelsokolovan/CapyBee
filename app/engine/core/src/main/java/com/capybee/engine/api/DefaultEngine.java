@@ -240,7 +240,7 @@ final class DefaultEngine implements Engine {
                     "Snapshot version, pack, or state is invalid"));
             return new ResumeResult(null, issues);
         }
-        Pack pack = packs.find(snapshot.pack().id()).orElse(null);
+        Pack pack = packs.find(snapshot.pack().id(),snapshot.pack().version()).or(()->packs.find(snapshot.pack().id())).orElse(null);
         if (pack == null) {
             issues.add(new Issue(Issue.Severity.ERROR, "SNAPSHOT_PACK_MISMATCH", "Snapshot pack is not loaded"));
             return new ResumeResult(null, issues);
@@ -547,7 +547,8 @@ final class DefaultEngine implements Engine {
 
         Set<PackFeature> unsupported = new HashSet<>();
         for (PackFeature feature : pack.manifest().features()) {
-            if (feature == PackFeature.GENERATION && !request.generated()) {
+            if (feature == PackFeature.GENERATION && !request.generated()
+                    && pack.generatedGameProfile().filter(profile -> profile.kind() == com.capybee.engine.generation.GeneratedGameProfile.Kind.AUTHORED_GRAPH).isEmpty()) {
                 unsupported.add(feature);
             }
             if (feature != PackFeature.PLACES && feature != PackFeature.ASSETS && feature != PackFeature.GENERATION) {

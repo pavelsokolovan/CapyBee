@@ -59,11 +59,19 @@ public class GameSessionConfiguration {
     PackRegistry gamePackRegistry(@Value("${capybee.game.pack-ids:}") String configuredPackIds) {
         if (configuredPackIds.isBlank()) return new PackRegistry(List.of());
         PackLoader loader = new PackLoader(Engine.sectionValidators());
-        List<Pack> packs = Arrays.stream(configuredPackIds.split(","))
-                .map(String::trim).filter(id -> !id.isEmpty())
-                .map(id -> loader.load(new PackId(id), new ClasspathPackSource(
-                        GameSessionConfiguration.class.getClassLoader(), "game-packs/" + id)))
-                .toList();
+        List<Pack> packs = new java.util.ArrayList<>();
+        for(String id:configuredPackIds.split(",")){
+            id=id.trim();if(id.isEmpty())continue;
+            var source=new ClasspathPackSource(GameSessionConfiguration.class.getClassLoader(),"game-packs/"+id);
+            packs.add(loader.load(new PackId(id),source));
+            String packId=id;
+            source.read("retained-versions.json").ifPresent(raw->{
+                var versions=com.capybee.engine.session.wire.SessionJson.tree(raw);
+                if(!versions.isArray()||versions.size()>8)throw new IllegalStateException("PACK_VERSIONS_INVALID");
+                for(var v:versions){String version=v.asString();if(com.capybee.engine.pack.PackVersion.tryParse(version).isEmpty())throw new IllegalStateException("PACK_VERSIONS_INVALID");
+                    packs.add(loader.load(new PackId(packId),new ClasspathPackSource(GameSessionConfiguration.class.getClassLoader(),"game-packs/"+packId+"/retained/"+version)));}
+            });
+        }
         return new PackRegistry(packs);
     }
 
@@ -152,9 +160,9 @@ public class GameSessionConfiguration {
     @Bean
     @ConditionalOnProperty(name = "capybee.game.dynamic.enabled", havingValue = "true")
     DynamicStartCoordinator dynamicStartCoordinator(RunSessionService sessions, TextGenerator generator,
-            SessionPorts.GenerationLedger ledger, SessionLimits limits, Clock gameSessionClock) {
+            SessionPorts.GenerationLedger ledger, SessionLimits limits, Clock gameSessionClock, ReviewedInputGuard guard) {
         return new DynamicStartCoordinator(sessions, new SessionGenerators(generator, ledger, limits),
-                new DefaultBlueprintOutputReviewer(), new DefaultInputGuard(), new UuidIdSource(), gameSessionClock);
+                new DefaultBlueprintOutputReviewer(), guard, new UuidIdSource(), gameSessionClock);
     }
 
     @Bean
@@ -168,7 +176,7 @@ public class GameSessionConfiguration {
 
     @Bean
     SessionPorts.EngineFactory gameEngineFactory(PackRegistry registry, ObjectProvider<TextGenerator> generators,
-            SessionPorts.GenerationLedger ledger, FamilyProfileRepository profiles, Clock gameSessionClock,
+            SessionPorts.GenerationLedger ledger, FamilyProfileRepository profiles, Clock gameSessionClock, ReviewedInputGuard inputGuard,
             @Value("${capybee.game.limits.profile-calls-per-day:40}") int profileCalls,
             @Value("${capybee.game.limits.global-calls-per-day:1500}") int globalCalls,
             @Value("${capybee.game.limits.run-calls:24}") int runCalls,
@@ -181,7 +189,7 @@ public class GameSessionConfiguration {
             TextGenerator provider = generationEnabled ? generators.getIfAvailable() : null;
             var builder = Engine.builder(registry).clock(gameSessionClock)
                     .random(Randoms.seeded(runId.getMostSignificantBits() ^ runId.getLeastSignificantBits()))
-                    .ids(new UuidIdSource());
+                    .ids(new UuidIdSource()).inputGuard(inputGuard);
             if (provider != null) {
                 UUID userId = UUID.fromString(owner.value());
                 String profileScope = profiles.findByParentUser_Id(userId)
@@ -193,7 +201,7 @@ public class GameSessionConfiguration {
                         new LedgerScope("global", globalCalls),
                         LocalDate.now(gameSessionClock.withZone(ZoneId.of(dayZone))),
                         runId, runCalls, priority, profileReserve, globalReserve, runReserve);
-                builder.textGenerator(metered).inputInterpreter(new StructuredInputInterpreter(metered));
+                builder.textGenerator(TransientGenerationPrivacy.filter(metered)).inputInterpreter(new StructuredInputInterpreter(metered));
             }
             return builder.build();
         };

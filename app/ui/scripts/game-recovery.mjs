@@ -58,7 +58,7 @@ export async function checkRecovery({page,context,base,requests,logs}){
  const after=await context.request.get(base+'/api/game/runs/'+current.runId);assert.equal((await after.json()).revision,current.revision+1,'competing tabs advanced twice');await peer.close();
  // Text is online-only and never durable, including the ambiguous/lost-response path.
  await start(page,'Fixture Text Input');
- const sentinel='gameplay-private-'+crypto.randomUUID();
+ const sentinel='gameplay-private-'+crypto.randomUUID().replace(/[0-9]/g,d=>String.fromCharCode(107+Number(d)));
  await context.setOffline(true);await page.locator('.game-run textarea').waitFor();assert.equal(await page.locator('.game-run textarea').isDisabled(),true);await context.setOffline(false);
  await page.locator('.game-run textarea').fill(sentinel);
  let dropped=false;

@@ -21,7 +21,8 @@ public final class FullGeneratedGameValidator {
     public static GeneratedGameProfile validate(Pack pack, GenerationCatalog catalog, PackValidationContext context) {
         RunContract contract = catalog.runContract();
         if (contract == null) return GeneratedGameProfile.contentOnly();
-        if (contract.kind() != RunContractKind.FULL_GAME || contract.contractVersion() != 1) return null;
+        if (contract.contractVersion() != 1) return null;
+        boolean authored = contract.kind() == RunContractKind.AUTHORED_GRAPH;
         Map<LocaleTag, SceneSet> sets = SceneSets.load(pack);
         Rules rules = RulesParser.parse(pack);
         SceneSet base = sets.get(new LocaleTag(catalog.defaultLocale()));
@@ -92,11 +93,11 @@ public final class FullGeneratedGameValidator {
             graph.put(story, targets);
             for (String target : targets) {
                 int from = phaseOf.get(story), to = phaseOf.get(target);
-                if (to < from) error(context, "PACK_RUN_ROUTE_BACKWARDS", "Route moves backwards: " + story + " -> " + target);
-                if (to > from + 1) error(context, "PACK_RUN_ROUTE_DEAD_END", "Route skips a required phase: " + story + " -> " + target);
+                if (!authored && to < from) error(context, "PACK_RUN_ROUTE_BACKWARDS", "Route moves backwards: " + story + " -> " + target);
+                if (!authored && to > from + 1) error(context, "PACK_RUN_ROUTE_DEAD_END", "Route skips a required phase: " + story + " -> " + target);
             }
         }
-        if (hasCycle(graph)) error(context, "PACK_RUN_ROUTE_CYCLIC", "Story graph contains a cycle");
+        if (!authored && hasCycle(graph)) error(context, "PACK_RUN_ROUTE_CYCLIC", "Story graph contains a cycle");
         if (start == null) return null;
         Set<String> reachable = reachable(start.id(), graph);
         for (String id : phaseOf.keySet()) if (!reachable.contains(id)) error(context, "PACK_RUN_SCENE_UNREACHABLE", "Unreachable story scene: " + id);
@@ -111,6 +112,14 @@ public final class FullGeneratedGameValidator {
         if (!meaningfulChoice) error(context, "PACK_RUN_CHOICE_REQUIRED", "A pre-resolution choice is required");
         if (context.hasErrors()) return null;
 
+        if (authored && (contract.length().minimumStoryTransitions()!=0 || contract.length().maximumStoryTransitions()!=0))
+            error(context,"PACK_RUN_LENGTH_INVALID","Authored graph presentation does not impose route length bounds");
+        if (authored && catalog.limits().totalCallsPerRun() < catalog.stages().size())
+            error(context,"PACK_RUN_BUDGET_INSUFFICIENT","Generation budget cannot attempt initialization");
+        if(context.hasErrors())return null;
+        if (authored) return new GeneratedGameProfile(GeneratedGameProfile.Kind.AUTHORED_GRAPH,1,
+                contract.phases().stream().map(p->new PhaseProfile(p.id(),p.kind(),p.sceneIds().size())).toList(),
+                reachable.size(),endings.size(),0,0,5);
         PathBounds bounds = bounds(start.id(), graph, endings.keySet(), new HashMap<>());
         if (bounds.min < contract.length().minimumStoryTransitions() || bounds.max > contract.length().maximumStoryTransitions()
                 || bounds.max > 32) error(context, "PACK_RUN_LENGTH_INVALID", "Derived route length violates contract bounds");
@@ -131,7 +140,7 @@ public final class FullGeneratedGameValidator {
         boolean hasSuccess = rules.outcomes().stream().anyMatch(o -> o.resultClass() == ResultClass.SUCCESS);
         boolean hasOther = rules.outcomes().stream().anyMatch(o -> o.resultClass() != ResultClass.SUCCESS);
         Set<String> labels = new HashSet<>();
-        if (rules.outcomes().size() < 2 || rules.outcomes().size() > 8 || !hasSuccess || !hasOther
+        if (rules.outcomes().size() < 2 || rules.outcomes().size() > 8 || !hasSuccess || catalog.runContract().kind()==RunContractKind.FULL_GAME && !hasOther
                 || rules.outcomes().stream().anyMatch(o -> o.labelKey() == null || !used.contains(o.id())
                     || !labels.add(o.labelKey()))) {
             error(context, "PACK_RESULT_OUTCOME_INVALID", "Full-game outcomes need unique labels, complete ending coverage, and distinct result classes");

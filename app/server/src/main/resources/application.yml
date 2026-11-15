@@ -70,6 +70,9 @@ capybee:
   game:
     web-client-enabled: ${CAPYBEE_GAME_WEB_CLIENT_ENABLED:false}
     enabled: ${CAPYBEE_GAME_ENABLED:false}
+    pack-preparation:
+      enabled: ${CAPYBEE_GAME_PACK_PREPARATION_ENABLED:false}
+      provider-approved: ${CAPYBEE_GAME_PACK_PROVIDER_APPROVED:false}
     generation-enabled: ${CAPYBEE_GAME_GENERATION_ENABLED:false}
     dynamic:
       enabled: ${CAPYBEE_GAME_DYNAMIC_ENABLED:false}

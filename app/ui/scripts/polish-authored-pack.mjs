@@ -9,7 +9,7 @@ export async function checkPolishPack({page,context,base,requests}) {
   if(await another.count())await another.click();
   const pack=page.getByRole('button',{name:/CapyBee — Nowy ul, dwa światła/});
   assert.ok((await pack.innerText()).includes(locale==='en'?'Story language: Polish':'Język historii: polski'));
-  await pack.click();assert.equal(await page.getByRole('checkbox',{name:/Use AI narration|Użyj narracji AI/}).count(),0);
+  await pack.click();assert.equal(await page.getByRole('checkbox',{name:/Use AI narration|Użyj narracji AI/}).count(),1);
   await page.getByRole('button',{name:locale==='en'?'Review':'Sprawdź',exact:true}).click();
   const before=requests.length;
   await page.getByRole('button',{name:locale==='en'?'Start adventure':'Rozpocznij przygodę',exact:true}).click();
@@ -17,13 +17,13 @@ export async function checkPolishPack({page,context,base,requests}) {
   await game.getByText(locale==='en'?'Story language: Polish':'Język historii: polski',{exact:true}).waitFor();
   const starts=requests.slice(before).filter(r=>r.url.endsWith('/api/game/runs'));assert.equal(starts.length,1);
   assert.equal(starts[0].body.packId,'capybee-new-hive');assert.equal(starts[0].body.locale,'pl');assert.equal(starts[0].body.generated,false);
-  assert.deepEqual(starts[0].body.startInputs,{});
+  assert.deepEqual(starts[0].body.startInputs,{'story-tone':'cozy',interests:'',mood:''});
  };
  const ending=async outcome=>{
   await game.getByRole('button',{name:/Start another adventure|Rozpocznij inną przygodę/}).waitFor();
   const runId=requests.filter(r=>r.url.endsWith('/api/game/runs')&&r.body.packId==='capybee-new-hive').at(-1).body.id;
   const run=await (await context.request.get(`${base}/api/game/runs/${runId}`)).json();
-  assert.equal(run.status,'ENDED');assert.equal(run.endReason,'COMPLETED');assert.equal(run.view.outcome,outcome);assert.equal(run.packVersion,'1.0.0');
+  assert.equal(run.status,'ENDED');assert.equal(run.endReason,'COMPLETED');assert.equal(run.view.outcome,outcome);assert.equal(run.packVersion,'1.1.0');
  };
  await start();await choose('Continue');
  await game.getByText('Places',{exact:true}).click();assert.equal(await game.locator('.game-place-list li').count(),7);

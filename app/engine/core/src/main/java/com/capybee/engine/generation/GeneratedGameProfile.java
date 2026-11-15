@@ -4,7 +4,7 @@ public record GeneratedGameProfile(Kind kind, int contractVersion, List<PhasePro
         int reachableStoryScenes, int endings, int minimumStoryTransitions,
         int maximumStoryTransitions, int minimumRequiredProviderCalls) {
     public GeneratedGameProfile { phases = List.copyOf(phases); }
-    public enum Kind { CONTENT_ONLY, FULL_GAME }
+    public enum Kind { CONTENT_ONLY, FULL_GAME, AUTHORED_GRAPH }
     public static GeneratedGameProfile contentOnly() {
         return new GeneratedGameProfile(Kind.CONTENT_ONLY, 0, List.of(), 0, 0, 0, 0, 0);
     }

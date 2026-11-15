@@ -1,0 +1,468 @@
+{
+  "schemaVersion": 1,
+  "scenes": [
+    {
+      "id": "arrival",
+      "blocks": [
+        {
+          "kind": "NARRATION",
+          "text": "Nowy ul, dwa światła. CapyBee rozkłada planszę plastra miodu. Możesz tęsknić za dawnym domem i zauważyć coś nowego. Oba miejsca mogą być ważne. To baśniowa wyprawa: jej zwierzęcy towarzysze mieszkają w tej historii."
+        }
+      ],
+      "start": true,
+      "next": "board"
+    },
+    {
+      "id": "board",
+      "blocks": [
+        {
+          "kind": "NARRATION",
+          "text": "Na Polanie Nowego Ula wybierasz następny przystanek. Każde spotkanie jest dobrowolne. Możesz wracać, obejrzeć planszę albo zakończyć wyprawę odpoczynkiem."
+        }
+      ],
+      "options": [
+        {
+          "id": "visit-lantern",
+          "label": "Zaglądam do Latarni Wspomnień",
+          "next": "lantern",
+          "effects": [
+            {
+              "type": "GO_TO",
+              "place": "old-lantern"
+            }
+          ]
+        },
+        {
+          "id": "meet-mela",
+          "label": "Odwiedzam Melę na Cichej Łące",
+          "next": "mela",
+          "effects": [
+            {
+              "type": "GO_TO",
+              "place": "quiet-meadow"
+            }
+          ]
+        },
+        {
+          "id": "meet-borys",
+          "label": "Odwiedzam Borysa nad trzciną",
+          "next": "borys",
+          "effects": [
+            {
+              "type": "GO_TO",
+              "place": "reed-bank"
+            }
+          ]
+        },
+        {
+          "id": "meet-luna",
+          "label": "Odwiedzam Lunę pod wierzbą",
+          "next": "luna",
+          "effects": [
+            {
+              "type": "GO_TO",
+              "place": "willow-glen"
+            }
+          ]
+        },
+        {
+          "id": "visit-workshop",
+          "label": "Idę do Warsztatu Plastra",
+          "next": "workshop",
+          "effects": [
+            {
+              "type": "GO_TO",
+              "place": "hive-workshop"
+            }
+          ]
+        },
+        {
+          "id": "rest-now",
+          "label": "Na dziś wybieram odpoczynek",
+          "next": "ending-rest",
+          "effects": [
+            {
+              "type": "GO_TO",
+              "place": "hive-square"
+            }
+          ]
+        }
+      ],
+      "onEnter": [
+        {
+          "type": "GO_TO",
+          "place": "hive-square"
+        }
+      ]
+    },
+    {
+      "id": "lantern",
+      "blocks": [
+        {
+          "kind": "NARRATION",
+          "text": "W Latarni Wspomnień pali się ciepłe światło. Może przypominać zapach kuchni, piosenkę albo zwykły wieczór w dawnym domu. Nie musisz opowiadać nikomu, jakie to wspomnienie. CapyBee zostawia obok mały lampion na drogę."
+        }
+      ],
+      "options": [
+        {
+          "id": "carry-light",
+          "label": "Zabieram światło wspomnienia na drogę",
+          "next": "memory-light",
+          "effects": [
+            {
+              "type": "FLAG_SET",
+              "flag": "remembered-home",
+              "value": true
+            }
+          ]
+        },
+        {
+          "id": "back-to-board",
+          "label": "Wracam na polanę",
+          "next": "board",
+          "effects": [
+            {
+              "type": "GO_TO",
+              "place": "hive-square"
+            }
+          ]
+        },
+        {
+          "id": "rest-now",
+          "label": "Na dziś wybieram odpoczynek",
+          "next": "ending-rest",
+          "effects": [
+            {
+              "type": "GO_TO",
+              "place": "hive-square"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "memory-light",
+      "blocks": [
+        {
+          "kind": "NARRATION",
+          "text": "Mały lampion świeci spokojnie. Dawny dom nie musi zniknąć, żeby obok niego znalazło się miejsce na nowe doświadczenia. Wspomnienie może towarzyszyć ci dalej."
+        }
+      ],
+      "next": "board"
+    },
+    {
+      "id": "mela",
+      "blocks": [
+        {
+          "kind": "NARRATION",
+          "text": "Mela to cierpliwa pszczoła. Potrzebuje chwili ciszy, żeby wybrać spokojny kierunek lotu. „Możesz posiedzieć obok albo pójść dalej. Obie drogi są w porządku” — mówi.",
+          "refs": [
+            "actor:mela-bee"
+          ]
+        }
+      ],
+      "options": [
+        {
+          "id": "help-mela",
+          "label": "Siadam na chwilę i słucham Meli",
+          "next": "mela-thanks",
+          "effects": [
+            {
+              "type": "FLAG_SET",
+              "flag": "mela-joined",
+              "value": true
+            }
+          ]
+        },
+        {
+          "id": "wave-mela",
+          "label": "Macham na pożegnanie i idę dalej",
+          "next": "board",
+          "effects": [
+            {
+              "type": "GO_TO",
+              "place": "hive-square"
+            }
+          ]
+        },
+        {
+          "id": "rest-now",
+          "label": "Na dziś wybieram odpoczynek",
+          "next": "ending-rest",
+          "effects": [
+            {
+              "type": "GO_TO",
+              "place": "hive-square"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mela-thanks",
+      "blocks": [
+        {
+          "kind": "NARRATION",
+          "text": "Przez chwilę słuchacie szelestu kwiatów. Mela wybiera kierunek i proponuje wspólny kawałek baśniowej drogi. To współpraca w tej historii.",
+          "refs": [
+            "actor:mela-bee"
+          ]
+        }
+      ],
+      "next": "board"
+    },
+    {
+      "id": "borys",
+      "blocks": [
+        {
+          "kind": "NARRATION",
+          "text": "Borys to pomysłowy bóbr. Potrzebuje pomocy w przytrzymaniu trzciny, kiedy wiąże poręcz. „Możemy zrobić mały kawałek razem, jeśli masz ochotę” — proponuje.",
+          "refs": [
+            "actor:borys-beaver"
+          ]
+        }
+      ],
+      "options": [
+        {
+          "id": "help-borys",
+          "label": "Przytrzymuję trzcinę dla Borysa",
+          "next": "borys-thanks",
+          "effects": [
+            {
+              "type": "FLAG_SET",
+              "flag": "borys-joined",
+              "value": true
+            }
+          ]
+        },
+        {
+          "id": "wave-borys",
+          "label": "Macham na pożegnanie i idę dalej",
+          "next": "board",
+          "effects": [
+            {
+              "type": "GO_TO",
+              "place": "hive-square"
+            }
+          ]
+        },
+        {
+          "id": "rest-now",
+          "label": "Na dziś wybieram odpoczynek",
+          "next": "ending-rest",
+          "effects": [
+            {
+              "type": "GO_TO",
+              "place": "hive-square"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "borys-thanks",
+      "blocks": [
+        {
+          "kind": "NARRATION",
+          "text": "Borys spokojnie kończy węzeł. Dziękuje za pomoc i proponuje wspólną baśniową wyprawę. Nikt nie musi pracować szybciej, niż chce.",
+          "refs": [
+            "actor:borys-beaver"
+          ]
+        }
+      ],
+      "next": "board"
+    },
+    {
+      "id": "luna",
+      "blocks": [
+        {
+          "kind": "NARRATION",
+          "text": "Luna to uważna ćma. Potrzebuje czytelnego znaku, żeby znaleźć miejsce odpoczynku przy drodze. „Lubię wiedzieć, gdzie można przysiąść” — mówi spod liścia.",
+          "refs": [
+            "actor:luna-moth"
+          ]
+        }
+      ],
+      "options": [
+        {
+          "id": "help-luna",
+          "label": "Układam z Luną znak z liści",
+          "next": "luna-thanks",
+          "effects": [
+            {
+              "type": "FLAG_SET",
+              "flag": "luna-joined",
+              "value": true
+            }
+          ]
+        },
+        {
+          "id": "wave-luna",
+          "label": "Macham na pożegnanie i idę dalej",
+          "next": "board",
+          "effects": [
+            {
+              "type": "GO_TO",
+              "place": "hive-square"
+            }
+          ]
+        },
+        {
+          "id": "rest-now",
+          "label": "Na dziś wybieram odpoczynek",
+          "next": "ending-rest",
+          "effects": [
+            {
+              "type": "GO_TO",
+              "place": "hive-square"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "luna-thanks",
+      "blocks": [
+        {
+          "kind": "NARRATION",
+          "text": "Układacie liście w prosty znak. Luna pokazuje zatoczkę, w której można odpocząć, i dołącza do baśniowej wyprawy. Miejsce na przerwę pozostaje dostępne.",
+          "refs": [
+            "actor:luna-moth"
+          ]
+        }
+      ],
+      "next": "board"
+    },
+    {
+      "id": "workshop",
+      "blocks": [
+        {
+          "kind": "NARRATION",
+          "text": "W Warsztacie Plastra czeka krótka poręcz z trzciny. CapyBee sprawdza węzeł razem z tobą. Pomoc zwierzęcych towarzyszy jest miła, ale wyprawa jest dostępna również bez tych spotkań."
+        }
+      ],
+      "options": [
+        {
+          "id": "tie-rail",
+          "label": "Wiążę poręcz i ruszam do mostku",
+          "next": "crossing",
+          "effects": [
+            {
+              "type": "FLAG_SET",
+              "flag": "rail-ready",
+              "value": true
+            },
+            {
+              "type": "GO_TO",
+              "place": "small-crossing"
+            }
+          ]
+        },
+        {
+          "id": "back-to-board",
+          "label": "Wracam na polanę",
+          "next": "board",
+          "effects": [
+            {
+              "type": "GO_TO",
+              "place": "hive-square"
+            }
+          ]
+        },
+        {
+          "id": "rest-now",
+          "label": "Na dziś wybieram odpoczynek",
+          "next": "ending-rest",
+          "effects": [
+            {
+              "type": "GO_TO",
+              "place": "hive-square"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "crossing",
+      "blocks": [
+        {
+          "kind": "NARRATION",
+          "text": "Przy Mostku Dwóch Świateł widać ścieżkę do nowego zakątka. Jest też miejsce na lampion ze wspomnieniem. Możesz wybrać nowe światło, zabrać oba albo wrócić. Tęsknota nie musi zniknąć przed następnym krokiem."
+        }
+      ],
+      "options": [
+        {
+          "id": "light-new-path",
+          "label": "Zapalam światło przy nowej ścieżce",
+          "next": "ending-new"
+        },
+        {
+          "id": "keep-two-lights",
+          "label": "Zostawiam miejsce na oba światła",
+          "next": "ending-two",
+          "requires": {
+            "type": "FLAG_IS",
+            "flag": "remembered-home",
+            "value": true
+          },
+          "unmetHint": "hint.remember"
+        },
+        {
+          "id": "back-to-board",
+          "label": "Wracam na polanę",
+          "next": "board",
+          "effects": [
+            {
+              "type": "GO_TO",
+              "place": "hive-square"
+            }
+          ]
+        },
+        {
+          "id": "rest-now",
+          "label": "Na dziś wybieram odpoczynek",
+          "next": "ending-rest",
+          "effects": [
+            {
+              "type": "GO_TO",
+              "place": "hive-square"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ending-new",
+      "blocks": [
+        {
+          "kind": "NARRATION",
+          "text": "Nowa ścieżka. Małe światło rozjaśnia tylko najbliższy krok. To wystarczy na tę wyprawę. Wspomnienia dawnego domu nadal mają swoje miejsce.\nJeśli chcesz, po grze możesz podziękować komuś za drobną pomoc. Możesz też zostać przy odpoczynku. Ta propozycja niczego nie zapisuje ani nie zalicza."
+        }
+      ],
+      "end": true,
+      "outcome": "new-path"
+    },
+    {
+      "id": "ending-two",
+      "blocks": [
+        {
+          "kind": "NARRATION",
+          "text": "Dwa światła. Lampion wspomnienia i nowe światełko stoją obok siebie. Nie trzeba wybierać, który dom jest ważniejszy. Wyprawa na dziś jest zakończona.\nJeśli chcesz, po grze możesz posłuchać piosenki, która przypomina ci dawny dom. Możesz też wybrać ciszę i odpoczynek. Ta propozycja niczego nie zapisuje ani nie zalicza."
+        }
+      ],
+      "end": true,
+      "outcome": "two-lights"
+    },
+    {
+      "id": "ending-rest",
+      "blocks": [
+        {
+          "kind": "NARRATION",
+          "text": "Odpoczynek na dziś. CapyBee składa planszę i zostawia latarnię w zasięgu wzroku. Pauza jest pełnoprawnym zakończeniem tej wyprawy. Możesz wrócić innym razem albo pozostać przy tym zakończeniu.\nJeśli chcesz, zrób teraz wygodną przerwę. Nie trzeba wykonywać żadnej Misji ani niczego udowadniać. Ta propozycja niczego nie zapisuje ani nie zalicza."
+        }
+      ],
+      "end": true,
+      "outcome": "rest-here"
+    }
+  ]
+}

@@ -40,6 +40,10 @@ import static com.capybee.engine.session.SessionTypes.*;
 @RequestMapping("/api/game")
 public class GameRunController {
     private final RunSessionService sessions;
+    private final PackPreparationService preparations;
+    private final ReviewedInputGuard inputGuard;
+    private final DynamicStartRateLimiter startLimiter;
+    private final java.util.Set<String> allowedOrigins;
     private final com.capybee.engine.session.SessionPorts.PackCatalog catalog;
     private final java.time.Clock clock;
     private final UserService users;
@@ -50,7 +54,8 @@ public class GameRunController {
     private final long syncWaitMs;
     private final GameCommandRateLimiter commandRateLimiter;
 
-    public GameRunController(RunSessionService sessions, UserService users,
+    public GameRunController(RunSessionService sessions, UserService users, PackPreparationService preparations, DynamicStartRateLimiter startLimiter, ReviewedInputGuard inputGuard,
+                             @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:4173,https://capybee.fly.dev}") String origins,
                              FamilyProfileRepository profiles,
                              @Value("${capybee.game.enabled:false}") boolean enabled,
                              @Value("${capybee.game.generation-enabled:false}") boolean generationEnabled,
@@ -58,7 +63,8 @@ public class GameRunController {
                              @Value("${capybee.game.sync-wait-ms:8000}") long syncWaitMs,
                              GameCommandRateLimiter commandRateLimiter,
                              com.capybee.engine.session.SessionPorts.PackCatalog catalog, java.time.Clock clock) {
-        this.catalog = catalog; this.clock = clock;
+        this.catalog = catalog; this.clock = clock; this.preparations=preparations; this.inputGuard=inputGuard; this.startLimiter=startLimiter;
+        this.allowedOrigins=java.util.Set.copyOf(java.util.Arrays.stream(origins.split(",")).map(String::trim).toList());
         this.sessions = sessions;
         this.users = users;
         this.profiles = profiles;
@@ -74,7 +80,13 @@ public class GameRunController {
                                    @RequestHeader(name = "Accept-Language", required = false) Locale locale) {
         requireEnabled();
         currentOwner(authentication);
-        return sessions.packs(locale);
+        return sessions.packs(locale).stream().map(info -> {
+            var pack=catalog.find(info.id()).orElseThrow();
+            if(pack.generatedGameProfile().filter(profile -> profile.kind()==com.capybee.engine.generation.GeneratedGameProfile.Kind.AUTHORED_GRAPH).isEmpty())return info;
+            var setup=info.setup();
+            return new PackInfoDto(info.id(),info.version(),info.locales(),info.defaultLocale(),info.startInputs(),preparations.enabled(),
+                new com.capybee.engine.session.wire.PackSetupDto(setup.schemaVersion(),setup.metadataLocale(),setup.title(),setup.description(),preparations.enabled(),setup.steps(),setup.inputs(),PackPreparationService.fingerprint(pack)));
+        }).toList();
     }
 
     @PostMapping("/runs")
@@ -86,6 +98,16 @@ public class GameRunController {
             throw new SessionException(ErrorCode.REQUEST_INVALID);
         }
         boolean generated = Boolean.TRUE.equals(body.generated());
+        var selected=catalog.find(body.packId()).orElseThrow(()->new SessionException(ErrorCode.REQUEST_INVALID));
+        if(generated && selected.generatedGameProfile().filter(profile->profile.kind()==com.capybee.engine.generation.GeneratedGameProfile.Kind.AUTHORED_GRAPH).isPresent())
+            throw new SessionException(ErrorCode.REQUEST_INVALID);
+        if(body.startInputs()!=null)body.startInputs().forEach((key,value)->{
+            if(selected.manifest().startInputs().stream().noneMatch(input->input.id().equals(key)&&!(input instanceof com.capybee.engine.pack.StartInputDef.FreeTextInput)))
+                throw new SessionException(ErrorCode.REQUEST_INVALID);
+        });
+        if(selected.manifest().locales().stream().noneMatch(tag->tag.value().equals(body.locale())))throw new SessionException(ErrorCode.REQUEST_INVALID);
+        var validatedInputs=new com.capybee.engine.input.StartInputProcessor().prepare(selected,new com.capybee.engine.pack.LocaleTag(body.locale()),body.startInputs(),inputGuard);
+        if(!validatedInputs.ok())throw new SessionException(ErrorCode.REQUEST_INVALID);
         if (generated) {
             var policy = catalog.find(body.packId()).orElseThrow(() -> new SessionException(ErrorCode.REQUEST_INVALID)).manifest().contentPolicy();
             var child = profiles.findByParentUser_Id(users.getCurrentUser(authentication).getId()).filter(p -> p.isActive());
@@ -97,11 +119,40 @@ public class GameRunController {
         if (generated && !generationEnabled) throw new SessionException(ErrorCode.GENERATION_UNAVAILABLE);
         StartAccepted accepted = sessions.start(owner, new StartRequest(body.id(),
                 new com.capybee.engine.pack.PackId(body.packId()),
-                new com.capybee.engine.pack.LocaleTag(body.locale()), body.startInputs(),
+                new com.capybee.engine.pack.LocaleTag(body.locale()), validatedInputs.persistentValues(),
                 allowSeed ? body.seed() : null, generated), Duration.ofMillis(syncWaitMs));
         return ResponseEntity.status(accepted.status() == RunStatus.ACTIVE ? HttpStatus.OK : HttpStatus.ACCEPTED)
                 .body(new StartResponse(accepted.runId(), accepted.status().name(), accepted.revision(),
                         accepted.retryAfterMs()));
+    }
+
+    @PostMapping(value="/pack-starts", consumes="application/json")
+    public ResponseEntity<?> prepare(OAuth2AuthenticationToken authentication, @RequestHeader("Origin") String origin,
+                                    @RequestBody PackPreparationService.Body body) {
+        requireEnabled(); requireOrigin(origin); var owner=currentOwner(authentication);
+        if(body==null||body.requestId()==null)throw new SessionException(ErrorCode.REQUEST_INVALID);
+        var pack=catalog.find(body.packId()).orElseThrow(()->new SessionException(ErrorCode.REQUEST_INVALID));
+        var policy=pack.manifest().contentPolicy();
+        Integer year=profiles.findByParentUser_Id(users.getCurrentUser(authentication).getId()).filter(p->p.isActive()).map(p->p.getBirthYear()).orElse(null);
+        if(policy.audience()==null||!DynamicGameController.audienceEligible(year,java.time.Year.now(clock).getValue(),policy.audience().minAge(),policy.audience().maxAge()))
+            throw new SessionException(ErrorCode.GENERATION_UNAVAILABLE);
+        if(!preparations.exists(owner,body.requestId()))startLimiter.check(owner);
+        return preparationResponse(owner,preparations.submit(owner,body,Duration.ofMillis(syncWaitMs)));
+    }
+    @GetMapping("/pack-starts/{id}")
+    public ResponseEntity<?> preparationStatus(OAuth2AuthenticationToken authentication,@PathVariable UUID id){
+        requireEnabled();var owner=currentOwner(authentication);return preparationResponse(owner,preparations.status(owner,id));
+    }
+    @DeleteMapping("/pack-starts/{id}")
+    public ResponseEntity<?> cancelPreparation(OAuth2AuthenticationToken authentication,@RequestHeader("Origin") String origin,@PathVariable UUID id){
+        requireEnabled();requireOrigin(origin);var owner=currentOwner(authentication);return preparationResponse(owner,preparations.cancel(owner,id));
+    }
+    private void requireOrigin(String origin){if(!allowedOrigins.contains(origin))throw new SessionException(ErrorCode.REQUEST_INVALID);}
+    private ResponseEntity<?> preparationResponse(OwnerRef owner,PackPreparationService.Result result){
+        var run=result.runId()==null?null:toSummary(sessions.get(owner,result.runId()));
+        var status=result.status().equals("PROCESSING")?HttpStatus.ACCEPTED:result.status().equals("NEEDS_INPUT")?HttpStatus.UNPROCESSABLE_ENTITY:result.status().equals("FAILED")?HttpStatus.SERVICE_UNAVAILABLE:HttpStatus.OK;
+        return ResponseEntity.status(status).cacheControl(org.springframework.http.CacheControl.noStore())
+            .body(new DynamicGameController.OperationDto(result.status(),result.retryAfterMs(),run,result.code()));
     }
 
     @GetMapping("/runs/current")
@@ -123,6 +174,19 @@ public class GameRunController {
         CommandRequest request = commandRequest(body);
         OwnerRef owner = currentOwner(authentication);
         commandRateLimiter.check(owner);
+        if(request.command() instanceof Command.SubmitText text && text.text()!=null){
+            var current=sessions.get(owner,runId);
+            if(current.status()==RunStatus.ACTIVE && current.revision()==request.expectedRevision()){
+                com.capybee.engine.input.InputSafetyDecision decision;
+                try {decision=inputGuard.inspect(new com.capybee.engine.input.PiiScrubber().process(text.text()).input(),
+                    new com.capybee.engine.input.InputPolicy(true,500,280,3,null,java.util.Set.of(),"1"));}
+                catch(RuntimeException invalid){throw new SessionException(ErrorCode.REQUEST_INVALID);}
+                if(decision.action()==com.capybee.engine.input.InputSafetyAction.BLOCK){
+                    var issue=new com.capybee.engine.api.Issue(com.capybee.engine.api.Issue.Severity.ERROR,decision.reasonCode(),"Text input was not accepted");
+                    return ResponseEntity.ok(new CommandOutcomeDto(request.id(),"REJECTED",false,current.revision(),current.revision(),current.status().name(),current.view(),View.CURRENT_VIEW_SCHEMA,List.of(),List.of(issue)));
+                }
+            }
+        }
         CommandOutcome outcome = sessions.command(owner, runId, request,
                 Duration.ofMillis(syncWaitMs));
         if (outcome.outcome() == Outcome.PROCESSING) {

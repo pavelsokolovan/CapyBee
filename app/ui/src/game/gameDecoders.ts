@@ -95,7 +95,7 @@ export function decodeProfile(value: unknown): GeneratorProfile {
 export function decodePack(value:unknown):GamePackInfoDto {
  const v=object(value);text(v.id);text(v.version);strings(v.locales);text(v.defaultLocale);bool(v.generated);array(v.startInputs);
  if(v.setup!=null){
-  const setup=object(v.setup);if(setup.schemaVersion!==1 || setup.transientTextSupported!==false)throw new GameContractError();
+  const setup=object(v.setup);if(setup.schemaVersion!==1 || typeof setup.transientTextSupported!=='boolean' || setup.transientTextSupported && typeof setup.preparationFingerprint!=='string')throw new GameContractError();
   text(setup.title);if(setup.description!=null)text(setup.description);text(setup.metadataLocale);
   for(const item of array(setup.steps)){const x=object(item);text(x.id);text(x.title);strings(x.inputIds);}
   for(const item of array(setup.inputs)){const x=object(item);text(x.id);text(x.label);text(x.help);member(x.kind,['ENUM','ENUM_SET','FREE_TEXT']);bool(x.required);integer(x.maxItems);strings(x.defaults);
