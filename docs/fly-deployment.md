@@ -38,8 +38,20 @@ runtime secrets, including:
 Manage runtime secrets through Fly's dashboard or `fly secrets set --app capybee`.
 They are separate from GitHub's deploy token. Google OAuth must allow the
 production callback `https://capybee.fly.dev/login/oauth2/code/google`.
-Generation and RPG web rollout remain controlled by their existing flags;
-automatic deployment does not enable paid generation.
+The Fly profile enables the Adventures entry and authored Polish Pack
+(`capybee-new-hive`) by default. `CAPYBEE_GAME_ENABLED`,
+`CAPYBEE_GAME_WEB_CLIENT_ENABLED` and `CAPYBEE_GAME_PACK_IDS` remain explicit
+operator overrides. AI generation, dynamic starts, transient AI preparation and
+completion rollout retain their disabled defaults.
+
+The deploy workflow preserves an existing `CAPYBEE_GAME_COMMAND_HMAC_KEY` or
+`APP_SECRET`. If neither exists, it generates and stages a 48-byte random game
+key through Fly secrets management before deployment. The value is never
+committed or printed; later deployments preserve it. Manual deployments must
+configure one of these stable secrets (at least 32 bytes) first. A failed secret
+setup stops deployment rather than starting the game without a key. To hide
+the entry without removing saved runs, set `CAPYBEE_GAME_WEB_CLIENT_ENABLED=false`;
+keep `CAPYBEE_GAME_ENABLED=true` for saved-run API access.
 
 The existing zero-idle-machine policy is preserved: Fly can suspend the app
 when idle and automatically wake it on a request. To intentionally keep one

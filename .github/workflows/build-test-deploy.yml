@@ -160,6 +160,8 @@ jobs:
           ref: ${{ github.sha }}
       - name: Install Fly CLI
         uses: superfly/flyctl-actions/setup-flyctl@98172f70657cb3e15db199af139be99bd3e61200
+      - name: Ensure persistent game signing secret
+        run: python3 scripts/ensure-game-secret.py
       - name: Build and deploy tested revision
         run: >-
           flyctl deploy --remote-only --app capybee --config fly.toml
