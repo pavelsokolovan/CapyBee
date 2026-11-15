@@ -88,11 +88,9 @@ public final class ConsoleApp {
         }
 
         Path packDir = options.packDir().toAbsolutePath().normalize();
-        String packName = packDir.getFileName() == null ? "" : packDir.getFileName().toString();
-        PackId packId = new PackId(packName);
         LoadResult load;
         try {
-            load = new PackLoader(Engine.sectionValidators()).tryLoad(packId, new DirectoryPackSource(packDir));
+            load = new PackLoader(Engine.sectionValidators()).tryLoad(new DirectoryPackSource(packDir));
         } catch (RuntimeException exception) {
             err.println("PACK_SOURCE_INVALID: " + exception.getMessage());
             return 1;
@@ -105,6 +103,7 @@ public final class ConsoleApp {
         }
 
         var pack = load.pack().orElseThrow();
+        PackId packId = pack.manifest().id();
         var suppliedInputs = options.inputs();
         if (options.generated() && pack.generatedGameProfile()
                 .filter(profile -> profile.kind() == com.capybee.engine.generation.GeneratedGameProfile.Kind.FULL_GAME)

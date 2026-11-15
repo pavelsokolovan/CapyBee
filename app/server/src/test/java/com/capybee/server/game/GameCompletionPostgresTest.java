@@ -53,8 +53,8 @@ class GameCompletionPostgresTest {
     @Test void actualPolishEndingsBindBothRetainedVersionsAndGeneratedPresentationEqually() throws Exception {
         var fixture=com.capybee.engine.session.wire.SessionJson.tree(java.nio.file.Files.readString(java.nio.file.Path.of("../engine/fixtures/reference-authored-routes.json"))).path("packs").get(0);
         int accepted=0;
-        for(String mode:List.of("1.0.0","1.1.0","generated")) for(String outcome:List.of("new-path","two-lights","rest-here")) {
-            String root="game-packs/capybee-new-hive"+(mode.equals("1.0.0")?"/retained/1.0.0":"");
+        for(String mode:List.of("1.0.0","1.1.0","1.2.0","generated")) for(String outcome:List.of("new-path","two-lights","rest-here")) {
+            String root="game-packs/capybee-new-hive"+(List.of("1.0.0","1.1.0").contains(mode)?"/retained/"+mode:"");
             var pack=new com.capybee.engine.pack.json.PackLoader(Engine.sectionValidators()).load(new PackId("capybee-new-hive"),new ClasspathPackSource(getClass().getClassLoader(),root));
             var engine=Engine.builder(new PackRegistry(List.of(pack))).clock(Clock.systemUTC()).ids(new com.capybee.engine.adapter.UuidIdSource()).random(com.capybee.engine.adapter.Randoms.seeded(7)).build();
             var run=engine.start(new RunRequest(pack.manifest().id(),new LocaleTag("pl"),Map.of(),7L,mode.equals("generated"))).run();

@@ -23,4 +23,7 @@ record PackRuntimeGameDefinition(Pack pack, LocaleTag locale, SceneSet scenes, R
     @Override public List<StartInputDef> startInputs() { return pack.manifest().startInputs(); }
     @Override public PackRef snapshotPack() { return new PackRef(pack.manifest().id(), pack.manifest().version()); }
     @Override public boolean presentationReady() { return true; }
+    @Override public com.capybee.engine.content.PresentationDefinition presentation() {
+        return com.capybee.engine.content.json.PresentationParser.parse(pack);
+    }
 }

@@ -1,0 +1,20 @@
+{
+  "title": "Mały przystanek",
+  "narration": "Mela to cierpliwa pszczoła. Potrzebuje chwili ciszy, żeby wybrać spokojny kierunek lotu. „Możesz posiedzieć obok albo pójść dalej. Obie drogi są w porządku” — mówi.",
+  "dialogue": [],
+  "choices": [
+    {
+      "id": "help-mela",
+      "label": "Siadam na chwilę i słucham Meli"
+    },
+    {
+      "id": "wave-mela",
+      "label": "Macham na pożegnanie i idę dalej"
+    },
+    {
+      "id": "rest-now",
+      "label": "Na dziś wybieram odpoczynek"
+    }
+  ],
+  "continuityFacts": []
+}

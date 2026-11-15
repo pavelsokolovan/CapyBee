@@ -55,6 +55,7 @@ import java.util.Optional;
 final class RunImpl implements Run {
     private final String id;
     private final RuntimeGameDefinition definition;
+    private final com.capybee.engine.content.PresentationDefinition presentationDefinition;
     private final LocaleTag locale;
     private final long seed;
     private final Map<String, String> startInputs;
@@ -145,6 +146,7 @@ final class RunImpl implements Run {
             GenerationPipeline generationPipeline, DynamicPresentationPipeline dynamicPresentation) {
         this.id = id;
         this.definition = definition;
+        this.presentationDefinition = definition.presentation();
         this.locale = definition.locale();
         this.seed = seed;
         this.startInputs = Map.copyOf(startInputs);
@@ -565,7 +567,7 @@ final class RunImpl implements Run {
         blocks.add(new Block(BlockKind.NARRATION, null, safeReply, List.of()));
         View replyView = new View(blocks, current.options(), current.input(), current.status(), current.ended(),
                 current.endReason(), current.objectives(), current.outcome(), current.places(), current.story(),
-                current.characters(), current.result(), current.canAdvance());
+                current.characters(), current.result(), current.canAdvance(), current.presentation());
         List<Issue> issues = processedReply.changed()
                 ? List.of(new Issue(Issue.Severity.WARNING, "INPUT_REDACTED", "Personal details were removed from the reply"))
                 : List.of();
@@ -644,8 +646,13 @@ final class RunImpl implements Run {
                 }
             }
         }
-        return ViewBuilder.build(scene, ended, endReason, options, status, objectiveItems, outcome,
+        View base = ViewBuilder.build(scene, ended, endReason, options, status, objectiveItems, outcome,
                 buildPlacesView(ended), storyInfo(), discoveredCharacters(), buildRunResult(objectiveItems));
+        var publicPlaces = base.places() == null ? Set.<String>of() : base.places().places().stream()
+                .map(PlaceView::id).collect(java.util.stream.Collectors.toSet());
+        var projection = PresentationProjector.project(presentationDefinition, sceneId, visited, flags, strings,
+                base.characters(), publicPlaces);
+        return base.withPresentation(projection.presentation(), projection.characters());
     }
 
     private RunResult buildRunResult(List<ObjectiveItem> objectiveItems) {

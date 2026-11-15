@@ -136,6 +136,12 @@ Use forward migrations and preserve compatible saved-run reading in rollbacks.
 
 ## Verification
 
+Public view schema 2 can optionally include `presentation-v1` metadata for
+artwork, discovered traits/needs and recruited companions. See the
+[presentation contract](game-presentation-contracts.md). Consumers must use the
+public projection and fixed catalog fallbacks, never private flags or Pack-ID
+lookups. Text-only and older views remain supported.
+
 Use Java 25, PostgreSQL 16, Node and the UI development dependencies. Run the
 repository engine/backend gates and frontend coverage, then the documented
 PowerShell static-sync workflow. For browser acceptance, use:

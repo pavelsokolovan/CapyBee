@@ -54,6 +54,8 @@ class GameMetadataTest {
         assertThat(metadata.metadataLocale()).isEqualTo("pl");assertThat(metadata.steps()).isNotEmpty();
         assertThat(metadata.inputs()).anyMatch(input -> input.kind().equals("ENUM_SET") && input.maxItems() == 2);
         assertThat(controller.capabilities(auth).getBody()).containsEntry("clientEnabled",false).containsEntry("dynamicStartEnabled",true);
+        assertThat(controller.capabilities(auth).getBody()).containsEntry("viewFeatures",List.of("canAdvance","presentation-v1"))
+                .containsEntry("supportedViewSchemas",List.of(1,2));
         assertThatThrownBy(()->controller.profile(auth,"classic-detective",Locale.ENGLISH)).isInstanceOf(com.capybee.engine.session.SessionException.class);
         child.setBirthYear(null);
         assertThat(controller.profiles(auth,Locale.ENGLISH).getBody()).isEmpty();

@@ -1,0 +1,74 @@
+{
+  "packVersion": "1.2.0",
+  "indexedResourceSha256": "fcc77f64ad4ea557f4f142c7f3ce904f1774af26aab22323ff65ae8c1498560c",
+  "assetIds": 20,
+  "characters": 4,
+  "sceneBindings": 15,
+  "placeBindings": 7,
+  "catalogVersion": 1,
+  "packagedCompatibility": {
+    "1.0.0": {
+      "serverIndexedResourcesMatched": 5,
+      "cliIndexedResourcesMatched": 5,
+      "freshProcessResumedRoutes": [
+        "new-path-without-companions",
+        "two-lights-with-companions-and-revisits",
+        "rest-without-encounters",
+        "optional-encounters-can-be-declined"
+      ]
+    },
+    "1.1.0": {
+      "serverIndexedResourcesMatched": 29,
+      "cliIndexedResourcesMatched": 29,
+      "freshProcessResumedRoutes": [
+        "new-path-without-companions",
+        "two-lights-with-companions-and-revisits",
+        "rest-without-encounters",
+        "optional-encounters-can-be-declined"
+      ]
+    },
+    "1.2.0": {
+      "serverIndexedResourcesMatched": 31,
+      "cliIndexedResourcesMatched": 31,
+      "freshProcessResumedRoutes": [
+        "new-path-without-companions",
+        "two-lights-with-companions-and-revisits",
+        "rest-without-encounters",
+        "optional-encounters-can-be-declined"
+      ]
+    }
+  },
+  "developmentArchiveSha256": "e7b0350a634d57cb0639f52604f30941a7f50a0139ca9af062e42dbb8c7d5bbf",
+  "serverJarSha256": "33429b6bba9c20fbed981e09b8f4867fa652982ba4b8454db5a398ef50fad099",
+  "gates": {
+    "frontend": {
+      "files": 20,
+      "tests": 155,
+      "result": "passed"
+    },
+    "standaloneEngine": "clean verify passed",
+    "backend": "verify passed",
+    "springPostgresBrowser": "passed",
+    "staticSync": "both directories match",
+    "packageVerifier": "passed",
+    "providers": "disabled or deterministic test doubles",
+    "core": {
+      "tests": 144,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "session": {
+      "tests": 54,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "cli": {
+      "tests": 52,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  }
+}

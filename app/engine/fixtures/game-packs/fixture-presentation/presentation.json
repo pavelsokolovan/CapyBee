@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "playerAssetId": "character.player",
+  "characters": [
+    {
+      "id": "actor:traveler",
+      "nameKey": "helper.name",
+      "descriptionKey": "helper.description",
+      "traitKey": "helper.trait",
+      "needKey": "helper.need",
+      "assetId": "character.traveler",
+      "sceneIds": [
+        "visitor",
+        "thanks"
+      ],
+      "recruitedFlag": "joined"
+    }
+  ],
+  "scenes": [
+    {
+      "sceneId": "camp",
+      "backdropAssetId": "backdrop.camp"
+    },
+    {
+      "sceneId": "visitor",
+      "backdropAssetId": "backdrop.river"
+    }
+  ],
+  "places": [
+    {
+      "placeId": "camp",
+      "terrainAssetId": "terrain.camp"
+    }
+  ]
+}

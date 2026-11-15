@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "startPlace": "camp",
+  "layout": {
+    "kind": "HEX"
+  },
+  "places": [
+    {
+      "id": "camp",
+      "labelKey": "place.camp",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "river",
+      "labelKey": "place.river",
+      "position": {
+        "x": 1,
+        "y": 0
+      }
+    }
+  ],
+  "links": [
+    {
+      "from": "camp",
+      "to": "river",
+      "bidirectional": true
+    }
+  ]
+}

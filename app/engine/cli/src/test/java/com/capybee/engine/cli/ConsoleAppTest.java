@@ -27,6 +27,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ConsoleAppTest {
+    @Test void explicitRetainedVersionDirectoryUsesManifestIdentity(@org.junit.jupiter.api.io.TempDir Path temporary) throws Exception {
+        Path source = Path.of("../fixtures/game-packs/fixture-minimal"), retained = temporary.resolve("1.0.0");
+        try (var paths = Files.walk(source)) {
+            for (Path file : paths.toList()) {
+                Path target = retained.resolve(source.relativize(file));
+                if (Files.isDirectory(file)) Files.createDirectories(target); else Files.copy(file, target);
+            }
+        }
+        var result = run(new String[]{"play", "--pack-dir", retained.toString(), "--memory", "--offline"}, "");
+        assertThat(result.exitCode).isZero(); assertThat(result.errors).isEmpty();
+    }
     private static final String MINIMAL_PACK = Path.of("..", "fixtures", "game-packs", "fixture-minimal").toString();
     private static final String DUNGEON_PACK = Path.of("..", "fixtures", "game-packs", "fixture-text-dungeon").toString();
     private static final String TEXT_INPUT_PACK = Path.of("..", "fixtures", "game-packs", "fixture-text-input").toString();

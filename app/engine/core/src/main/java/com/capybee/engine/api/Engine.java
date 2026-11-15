@@ -17,7 +17,7 @@ public interface Engine {
 
     static List<SectionValidator> sectionValidators() {
         return List.of(new SceneSectionValidator(), new RulesSectionValidator(), new RuleReferenceValidator(),
-            new PlacesSectionValidator());
+            new PlacesSectionValidator(), new com.capybee.engine.content.json.PresentationParser());
     }
 
     StartResult start(RunRequest request);

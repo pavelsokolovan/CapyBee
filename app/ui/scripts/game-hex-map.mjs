@@ -65,9 +65,15 @@ export async function checkHexMap({page, context, base, requests}) {
  assert.equal(await current.innerText().then(t=>t.includes('Corridor')),true);
  await context.setOffline(false);
  await page.waitForFunction(()=>document.querySelector('.game-run [role=status]')?.textContent==='Saved');
+ // A status notification can precede the accepted map's React commit. Wait
+ // for the destination itself before tearing down the controller on reload.
+ await page.waitForFunction(()=>document.querySelector('.game-place-list [aria-current=location]')?.textContent?.includes('Home by the quiet meadow'));
+ const accepted=await (await context.request.get(base+'/api/game/runs/current')).json();
+ assert.equal(accepted.view.places.currentPlaceId,'cell','offline destination was not saved');
  await page.reload();await page.getByRole('button',{name:'Play',exact:true}).click();
  await page.getByRole('button',{name:/Adventures/}).click();await page.getByRole('button',{name:'Continue',exact:true}).click();
  await game.getByText('Places',{exact:true}).click();
+ await page.waitForFunction(()=>document.querySelector('.game-place-list [aria-current=location]')?.textContent?.includes('Home by the quiet meadow'));
  assert.equal(await current.innerText().then(t=>t.includes('Home by the quiet meadow')),true);
  // A second tab accepts a move without broadcasting; the first tab's stale
  // selection must reconcile, never rebase and execute against the new revision.

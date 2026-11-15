@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 2,
+  "counters": [],
+  "flags": [
+    {
+      "id": "joined",
+      "initial": false
+    }
+  ],
+  "sets": [],
+  "objectives": []
+}

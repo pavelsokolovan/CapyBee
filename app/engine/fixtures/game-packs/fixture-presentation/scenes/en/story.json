@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "scenes": [
+    {
+      "id": "camp",
+      "start": true,
+      "blocks": [
+        {
+          "kind": "NARRATION",
+          "text": "You can rest or visit the river."
+        }
+      ],
+      "options": [
+        {
+          "id": "meet",
+          "label": "Visit",
+          "next": "visitor"
+        },
+        {
+          "id": "rest",
+          "label": "Rest",
+          "next": "ending"
+        }
+      ]
+    },
+    {
+      "id": "visitor",
+      "blocks": [
+        {
+          "kind": "SPEECH",
+          "speaker": "actor:traveler",
+          "text": "May we sit quietly?"
+        }
+      ],
+      "options": [
+        {
+          "id": "help",
+          "label": "Help",
+          "next": "thanks",
+          "effects": [
+            {
+              "type": "FLAG_SET",
+              "flag": "joined",
+              "value": true
+            }
+          ]
+        },
+        {
+          "id": "decline",
+          "label": "Another time",
+          "next": "camp"
+        }
+      ]
+    },
+    {
+      "id": "thanks",
+      "blocks": [
+        {
+          "kind": "NARRATION",
+          "text": "The traveler joins the walk."
+        }
+      ],
+      "next": "camp"
+    },
+    {
+      "id": "ending",
+      "blocks": [
+        {
+          "kind": "NARRATION",
+          "text": "A quiet rest."
+        }
+      ],
+      "end": true
+    }
+  ]
+}

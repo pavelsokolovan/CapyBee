@@ -91,9 +91,10 @@ list. The current implementation boundary is:
 
 - [Intent](intent/03-illustrated-honeycomb-rpg.md) — visual RPG direction and Spec 30 delivery boundaries.
 - [30.1](30.1-visual-design-and-svg-catalog-instruction.md) — fixed SVG catalog, React artwork renderers and development/test gallery.
+- [30.2](30.2-public-presentation-contracts-instruction.md) — optional public artwork, character traits/needs and accepted companion contracts (implemented, Pack 1.2.0).
 
-Specs 30.2–30.7 remain follow-ups described in the intent; 30.1 does not implement
-public presentation contracts, playable encounter entry or recruitment display.
+Specs 30.3–30.7 remain follow-ups described in the intent, covering playable
+encounter entry, illustrated board/party/scene UI, generation and visual release.
 
 ### Roadmap reconciliation
 

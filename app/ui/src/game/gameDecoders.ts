@@ -1,4 +1,5 @@
 import type { GameRunSummaryDto, GameSource, GameView, DynamicOperation, GameCapabilities, GeneratorProfile, GamePackInfoDto } from './gameApi';
+import {decodePresentation} from './presentationDecoder';
 export class GameContractError extends Error { constructor() { super('GAME_CONTRACT_UNSUPPORTED'); } }
 type ObjectValue = Record<string, unknown>;
 export function object(value: unknown): ObjectValue {
@@ -43,15 +44,20 @@ export function decodeView(value: unknown, schema: unknown): GameView {
     for(const item of array(p.places)){const x=object(item);text(x.id);text(x.label);if(x.description!=null)text(x.description);}
     for(const item of array(p.links)){const x=object(item);text(x.from);text(x.to);bool(x.bidirectional);}
   }
+  const decoded = {...v};
+  if (schema === 1) delete decoded.presentation;
+  else if (Object.hasOwn(v, 'presentation')) decoded.presentation = decodePresentation(v.presentation,
+    new Set(array(v.characters).map(item => text(object(item).id))),
+    new Set(v.places == null ? [] : array(object(v.places).places).map(item => text(object(item).id))));
   // Coordinates are optional presentation hints; malformed hints use the list.
   if(v.places != null) {
     const p=object(v.places);
-    return {...v, places:{...p, places:array(p.places).map(item=>{
+    return {...decoded, places:{...p, places:array(p.places).map(item=>{
       const place=object(item);
       return {...place, x:Number.isSafeInteger(place.x)?place.x:null, y:Number.isSafeInteger(place.y)?place.y:null};
     })}} as unknown as GameView;
   }
-  return v as unknown as GameView;
+  return decoded as unknown as GameView;
 }
 export function decodeSummary(value: unknown): GameRunSummaryDto {
   const v=object(value); text(v.runId);member(v.status,statuses);integer(v.revision);text(v.locale);text(v.updatedAt);

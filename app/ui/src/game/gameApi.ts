@@ -1,4 +1,13 @@
+import type {CharacterId, BackdropId, TerrainId, Expression} from '../assets/game/catalog';
 export type GameRunStatus = 'PREPARING' | 'ACTIVE' | 'ENDED' | 'FAILED' | 'SUSPENDED' | 'CANCELLING' | 'CANCELLED';
+
+/** Decoded, optional enrichment; unknown artwork has already resolved to a local fallback. */
+export interface GamePresentation {
+  schemaVersion: 1; catalogVersion: number; playerAssetId: CharacterId | null; backdropAssetId: BackdropId | null;
+  places: Array<{placeId: string; terrainAssetId: TerrainId}>;
+  characters: Array<{id: string; assetId: CharacterId; trait: string | null; need: string | null; expression: Expression; recruited: boolean}>;
+  party: string[];
+}
 
 export interface GameIssueDto {
   severity: 'ERROR' | 'WARNING' | 'INFO';
@@ -7,6 +16,7 @@ export interface GameIssueDto {
 }
 
 export interface GameViewV1 {
+  presentation?: null;
   blocks: Array<{ kind: string; actorId?: string | null; text: string; tags: string[] }>;
   options: Array<{ id: string; label: string; enabled: boolean; hint?: string | null }>;
   input?: { mode: string; maxChars: number; prompt?: string | null } | null;
@@ -20,6 +30,7 @@ export interface GameViewV1 {
 }
 
 export interface GameViewV2 {
+  presentation?: GamePresentation | null;
   blocks: Array<{ kind: string; speaker?: string | null; text: string; refs: string[] }>;
   options: Array<{ id: string; label: string; enabled: boolean; hint?: string | null }>;
   input?: { mode: string; maxChars: number; prompt?: string | null } | null;

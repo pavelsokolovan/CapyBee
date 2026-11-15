@@ -1,0 +1,533 @@
+{
+  "schemaVersion": 2,
+  "supportedLocales": [
+    "pl"
+  ],
+  "defaultLocale": "pl",
+  "stages": [
+    {
+      "stage": "THEME",
+      "templateId": "hive-theme-v1",
+      "dependencies": [],
+      "fallbackResource": "generation/fallbacks/pl/theme.json"
+    },
+    {
+      "stage": "SCENARIO",
+      "templateId": "hive-plan-v1",
+      "dependencies": [
+        "THEME"
+      ],
+      "fallbackResource": "generation/fallbacks/pl/scenario.json"
+    },
+    {
+      "stage": "QUEST",
+      "templateId": "hive-quests-v1",
+      "dependencies": [
+        "SCENARIO"
+      ],
+      "fallbackResource": "generation/fallbacks/pl/quest.json"
+    },
+    {
+      "stage": "CAST",
+      "templateId": "hive-cast-v1",
+      "dependencies": [
+        "SCENARIO"
+      ],
+      "fallbackResource": "generation/fallbacks/pl/cast.json"
+    },
+    {
+      "stage": "SCENE",
+      "templateId": "hive-scene-v1",
+      "dependencies": [
+        "THEME",
+        "SCENARIO",
+        "QUEST",
+        "CAST"
+      ],
+      "fallbackResource": "generation/fallbacks/pl/arrival.json"
+    }
+  ],
+  "sceneSlots": [
+    {
+      "slotId": "arrival-slot",
+      "sceneId": "arrival",
+      "templateId": "hive-scene-v1",
+      "fallbackResource": "generation/fallbacks/pl/arrival.json",
+      "choiceIds": [],
+      "phaseId": "opening",
+      "storyRole": "arrival",
+      "actorSlots": [
+        "hive-guide"
+      ],
+      "objectiveIds": [
+        "prepare-rail",
+        "carry-memory",
+        "listen-mela",
+        "help-borys",
+        "mark-luna-rest"
+      ],
+      "toneTags": [
+        "warm",
+        "reflective"
+      ],
+      "generationTiming": "ON_ENTRY"
+    },
+    {
+      "slotId": "board-slot",
+      "sceneId": "board",
+      "templateId": "hive-scene-v1",
+      "fallbackResource": "generation/fallbacks/pl/board.json",
+      "choiceIds": [
+        "visit-lantern",
+        "meet-mela",
+        "meet-borys",
+        "meet-luna",
+        "visit-workshop",
+        "rest-now"
+      ],
+      "phaseId": "development",
+      "storyRole": "exploration",
+      "actorSlots": [
+        "hive-guide"
+      ],
+      "objectiveIds": [
+        "prepare-rail",
+        "carry-memory",
+        "listen-mela",
+        "help-borys",
+        "mark-luna-rest"
+      ],
+      "toneTags": [
+        "warm",
+        "reflective"
+      ],
+      "generationTiming": "ON_ENTRY"
+    },
+    {
+      "slotId": "lantern-slot",
+      "sceneId": "lantern",
+      "templateId": "hive-scene-v1",
+      "fallbackResource": "generation/fallbacks/pl/lantern.json",
+      "choiceIds": [
+        "carry-light",
+        "back-to-board",
+        "rest-now"
+      ],
+      "phaseId": "development",
+      "storyRole": "exploration",
+      "actorSlots": [
+        "hive-guide"
+      ],
+      "objectiveIds": [
+        "prepare-rail",
+        "carry-memory",
+        "listen-mela",
+        "help-borys",
+        "mark-luna-rest"
+      ],
+      "toneTags": [
+        "warm",
+        "reflective"
+      ],
+      "generationTiming": "ON_ENTRY"
+    },
+    {
+      "slotId": "memory-light-slot",
+      "sceneId": "memory-light",
+      "templateId": "hive-scene-v1",
+      "fallbackResource": "generation/fallbacks/pl/memory-light.json",
+      "choiceIds": [],
+      "phaseId": "development",
+      "storyRole": "exploration",
+      "actorSlots": [
+        "hive-guide"
+      ],
+      "objectiveIds": [
+        "prepare-rail",
+        "carry-memory",
+        "listen-mela",
+        "help-borys",
+        "mark-luna-rest"
+      ],
+      "toneTags": [
+        "warm",
+        "reflective"
+      ],
+      "generationTiming": "ON_ENTRY"
+    },
+    {
+      "slotId": "mela-slot",
+      "sceneId": "mela",
+      "templateId": "hive-scene-v1",
+      "fallbackResource": "generation/fallbacks/pl/mela.json",
+      "choiceIds": [
+        "help-mela",
+        "wave-mela",
+        "rest-now"
+      ],
+      "phaseId": "development",
+      "storyRole": "encounter",
+      "actorSlots": [
+        "hive-guide",
+        "mela-bee"
+      ],
+      "objectiveIds": [
+        "prepare-rail",
+        "carry-memory",
+        "listen-mela",
+        "help-borys",
+        "mark-luna-rest"
+      ],
+      "toneTags": [
+        "warm",
+        "reflective"
+      ],
+      "generationTiming": "ON_ENTRY"
+    },
+    {
+      "slotId": "mela-thanks-slot",
+      "sceneId": "mela-thanks",
+      "templateId": "hive-scene-v1",
+      "fallbackResource": "generation/fallbacks/pl/mela-thanks.json",
+      "choiceIds": [],
+      "phaseId": "development",
+      "storyRole": "cooperation",
+      "actorSlots": [
+        "hive-guide",
+        "mela-bee"
+      ],
+      "objectiveIds": [
+        "prepare-rail",
+        "carry-memory",
+        "listen-mela",
+        "help-borys",
+        "mark-luna-rest"
+      ],
+      "toneTags": [
+        "warm",
+        "reflective"
+      ],
+      "generationTiming": "ON_ENTRY"
+    },
+    {
+      "slotId": "borys-slot",
+      "sceneId": "borys",
+      "templateId": "hive-scene-v1",
+      "fallbackResource": "generation/fallbacks/pl/borys.json",
+      "choiceIds": [
+        "help-borys",
+        "wave-borys",
+        "rest-now"
+      ],
+      "phaseId": "development",
+      "storyRole": "encounter",
+      "actorSlots": [
+        "hive-guide",
+        "borys-beaver"
+      ],
+      "objectiveIds": [
+        "prepare-rail",
+        "carry-memory",
+        "listen-mela",
+        "help-borys",
+        "mark-luna-rest"
+      ],
+      "toneTags": [
+        "warm",
+        "reflective"
+      ],
+      "generationTiming": "ON_ENTRY"
+    },
+    {
+      "slotId": "borys-thanks-slot",
+      "sceneId": "borys-thanks",
+      "templateId": "hive-scene-v1",
+      "fallbackResource": "generation/fallbacks/pl/borys-thanks.json",
+      "choiceIds": [],
+      "phaseId": "development",
+      "storyRole": "cooperation",
+      "actorSlots": [
+        "hive-guide",
+        "borys-beaver"
+      ],
+      "objectiveIds": [
+        "prepare-rail",
+        "carry-memory",
+        "listen-mela",
+        "help-borys",
+        "mark-luna-rest"
+      ],
+      "toneTags": [
+        "warm",
+        "reflective"
+      ],
+      "generationTiming": "ON_ENTRY"
+    },
+    {
+      "slotId": "luna-slot",
+      "sceneId": "luna",
+      "templateId": "hive-scene-v1",
+      "fallbackResource": "generation/fallbacks/pl/luna.json",
+      "choiceIds": [
+        "help-luna",
+        "wave-luna",
+        "rest-now"
+      ],
+      "phaseId": "development",
+      "storyRole": "encounter",
+      "actorSlots": [
+        "hive-guide",
+        "luna-moth"
+      ],
+      "objectiveIds": [
+        "prepare-rail",
+        "carry-memory",
+        "listen-mela",
+        "help-borys",
+        "mark-luna-rest"
+      ],
+      "toneTags": [
+        "warm",
+        "reflective"
+      ],
+      "generationTiming": "ON_ENTRY"
+    },
+    {
+      "slotId": "luna-thanks-slot",
+      "sceneId": "luna-thanks",
+      "templateId": "hive-scene-v1",
+      "fallbackResource": "generation/fallbacks/pl/luna-thanks.json",
+      "choiceIds": [],
+      "phaseId": "development",
+      "storyRole": "cooperation",
+      "actorSlots": [
+        "hive-guide",
+        "luna-moth"
+      ],
+      "objectiveIds": [
+        "prepare-rail",
+        "carry-memory",
+        "listen-mela",
+        "help-borys",
+        "mark-luna-rest"
+      ],
+      "toneTags": [
+        "warm",
+        "reflective"
+      ],
+      "generationTiming": "ON_ENTRY"
+    },
+    {
+      "slotId": "workshop-slot",
+      "sceneId": "workshop",
+      "templateId": "hive-scene-v1",
+      "fallbackResource": "generation/fallbacks/pl/workshop.json",
+      "choiceIds": [
+        "tie-rail",
+        "back-to-board",
+        "rest-now"
+      ],
+      "phaseId": "challenge",
+      "storyRole": "preparation",
+      "actorSlots": [
+        "hive-guide"
+      ],
+      "objectiveIds": [
+        "prepare-rail",
+        "carry-memory",
+        "listen-mela",
+        "help-borys",
+        "mark-luna-rest"
+      ],
+      "toneTags": [
+        "warm",
+        "reflective"
+      ],
+      "generationTiming": "ON_ENTRY"
+    },
+    {
+      "slotId": "crossing-slot",
+      "sceneId": "crossing",
+      "templateId": "hive-scene-v1",
+      "fallbackResource": "generation/fallbacks/pl/crossing.json",
+      "choiceIds": [
+        "light-new-path",
+        "keep-two-lights",
+        "back-to-board",
+        "rest-now"
+      ],
+      "phaseId": "resolution",
+      "storyRole": "resolution",
+      "actorSlots": [
+        "hive-guide"
+      ],
+      "objectiveIds": [
+        "prepare-rail",
+        "carry-memory",
+        "listen-mela",
+        "help-borys",
+        "mark-luna-rest"
+      ],
+      "toneTags": [
+        "warm",
+        "reflective"
+      ],
+      "generationTiming": "ON_ENTRY"
+    },
+    {
+      "slotId": "ending-new-slot",
+      "sceneId": "ending-new",
+      "templateId": "hive-scene-v1",
+      "fallbackResource": "generation/fallbacks/pl/ending-new.json",
+      "choiceIds": [],
+      "phaseId": "ending",
+      "storyRole": "ending",
+      "actorSlots": [
+        "hive-guide"
+      ],
+      "objectiveIds": [
+        "prepare-rail",
+        "carry-memory",
+        "listen-mela",
+        "help-borys",
+        "mark-luna-rest"
+      ],
+      "toneTags": [
+        "warm",
+        "reflective"
+      ],
+      "generationTiming": "ON_ENTRY"
+    },
+    {
+      "slotId": "ending-two-slot",
+      "sceneId": "ending-two",
+      "templateId": "hive-scene-v1",
+      "fallbackResource": "generation/fallbacks/pl/ending-two.json",
+      "choiceIds": [],
+      "phaseId": "ending",
+      "storyRole": "ending",
+      "actorSlots": [
+        "hive-guide"
+      ],
+      "objectiveIds": [
+        "prepare-rail",
+        "carry-memory",
+        "listen-mela",
+        "help-borys",
+        "mark-luna-rest"
+      ],
+      "toneTags": [
+        "warm",
+        "reflective"
+      ],
+      "generationTiming": "ON_ENTRY"
+    },
+    {
+      "slotId": "ending-rest-slot",
+      "sceneId": "ending-rest",
+      "templateId": "hive-scene-v1",
+      "fallbackResource": "generation/fallbacks/pl/ending-rest.json",
+      "choiceIds": [],
+      "phaseId": "ending",
+      "storyRole": "ending",
+      "actorSlots": [
+        "hive-guide"
+      ],
+      "objectiveIds": [
+        "prepare-rail",
+        "carry-memory",
+        "listen-mela",
+        "help-borys",
+        "mark-luna-rest"
+      ],
+      "toneTags": [
+        "warm",
+        "reflective"
+      ],
+      "generationTiming": "ON_ENTRY"
+    }
+  ],
+  "limits": {
+    "totalCallsPerRun": 20,
+    "callsPerStage": 2,
+    "maxOutputTokens": 1500,
+    "maxInputCharacters": 24000,
+    "repairAttempts": 1
+  },
+  "runContract": {
+    "kind": "AUTHORED_GRAPH",
+    "contractVersion": 1,
+    "setupResource": "generation/setup.json",
+    "qualityResources": {
+      "pl": "generation/quality/pl.json"
+    },
+    "phases": [
+      {
+        "id": "opening",
+        "kind": "OPENING",
+        "sceneIds": [
+          "arrival"
+        ]
+      },
+      {
+        "id": "development",
+        "kind": "DEVELOPMENT",
+        "sceneIds": [
+          "board",
+          "lantern",
+          "memory-light",
+          "mela",
+          "mela-thanks",
+          "borys",
+          "borys-thanks",
+          "luna",
+          "luna-thanks"
+        ]
+      },
+      {
+        "id": "challenge",
+        "kind": "CHALLENGE",
+        "sceneIds": [
+          "workshop"
+        ]
+      },
+      {
+        "id": "resolution",
+        "kind": "RESOLUTION",
+        "sceneIds": [
+          "crossing"
+        ]
+      },
+      {
+        "id": "ending",
+        "kind": "ENDING",
+        "sceneIds": [
+          "ending-new",
+          "ending-two",
+          "ending-rest"
+        ]
+      }
+    ],
+    "utilitySceneIds": [],
+    "length": {
+      "minimumStoryTransitions": 0,
+      "maximumStoryTransitions": 0
+    },
+    "completion": {
+      "endings": [
+        {
+          "sceneId": "ending-new",
+          "outcomeId": "new-path"
+        },
+        {
+          "sceneId": "ending-two",
+          "outcomeId": "two-lights"
+        },
+        {
+          "sceneId": "ending-rest",
+          "outcomeId": "rest-here"
+        }
+      ]
+    }
+  }
+}

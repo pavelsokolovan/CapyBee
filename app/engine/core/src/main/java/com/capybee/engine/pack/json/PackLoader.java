@@ -25,6 +25,29 @@ public final class PackLoader {
         this.sectionValidators = List.copyOf(sectionValidators);
     }
 
+    /** Explicit directory/file sources may use a version directory rather than an ID-named folder. */
+    public LoadResult tryLoad(PackSource source) {
+        Objects.requireNonNull(source);
+        var context = new PackValidationContext();
+        var raw = source.read("pack.json");
+        if (raw.isEmpty()) {
+            context.error("PACK_MANIFEST_MISSING", "pack.json", "", "Manifest is missing");
+            return result(null, context);
+        }
+        if (bytes(raw.get()) > PackLayout.MAX_FILE_BYTES) {
+            context.error("PACK_TOO_LARGE", "pack.json", "", "File exceeds size limit");
+            return result(null, context);
+        }
+        var root = JsonDocuments.parse(stripBom(raw.get(), "pack.json", context), "pack.json", context);
+        if (context.hasErrors()) return result(null, context);
+        var id = root == null || !root.isObject() ? null : root.get("id");
+        if (id == null || !id.isString() || !PackId.isValid(id.asString())) {
+            context.error("PACK_FIELD_INVALID", "pack.json", "/id", "Expected pack id");
+            return result(null, context);
+        }
+        return tryLoad(new PackId(id.asString()), source);
+    }
+
     public LoadResult tryLoad(PackId expectedId, PackSource source) {
         Objects.requireNonNull(expectedId);
         Objects.requireNonNull(source);

@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture-presentation",
+  "version": "1.0.0",
+  "name": "Fixture presentation",
+  "locales": [
+    "en"
+  ],
+  "defaultLocale": "en",
+  "features": [
+    "ASSETS",
+    "PLACES"
+  ],
+  "startInputs": [],
+  "contentPolicy": {
+    "freeTextAllowed": false
+  },
+  "files": [
+    "strings/en.json",
+    "scenes/en/story.json",
+    "rules.json",
+    "places.json",
+    "presentation.json",
+    "assets/catalog.json"
+  ]
+}

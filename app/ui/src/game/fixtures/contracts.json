@@ -30,7 +30,8 @@
       "story": null,
       "characters": [],
       "result": null,
-      "canAdvance": false
+      "canAdvance": false,
+      "presentation": null
     },
     "updatedAt": "2026-10-16T20:11:03Z"
   },
@@ -65,7 +66,8 @@
       "story": null,
       "characters": [],
       "result": null,
-      "canAdvance": false
+      "canAdvance": false,
+      "presentation": null
     },
     "updatedAt": "2026-10-16T20:11:03Z"
   },
@@ -151,7 +153,8 @@
         "story": null,
         "characters": [],
         "result": null,
-        "canAdvance": false
+        "canAdvance": false,
+        "presentation": null
       },
       "updatedAt": "2026-10-16T20:11:03Z"
     },
@@ -190,7 +193,8 @@
       "story": null,
       "characters": [],
       "result": null,
-      "canAdvance": false
+      "canAdvance": false,
+      "presentation": null
     },
     "viewSchema": 2,
     "events": [],

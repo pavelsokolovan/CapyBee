@@ -24,6 +24,8 @@ interface RuntimeGameDefinition {
     PackRef snapshotPack();
     boolean presentationReady();
 
+    default com.capybee.engine.content.PresentationDefinition presentation() { return null; }
+
     default SnapshotCapability snapshotCapability() {
         return SnapshotCapability.SUPPORTED;
     }

@@ -6,8 +6,20 @@ import java.util.List;
 
 public record View(List<Block> blocks, List<Option> options, InputSpec input, List<StatusItem> status,
                    boolean ended, EndReason endReason, List<ObjectiveItem> objectives, String outcome,
-                   PlacesView places, StoryInfo story, List<CharacterItem> characters, RunResult result, Boolean canAdvance) {
+                   PlacesView places, StoryInfo story, List<CharacterItem> characters, RunResult result, Boolean canAdvance,
+                   PresentationView presentation) {
     public static final int CURRENT_VIEW_SCHEMA = 2;
+
+    public View(List<Block> blocks, List<Option> options, InputSpec input, List<StatusItem> status,
+                boolean ended, EndReason endReason, List<ObjectiveItem> objectives, String outcome,
+                PlacesView places, StoryInfo story, List<CharacterItem> characters, RunResult result, Boolean canAdvance) {
+        this(blocks, options, input, status, ended, endReason, objectives, outcome, places, story, characters, result, canAdvance, null);
+    }
+
+    View withPresentation(PresentationView presentation, List<CharacterItem> characters) {
+        return new View(blocks, options, input, status, ended, endReason, objectives, outcome, places, story,
+                characters, result, canAdvance, presentation);
+    }
 
     public View(List<Block> blocks, List<Option> options, InputSpec input, List<StatusItem> status,
                 boolean ended, EndReason endReason, List<ObjectiveItem> objectives, String outcome,

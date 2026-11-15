@@ -1,0 +1,8 @@
+{
+  "place.camp": "Camp",
+  "place.river": "River",
+  "helper.name": "Traveler",
+  "helper.description": "A traveler resting beside the river.",
+  "helper.trait": "Patient",
+  "helper.need": "Needs a quiet place."
+}

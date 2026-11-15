@@ -13,6 +13,27 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SessionJsonTest {
+    @Test void sharedPresentationGoldenIsAValidPublicSummary() throws IOException {
+        try (var input = getClass().getResourceAsStream("/wire/run-presentation.json")) {
+            var summary = SessionJson.decode(new String(input.readAllBytes(), StandardCharsets.UTF_8), RunSummaryDto.class);
+            assertThat(summary.view().presentation().party()).containsExactly(summary.view().characters().getFirst().id());
+            assertThat(SessionJson.decode(SessionJson.encode(summary), RunSummaryDto.class)).isEqualTo(summary);
+        }
+    }
+    @Test void optionalPublicPresentationSurvivesSummaryAndEveryCommandEnvelope() {
+        var p = new com.capybee.engine.api.PresentationView(1, 1, "character.player", "backdrop.camp",
+                List.of(new com.capybee.engine.api.PresentationView.PlaceArt("camp", "terrain.camp")),
+                List.of(new com.capybee.engine.api.PresentationView.CharacterArt("actor:traveler", "character.traveler", "Patient", "A quiet place", "neutral", true)), List.of("actor:traveler"));
+        var view = new com.capybee.engine.api.View(List.of(), List.of(), null, List.of(), false, null, List.of(), null, null, null,
+                List.of(new com.capybee.engine.api.CharacterItem("actor:traveler", "traveler", "Traveler", "A visitor", true)), null, false, p);
+        var summary = new RunSummaryDto(UUID.randomUUID().toString(), "ACTIVE", 2, "fixture-presentation", "1.0.0", "en", null, null, 2, view, Instant.EPOCH);
+        assertThat(SessionJson.decode(SessionJson.encode(summary), RunSummaryDto.class)).isEqualTo(summary);
+        for (String outcome : List.of("APPLIED", "REPLAYED", "REJECTED")) {
+            var command = new CommandOutcomeDto(UUID.randomUUID(), outcome, !outcome.equals("REJECTED"), 2, 2, "ACTIVE", view, 2, List.of(), List.of());
+            assertThat(SessionJson.decode(SessionJson.encode(command), CommandOutcomeDto.class)).isEqualTo(command);
+        }
+        assertThat(SessionJson.encode(view)).doesNotContain("recruitedFlag", "sceneIds", "nameKey", "assetKinds");
+    }
     @Test
     void goldenRunSummaryRoundTrips() throws IOException {
         String golden;

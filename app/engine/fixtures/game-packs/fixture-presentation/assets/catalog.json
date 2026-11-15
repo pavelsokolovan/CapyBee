@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": 1,
+  "assets": [
+    {
+      "id": "character.traveler",
+      "kind": "CHARACTER"
+    },
+    {
+      "id": "character.player",
+      "kind": "CHARACTER"
+    },
+    {
+      "id": "terrain.camp",
+      "kind": "TERRAIN"
+    },
+    {
+      "id": "backdrop.camp",
+      "kind": "BACKDROP"
+    },
+    {
+      "id": "backdrop.river",
+      "kind": "BACKDROP"
+    }
+  ]
+}

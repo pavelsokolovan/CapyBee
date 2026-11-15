@@ -1,0 +1,54 @@
+{
+  "runId": "5f2fc4c8-bfc4-4b2f-8fd6-04fd187d687e",
+  "status": "ACTIVE",
+  "revision": 4,
+  "packId": "fixture-presentation",
+  "packVersion": "1.0.0",
+  "locale": "en",
+  "endReason": null,
+  "failureCode": null,
+  "viewSchema": 2,
+  "view": {
+    "blocks": [],
+    "options": [],
+    "input": null,
+    "status": [],
+    "ended": false,
+    "endReason": null,
+    "objectives": [],
+    "outcome": null,
+    "places": null,
+    "story": null,
+    "characters": [
+      {
+        "id": "actor:traveler",
+        "slotId": "traveler",
+        "name": "Traveler",
+        "description": "A visitor",
+        "inCurrentScene": true
+      }
+    ],
+    "canAdvance": false,
+    "presentation": {
+      "schemaVersion": 1,
+      "catalogVersion": 1,
+      "playerAssetId": "character.player",
+      "backdropAssetId": "backdrop.camp",
+      "places": [],
+      "characters": [
+        {
+          "id": "actor:traveler",
+          "assetId": "character.traveler",
+          "trait": "Patient",
+          "need": "A quiet place",
+          "expression": "neutral",
+          "recruited": true
+        }
+      ],
+      "party": [
+        "actor:traveler"
+      ]
+    }
+  },
+  "updatedAt": "2026-10-16T20:11:03Z"
+}

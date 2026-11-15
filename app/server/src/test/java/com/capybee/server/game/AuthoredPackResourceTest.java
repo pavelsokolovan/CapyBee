@@ -21,7 +21,12 @@ class AuthoredPackResourceTest {
         assertThat(packaged.manifest().features()).doesNotContain(PackFeature.GENERATION);
         var configuration=new GameSessionConfiguration();assertThat(configuration.gamePackRegistry("").all()).isEmpty();
         var registry=configuration.gamePackRegistry(id.value());assertThat(registry.all()).hasSize(1);
-        assertThat(registry.find(id).orElseThrow().manifest().version().toString()).isEqualTo("1.1.0");
+        assertThat(registry.find(id).orElseThrow().manifest().version().toString()).isEqualTo("1.2.0");
+        var retained=registry.find(id,new PackVersion(1,1,0)).orElseThrow();
+        var previous=loader.load(id,new DirectoryPackSource(Path.of("../engine/reference-game-pack-versions",id.value(),"1.1.0")));
+        assertThat(retained.files()).isEqualTo(previous.files()); assertThat(retained.manifest()).isEqualTo(previous.manifest());
+        var latest=loader.load(id,new DirectoryPackSource(Path.of("../engine/reference-game-pack-versions",id.value(),"1.2.0")));
+        assertThat(registry.find(id).orElseThrow().files()).isEqualTo(latest.files());
         assertThat(registry.find(id,new PackVersion(1,0,0))).contains(packaged);
     }
 }

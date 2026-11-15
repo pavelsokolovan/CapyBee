@@ -1,0 +1,135 @@
+{
+  "title": "Nowy ul, dwa światła",
+  "premise": "Wybierz dobrowolne przystanki na planszy plastra miodu.",
+  "setting": "Baśniowa polana, latarnia i mały mostek.",
+  "themes": [
+    "warm",
+    "reflective"
+  ],
+  "storyPromises": [
+    "Odwiedź znajome i nowe zakątki.",
+    "Wybierz współpracę lub odpoczynek."
+  ],
+  "phases": [
+    {
+      "phaseId": "opening",
+      "goal": "Rozejrzyj się przy nowym ulu.",
+      "development": "Ścieżka pachnie lipą, a przewodnik zostawia ci czas na decyzję.",
+      "transition": "Wejście prowadzi ku polanie lub miejscu na przerwę.",
+      "actorSlots": [
+        "hive-guide"
+      ],
+      "objectiveIds": [
+        "prepare-rail",
+        "carry-memory",
+        "listen-mela",
+        "help-borys",
+        "mark-luna-rest"
+      ],
+      "toneTags": [
+        "warm",
+        "reflective"
+      ],
+      "storyRoles": [
+        "arrival"
+      ]
+    },
+    {
+      "phaseId": "development",
+      "goal": "Poznaj dobrowolne przystanki na polanie.",
+      "development": "Mela, Borys i Luna mają własne drobne sprawy; latarnia przechowuje wspomnienie.",
+      "transition": "Po spotkaniu możesz wrócić na planszę i wybrać kolejny zakątek.",
+      "actorSlots": [
+        "hive-guide",
+        "mela-bee",
+        "borys-beaver",
+        "luna-moth"
+      ],
+      "objectiveIds": [
+        "prepare-rail",
+        "carry-memory",
+        "listen-mela",
+        "help-borys",
+        "mark-luna-rest"
+      ],
+      "toneTags": [
+        "warm",
+        "reflective"
+      ],
+      "storyRoles": [
+        "exploration",
+        "encounter",
+        "cooperation"
+      ]
+    },
+    {
+      "phaseId": "challenge",
+      "goal": "Przygotuj poręcz w Warsztacie Plastra.",
+      "development": "Miękka wstążka i stabilna trzcina wystarczą do spokojnej pracy.",
+      "transition": "Gotowy uchwyt otwiera drogę do mostku, ale odpoczynek nadal jest możliwy.",
+      "actorSlots": [
+        "hive-guide"
+      ],
+      "objectiveIds": [
+        "prepare-rail",
+        "carry-memory",
+        "listen-mela",
+        "help-borys",
+        "mark-luna-rest"
+      ],
+      "toneTags": [
+        "warm",
+        "reflective"
+      ],
+      "storyRoles": [
+        "preparation"
+      ]
+    },
+    {
+      "phaseId": "resolution",
+      "goal": "Zatrzymaj się przy Mostku Dwóch Świateł.",
+      "development": "Na drugim brzegu widać miejsce dla nowych znajomości i dawnego domu.",
+      "transition": "Wybór lampki określi zakończenie tej wyprawy.",
+      "actorSlots": [
+        "hive-guide"
+      ],
+      "objectiveIds": [
+        "prepare-rail",
+        "carry-memory",
+        "listen-mela",
+        "help-borys",
+        "mark-luna-rest"
+      ],
+      "toneTags": [
+        "warm",
+        "reflective"
+      ],
+      "storyRoles": [
+        "resolution"
+      ]
+    },
+    {
+      "phaseId": "ending",
+      "goal": "Nazwij swój dzisiejszy krok.",
+      "development": "Nowa ścieżka, dwa światła i odpoczynek są równie dobrymi rozwiązaniami.",
+      "transition": "Możesz zamknąć baśń i wrócić do niej innym razem.",
+      "actorSlots": [
+        "hive-guide"
+      ],
+      "objectiveIds": [
+        "prepare-rail",
+        "carry-memory",
+        "listen-mela",
+        "help-borys",
+        "mark-luna-rest"
+      ],
+      "toneTags": [
+        "warm",
+        "reflective"
+      ],
+      "storyRoles": [
+        "ending"
+      ]
+    }
+  ]
+}
