@@ -87,6 +87,14 @@ list. The current implementation boundary is:
 - [29.4](29.4-rpg-missions-and-daily-cell-integration-instruction.md) - Missions and Daily Game-cell Integration (host bridge implemented; Polish bindings pending)
 - [29.5](29.5-capybee-game-release-acceptance-instruction.md) - Polish Game Release Acceptance (draft)
 
+## Illustrated Honeycomb RPG
+
+- [Intent](intent/03-illustrated-honeycomb-rpg.md) — visual RPG direction and Spec 30 delivery boundaries.
+- [30.1](30.1-visual-design-and-svg-catalog-instruction.md) — fixed SVG catalog, React artwork renderers and development/test gallery.
+
+Specs 30.2–30.7 remain follow-ups described in the intent; 30.1 does not implement
+public presentation contracts, playable encounter entry or recruitment display.
+
 ### Roadmap reconciliation
 
 The web host and server-side SDK wiring move from the earlier "spec 29" plan

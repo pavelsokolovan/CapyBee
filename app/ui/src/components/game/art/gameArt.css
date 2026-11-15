@@ -1,0 +1,33 @@
+.game-art {
+  --game-paper: #fffdf7; --game-cream: #fdf6e3; --game-ink: var(--ink, #2e2413);
+  --game-muted: var(--muted, #6c5a3a); --game-honey: var(--accent, #f2b233);
+  --game-focus: #765321; --game-sage: #a8bea0; --game-water: #b5d5d8;
+  --game-lilac: #c9bed9; --game-earth: #c79a70;
+  color: var(--game-ink); background: var(--game-paper); line-height: 1.5;
+}
+.game-art svg, .game-tile-art > svg { display: block; width: 100%; height: auto; }
+.game-art button, .game-art select { min-width: 44px; min-height: 44px; padding: 10px 14px;
+  border: 2px solid var(--game-muted); border-radius: 12px; background: var(--game-cream);
+  color: var(--game-ink); font: inherit; white-space: normal; overflow-wrap: anywhere;
+  max-width: 100%; transform: none; transition: none; cursor: pointer; }
+.game-art :is(button, select, a):focus-visible, .game-art .game-focus-sample {
+  outline: 3px solid var(--game-focus); outline-offset: 3px; }
+.game-art button[aria-pressed=true] { border-style: double; border-width: 4px; }
+.game-tile-art { position: relative; display: block; width: 100%; }
+.game-tile-outline { position: absolute; inset: 0; }
+.game-tile-boundary, .game-tile-inset { fill: none; stroke: #6c5a3a; stroke-width: 3; }
+.game-tile-art[data-states~=unavailable] .game-tile-boundary { stroke-dasharray: 6 5; }
+.game-tile-art[data-states~=current] .game-tile-boundary,
+.game-tile-art[data-states~=selected] .game-tile-boundary { stroke: #2e2413; stroke-width: 3; }
+.game-tile-inset { stroke: #2e2413; stroke-width: 2; }
+.game-tile-marker { position: absolute; width: 40%; left: 30%; top: 26%; }
+.game-tile-marker svg { width: 100%; height: auto; }
+.game-tile-visited { position: absolute; bottom: 14%; left: 43%; color: #2e2413; background: #fdf6e3; border-radius: 50%; padding: 0 3px; }
+@media (prefers-reduced-motion: reduce) {
+  .game-art *, .game-art *::before, .game-art *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+@media (forced-colors: active) {
+  .game-art svg[aria-hidden=true], .game-tile-art { visibility: hidden; }
+  .game-art button, .game-art select { border-color: ButtonText; color: ButtonText; background: Canvas; }
+  .game-art :is(button, select, a):focus-visible, .game-art .game-focus-sample { outline-color: Highlight; }
+}

@@ -1,0 +1,33 @@
+{
+  "base": "http://127.0.0.1:46255",
+  "catalogVersion": 1,
+  "combinations": 31,
+  "backdrops": 8,
+  "states": 11,
+  "languages": [
+    "en",
+    "pl"
+  ],
+  "viewport": [
+    1280,
+    360
+  ],
+  "zoom": "200%",
+  "reducedMotion": true,
+  "forcedColors": true,
+  "keyboard": true,
+  "textParity": true,
+  "offlineReload": true,
+  "apiRequests": 0,
+  "externalRequests": 0,
+  "contrast": {
+    "inkCream": 14.128550609894196,
+    "mutedCream": 6.1584502545831,
+    "inkPaper": 14.982840718207177,
+    "mutedPaper": 6.530824129320369,
+    "focusCream": 6.426001152893625,
+    "inkChoice": 11.029834364170913,
+    "borderMeadow": 5.13838064175566,
+    "borderWater": 4.262323508407967
+  }
+}
