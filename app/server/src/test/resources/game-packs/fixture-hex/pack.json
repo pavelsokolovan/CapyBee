@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture-hex",
+  "version": "1.2.0",
+  "name": "Fixture — Hex Places",
+  "locales": [
+    "en"
+  ],
+  "defaultLocale": "en",
+  "features": [
+    "PLACES"
+  ],
+  "startInputs": [],
+  "events": [
+    {
+      "id": "run.completed",
+      "payload": [
+        {
+          "name": "outcome",
+          "type": "STRING"
+        },
+        {
+          "name": "health",
+          "type": "INT"
+        }
+      ]
+    }
+  ],
+  "contentPolicy": {
+    "freeTextAllowed": false
+  },
+  "files": [
+    "strings/en.json",
+    "scenes/en/dungeon.json",
+    "rules.json",
+    "places.json"
+  ]
+}

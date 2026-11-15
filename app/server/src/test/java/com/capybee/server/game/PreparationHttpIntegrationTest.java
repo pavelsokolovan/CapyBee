@@ -90,8 +90,18 @@ class PreparationHttpIntegrationTest {
                     new TextGenerationResult.TokenUsage(1,1,0,0),"preparation-fixture",TextGenerationResult.FinishReason.COMPLETE);
         };
     }
-    static PackRegistry packs(){return new PackRegistry(List.of("fixture-minimal","fixture-text-dungeon","fixture-text-input","fixture-generated").stream().map(id -> new PackLoader(Engine.sectionValidators()).load(
-            new PackId(id),new DirectoryPackSource(Path.of("../engine/fixtures/game-packs/"+id)))).toList());}
+    static PackRegistry packs(){
+        var packs=new java.util.ArrayList<>(List.of("fixture-minimal","fixture-text-dungeon","fixture-text-input","fixture-generated").stream().map(id -> new PackLoader(Engine.sectionValidators()).load(
+                new PackId(id),new DirectoryPackSource(Path.of("../engine/fixtures/game-packs/"+id)))).toList());
+        // Test-only HEX presentation over the same engine mechanics as the dungeon.
+        var base=new DirectoryPackSource(Path.of("../engine/fixtures/game-packs/fixture-text-dungeon"));
+        var overrides=new DirectoryPackSource(Path.of("src/test/resources/game-packs/fixture-hex"));
+        packs.add(new PackLoader(Engine.sectionValidators()).load(new PackId("fixture-hex"),new PackSource(){
+            public Optional<String> read(String path){return overrides.read(path).or(()->base.read(path));}
+            public String describe(){return "fixture-hex";}
+        }));
+        return new PackRegistry(packs);
+    }
     @DynamicPropertySource static void database(DynamicPropertyRegistry properties){
         properties.add("server.port",()->HTTP_PORT);
         properties.add("capybee.game.dynamic.enabled",()->!RESTARTED);

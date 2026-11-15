@@ -41,7 +41,7 @@ it('bounds text by code points without truncation and keeps multiline IME input'
 it('renders informational places but authorizes only availableMoves',async()=>{
  const v=run().view!,submit=vi.fn();v.places={currentPlaceId:'a',places:['a','b','c'].map(id=>({id,label:id,description:'Place',x:null,y:null})),links:[{from:'a',to:'c',bidirectional:true}],availableMoves:['b'],visitedPlaceIds:['a'],layoutKind:'LIST'};
  await act(async()=>root.render(<ScenePanels view={v} locale="en" locked={false} submit={submit}/>));
- const buttons=host.querySelectorAll('button');expect([...buttons].map(b=>b.disabled)).toEqual([true,false,true]);await act(async()=>buttons[1].click());expect(submit).toHaveBeenCalledWith({type:'MOVE',placeId:'b'});
+ const buttons=[...host.querySelectorAll('button')].filter(b=>b.textContent?.startsWith('Go to:'));expect(buttons.map(b=>b.disabled)).toEqual([true,false,true]);await act(async()=>buttons[1].click());expect(submit).toHaveBeenCalledWith({type:'MOVE',placeId:'b'});
 });
 it('reads legacy and supplied endings without creating results or rewards',async()=>{
  const v=run().view!;v.ended=true;v.endReason='ABANDONED';await act(async()=>root.render(<SceneResult view={v} locale="en"/>));expect(host.textContent).toContain('Abandoned');

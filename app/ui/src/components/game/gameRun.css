@@ -10,3 +10,20 @@
 .game-run dialog { max-width: min(28rem, 80vw); overflow-wrap: anywhere; }
 .game-system { border-inline-start: 3px solid #bca67c; padding-inline-start: .75rem; }
 @media (prefers-reduced-motion: reduce) { .game-run *, .game-run *::before, .game-run *::after { animation: none !important; transition: none !important; } }
+.game-places { container-type: inline-size; }
+.game-place-list { list-style: none; padding: 0; margin-block: 1rem; }
+.game-place { position: relative; isolation: isolate; min-width: 0; padding: 1rem; margin-block: .5rem; border: 2px solid #857350; border-radius: .5rem; background: #fff8e5; color: #352a18; }
+.game-place-current { border: 4px double #51401e; }
+.game-place button { display: block; width: 100%; min-width: 44px; margin-block: .4rem; overflow-wrap: anywhere; }
+.game-hex-map { display: grid; gap: .75rem .25rem; align-items: stretch; }
+.game-hex-map .game-place { padding: 1.5rem .5rem; margin: 0; border: 0; background: transparent; }
+.game-hex-map .game-place::before { content: ''; position: absolute; inset: 0; z-index: -1; background: #fff0ba; clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); }
+.game-hex-map .game-place-current::before { background: #efcf77; }
+.game-place-inspection { border-inline-start: 4px solid #857350; padding-inline-start: 1rem; }
+/* A narrow/zoomed board reflows to its semantic list without panning or hiding labels. */
+@container (max-width: 28rem) {
+ .game-hex-map { display: block; }
+ .game-hex-map .game-place { margin-block: .75rem; padding: 1rem; border: 2px solid #857350; background: #fff8e5; }
+ .game-hex-map .game-place-current { border: 4px double #51401e; }
+ .game-hex-map .game-place::before { display: none; }
+}

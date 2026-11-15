@@ -1,0 +1,11 @@
+{
+  "status.health": "Health",
+  "objective.escape": "Escape",
+  "hint.need-key": "You need the key.",
+  "place.cell": "Dom przy spokojnej łące — Home by the quiet meadow",
+  "place.corridor": "Corridor",
+  "place.armory": "ZażółćgęśląjaźńZażółćgęśląjaźńZażółćgęśląjaźńZażółćgęśląjaźńZażółćgęśląjaźńZażółćgęśląjaźńZażółćgęśląjaźńZażółćgęśląjaźńZażółćgęśląjaźńZażółćgęśląjaźńZażółćgęśląjaźńZażółćgęśląjaźń",
+  "place.stairs": "Stairs",
+  "place.exit": "Exit",
+  "place.description": "<img src=x onerror=alert(1)> A public description."
+}

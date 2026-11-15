@@ -40,8 +40,16 @@ export function decodeView(value: unknown, schema: unknown): GameView {
   }
   if(v.places != null) {
     const p=object(v.places); text(p.currentPlaceId);text(p.layoutKind);strings(p.availableMoves);strings(p.visitedPlaceIds);
-    for(const item of array(p.places)){const x=object(item);text(x.id);text(x.label);if(x.description!=null)text(x.description);for(const k of ['x','y'])if(x[k] != null && !Number.isSafeInteger(x[k]))throw new GameContractError();}
+    for(const item of array(p.places)){const x=object(item);text(x.id);text(x.label);if(x.description!=null)text(x.description);}
     for(const item of array(p.links)){const x=object(item);text(x.from);text(x.to);bool(x.bidirectional);}
+  }
+  // Coordinates are optional presentation hints; malformed hints use the list.
+  if(v.places != null) {
+    const p=object(v.places);
+    return {...v, places:{...p, places:array(p.places).map(item=>{
+      const place=object(item);
+      return {...place, x:Number.isSafeInteger(place.x)?place.x:null, y:Number.isSafeInteger(place.y)?place.y:null};
+    })}} as unknown as GameView;
   }
   return v as unknown as GameView;
 }

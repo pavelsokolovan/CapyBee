@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "startPlace": "cell",
+  "layout": {
+    "kind": "HEX"
+  },
+  "places": [
+    {
+      "id": "cell",
+      "labelKey": "place.cell",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "descriptionKey": "place.description"
+    },
+    {
+      "id": "corridor",
+      "labelKey": "place.corridor",
+      "position": {
+        "x": 1,
+        "y": 0
+      },
+      "descriptionKey": "place.description"
+    },
+    {
+      "id": "armory",
+      "labelKey": "place.armory",
+      "position": {
+        "x": 1,
+        "y": -1
+      },
+      "descriptionKey": "place.description"
+    },
+    {
+      "id": "stairs",
+      "labelKey": "place.stairs",
+      "position": {
+        "x": 0,
+        "y": 1
+      },
+      "descriptionKey": "place.description"
+    },
+    {
+      "id": "exit",
+      "labelKey": "place.exit",
+      "position": {
+        "x": 1,
+        "y": 1
+      },
+      "descriptionKey": "place.description"
+    }
+  ],
+  "links": [
+    {
+      "from": "cell",
+      "to": "corridor",
+      "bidirectional": true
+    },
+    {
+      "from": "corridor",
+      "to": "armory",
+      "bidirectional": true
+    },
+    {
+      "from": "corridor",
+      "to": "stairs",
+      "bidirectional": true
+    },
+    {
+      "from": "stairs",
+      "to": "exit",
+      "bidirectional": true
+    }
+  ]
+}

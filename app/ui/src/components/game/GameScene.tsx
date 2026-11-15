@@ -1,6 +1,7 @@
 import {useEffect,useState} from 'react';
 import type {GameView,GameCommand} from '../../game/gameApi';
 import {runCopy} from './runCopy';
+import {GamePlaces} from './GamePlaces';
 type Props={view:GameView;locale:'en'|'pl';locked:boolean;selection?:string;submit:(command:GameCommand)=>void};
 export function SceneBlocks({view,locale}:{view:GameView;locale:'en'|'pl'}) {
  const cast='characters' in view?view.characters:[];
@@ -29,8 +30,7 @@ export function ScenePanels({view,locale,locked,submit}:Props){
  return <aside>{view.objectives.length?<details><summary>{c.objectives}</summary>{view.objectives.map(o=><div key={o.id}><strong>{o.label}</strong><p>{'description' in o?o.description:null}</p><p>{o.state}</p></div>)}</details>:null}
  {cast.length?<details><summary>{c.characters}</summary>{cast.map(x=><div key={x.id}><strong>{x.name}</strong><p>{x.description}</p>{x.inCurrentScene?<p>{c.here}</p>:null}</div>)}</details>:null}
  {view.status.length?<details><summary>{c.status}</summary><dl>{view.status.map(s=><div key={s.id}><dt>{s.label}</dt><dd>{s.value}</dd></div>)}</dl></details>:null}
- {p?.places.length?<details><summary>{c.places}</summary>{p.places.map(place=><div key={place.id}><strong>{place.label}</strong><p>{place.description}</p>{place.id===p.currentPlaceId?<p>{c.current}</p>:p.visitedPlaceIds.includes(place.id)?<p>{c.visited}</p>:null}
- <button type="button" disabled={locked||!p.availableMoves.includes(place.id)} onClick={()=>submit({type:'MOVE',placeId:place.id})}>{c.move}: {place.label}</button></div>)}</details>:null}</aside>;
+ {p?.places.length?<GamePlaces places={p} locale={locale} locked={locked} submit={submit}/>:null}</aside>;
 }
 export function SceneResult({view,locale}:{view:GameView;locale:'en'|'pl'}) {
  const result='result' in view?view.result:null,c=runCopy[locale];

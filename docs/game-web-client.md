@@ -2,8 +2,38 @@
 
 The Play entry uses one renderer and the existing authenticated sync loop for
 Pack and dynamic adventures. The engine owns mechanics, legal commands,
-accepted story text, objectives, places and results. Spec 29 (the CapyBee Polish
-pack, product rewards and graphical map) is not implemented by this client.
+accepted story text, objectives, places and results. The source-neutral place
+map is implemented by Spec 29.3. The CapyBee Polish Pack (29.1) and product
+Mission/reward integration (29.4) remain separate dependencies.
+
+## Public place map
+
+`GamePlaces`, within `ScenePanels`, consumes only `PlacesView`. It renders HEX
+coordinates as an axial arrangement (`column = 2*x + y`, `row = y`), normalized
+to the visible origin. The board accepts at most 24 distinct places, eight
+half-columns and six rows, with safe integer coordinates within ±10000.
+Missing/malformed coordinates, duplicate positions/IDs, unsupported layouts or
+larger spans retain the semantic list. Optional malformed coordinate hints are
+normalized to null at the client decoder; command/state contracts stay strict.
+At container widths of 28rem or less (including zoom), the same list reflows
+vertically. The explicit list toggle is available on wider boards as well.
+
+Current and visited places have text and symbol indicators. Every destination
+has a readable movement hint; only `availableMoves` enables its MOVE button.
+Inspection reads the public description in memory, dispatches nothing and
+returns keyboard focus on Back/Escape. Pending commands leave the accepted
+map visible and disable all movement. Commands use the existing controller,
+revision, owner guard, offline queue and recovery path. The activity honeycomb
+has no connection to this fictional board. Discovered characters and speech
+continue through the shared scene renderer for every source.
+
+The existing Play catalog/preparation/start path renders any installed Pack,
+including the future Polish Pack, without another controller or source-specific
+renderer. This checkout does not contain 29.1's Pack; the test-only HEX variant
+of the dungeon validates this path without pretending to ship Polish content.
+Current dynamic profiles disable places; synthetic dynamic public-view tests
+exercise map parity without changing those profile capabilities or enabling
+generation. See [29.3 acceptance evidence](game-hex-map-acceptance.md).
 
 ## Configuration and audience
 
