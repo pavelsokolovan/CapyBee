@@ -50,6 +50,38 @@ class GameCompletionPostgresTest {
     }
     GameCompletionService.AcceptBody body(long revision) {return new GameCompletionService.AcceptBody(UUID.randomUUID(),revision,1);}
     int projections() {return jdbc.queryForObject("SELECT count(*) FROM game_results WHERE rpg_run_id IS NOT NULL",Integer.class);}
+    @Test void actualPolishEndingsBindBothRetainedVersionsAndGeneratedPresentationEqually() throws Exception {
+        var fixture=com.capybee.engine.session.wire.SessionJson.tree(java.nio.file.Files.readString(java.nio.file.Path.of("../engine/fixtures/reference-authored-routes.json"))).path("packs").get(0);
+        int accepted=0;
+        for(String mode:List.of("1.0.0","1.1.0","generated")) for(String outcome:List.of("new-path","two-lights","rest-here")) {
+            String root="game-packs/capybee-new-hive"+(mode.equals("1.0.0")?"/retained/1.0.0":"");
+            var pack=new com.capybee.engine.pack.json.PackLoader(Engine.sectionValidators()).load(new PackId("capybee-new-hive"),new ClasspathPackSource(getClass().getClassLoader(),root));
+            var engine=Engine.builder(new PackRegistry(List.of(pack))).clock(Clock.systemUTC()).ids(new com.capybee.engine.adapter.UuidIdSource()).random(com.capybee.engine.adapter.Randoms.seeded(7)).build();
+            var run=engine.start(new RunRequest(pack.manifest().id(),new LocaleTag("pl"),Map.of(),7L,mode.equals("generated"))).run();
+            var route=fixture.path("routes").valueStream().filter(item->outcome.equals(item.path("outcome").asString())).findFirst().orElseThrow();
+            for(var command:route.path("commands")) {
+                var action=switch(command.path("type").asString()){case "ADVANCE"->new Command.Advance();case "MOVE"->new Command.Move(command.path("id").asString());default->new Command.Choose(command.path("id").asString());};
+                assertThat(run.apply(action).accepted()).isTrue();
+            }
+            var snapshot=run.snapshot();runId=UUID.fromString(snapshot.runId());long revision=snapshot.step();
+            assertThat(snapshot.state().endReason()).isEqualTo(EndReason.COMPLETED);assertThat(snapshot.state().outcome()).isEqualTo(outcome);
+            jdbc.update("""
+                INSERT INTO game_runs(id,user_id,source_kind,pack_id,pack_version,locale,status,end_reason,revision,snapshot,created_at,updated_at,ended_at)
+                VALUES(?,?,'PACK','capybee-new-hive',?,'pl','ENDED','COMPLETED',?,?::jsonb,?,?,?)
+                """,runId,owner,pack.manifest().version().toString(),revision,SnapshotCodec.toJson(snapshot),java.sql.Timestamp.from(ended.minusSeconds(30)),java.sql.Timestamp.from(ended),java.sql.Timestamp.from(ended));
+            newService(true).ready();var offer=service.get(owner,runId,true);
+            String key=switch(outcome){case "new-path"->"say_thank_you_helper";case "two-lights"->"listen_song_reminds_home";default->"rest";};
+            assertThat(offer.suggestionKey()).isEqualTo(key);assertThat(offer.suggestionVersion()).isEqualTo(1);assertThat(offer.completedAt()).isEqualTo(ended);
+            assertThatThrownBy(()->service.get(UUID.randomUUID(),runId,false)).isInstanceOf(SessionException.class);
+            if(key.equals("rest")) {assertThat(offer.mission()).isNull();assertThatThrownBy(()->service.accept(owner,runId,body(revision),true,true)).isInstanceOf(SessionException.class);}
+            else {assertThat(offer.mission().code()).isEqualTo(key);service.accept(owner,runId,body(revision),true,true);service.accept(owner,runId,body(revision),true,true);}
+            service.accept(owner,runId,body(revision),false,true);service.accept(owner,runId,body(revision),false,true);
+            assertThat(projections()).isEqualTo(++accepted);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM mission_completions",Integer.class)).isZero();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM mission_interactions",Integer.class)).isZero();
+            assertThat(jdbc.queryForObject("SELECT metrics::text FROM game_results WHERE rpg_run_id=?",String.class,runId)).isEqualTo("{}");
+        }
+    }
     @Test void reconstructsAfterInterruptionAndKeepsReadsPure() {
         run("ENDED","COMPLETED","radiant-festival");
         assertThat(service.get(owner,runId,false)).isNull();

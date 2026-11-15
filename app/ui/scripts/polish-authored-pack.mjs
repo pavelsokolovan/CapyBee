@@ -24,6 +24,27 @@ export async function checkPolishPack({page,context,base,requests}) {
   const runId=requests.filter(r=>r.url.endsWith('/api/game/runs')&&r.body.packId==='capybee-new-hive').at(-1).body.id;
   const run=await (await context.request.get(`${base}/api/game/runs/${runId}`)).json();
   assert.equal(run.status,'ENDED');assert.equal(run.endReason,'COMPLETED');assert.equal(run.view.outcome,outcome);assert.equal(run.packVersion,'1.1.0');
+  const panel=game.locator('.game-completion');await panel.waitFor();
+  const completion=await (await context.request.get(`${base}/api/game/runs/${runId}/completion`)).json();
+  const key=outcome==='new-path'?'say_thank_you_helper':outcome==='two-lights'?'listen_song_reminds_home':'rest';
+  assert.equal(completion.suggestionKey,key);assert.equal(completion.suggestionVersion,1);
+  if(key==='rest'){
+   assert.equal(completion.mission,null);assert.equal(await panel.getByRole('button',{name:'Wybierz tę Misję',exact:true}).count(),0);
+   await panel.getByText('Możesz tu odpocząć. Nie ma Misji do przyjęcia.',{exact:true}).waitFor();
+  }else{
+   assert.equal(completion.mission.code,key);
+   if(outcome==='new-path'){
+    const before=requests.length;await context.setOffline(true);await page.evaluate(()=>window.dispatchEvent(new Event('offline')));
+    await panel.getByRole('button',{name:'Choose this Mission',exact:true}).click();await panel.getByText('Waiting for the saved choice',{exact:true}).waitFor();assert.equal(requests.length,before);
+    await context.setOffline(false);await page.evaluate(()=>window.dispatchEvent(new Event('online')));
+    await panel.getByText('Mission chosen. Do it in real life when you are ready; it is not completed yet.',{exact:true}).waitFor();
+    const writes=requests.slice(before).filter(r=>r.url.endsWith('/completion/mission'));assert.equal(writes.length,1);assert.deepEqual(Object.keys(writes[0].body).sort(),['expectedRevision','id','suggestionVersion']);
+    const acknowledged=await (await context.request.get(`${base}/api/game/runs/${runId}/completion`)).json();assert.equal(acknowledged.missionAccepted,true);assert.equal(acknowledged.cellAdded,false);
+   }else{
+    const before=requests.length;await panel.getByRole('button',{name:'Not now',exact:true}).click();assert.equal(requests.length,before);
+   }
+  }
+
  };
  await start();await choose('Continue');
  await game.getByText('Places',{exact:true}).click();assert.equal(await game.locator('.game-place-list li').count(),7);
@@ -52,5 +73,5 @@ export async function checkPolishPack({page,context,base,requests}) {
  await game.evaluate(n=>n.style.zoom='1');await page.screenshot({path:'/tmp/291-polish-rest-360.png'});
  await page.getByRole('button',{name:'Wróć do gier',exact:true}).click();await Promise.all([page.waitForResponse(r=>r.url().endsWith('/api/child-profile')&&r.request().method()==='PATCH'&&r.status()===200),page.locator('.locale-control select').first().selectOption('en')]);
  await page.getByRole('button',{name:'Play',exact:true}).click();await page.getByRole('button',{name:/Adventures/}).click();
- console.log('PASS: packaged Polish authored Pack, three resolutions, optional companions, legal map movement, exact reload, EN/PL language labels and narrow/zoom/reduced motion');
+ console.log('PASS: Polish reviewed ending bindings, offline Mission acceptance, optional dismissal, equally valid rest; packaged Polish authored Pack, three resolutions, optional companions, legal map movement, exact reload, EN/PL language labels and narrow/zoom/reduced motion');
 }

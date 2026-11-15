@@ -27,9 +27,25 @@ Catalog titles/time hints use existing EN/PL localization. No new catalog entry
 or generated title, instruction, reflection, URL or identifier is created.
 The authored Polish Pack from 29.1 now provides reviewed binding proposals in
 [its inventory](../app/engine/reference-game-packs/capybee-new-hive/CONTENT-INVENTORY.md).
-Those proposals do not activate host eligibility; applying its exact
-identities/outcomes to this allowlist remains separate integration work. The HTTP fixture's minimal
-Pack bindings are test-only, not production eligibility.
+The completed Polish binding integration (2026-11-15, after 29.2) allowlists
+`capybee-new-hive` versions **1.0.0 and 1.1.0 only**, with exact ending/outcome
+pairs:
+
+| Ending / authored outcome | Suggestion key/version | Optional step |
+|---|---|---|
+| `ending-new` / `new-path` | `say_thank_you_helper` / 1 | Thank someone for a small help |
+| `ending-two` / `two-lights` | `listen_song_reminds_home` / 1 | Listen to a song that reminds you of home |
+| `ending-rest` / `rest-here` | `rest` / 1 | Neutral rest; no Mission to accept |
+
+Both catalog Missions already have EN/PL translations. Authored and generated
+presentation of 1.1.0 share these bindings; accepted generated prose never
+becomes a Mission identifier. All three endings have equal cell eligibility.
+Unknown versions (including other patch versions), mismatched ending/outcome
+pairs and other sources cannot inherit eligibility. Retained 1.0.0 completions
+can reconcile through the existing server-owned startup/ending path. No new
+DTO, migration, retention field, grant policy or rollout flag is added. Production
+completion rollout remains disabled. The HTTP fixture's minimal Pack bindings
+are test-only, not production eligibility.
 
 ## DTOs and routes
 
@@ -170,3 +186,22 @@ movement and cold offline shell coverage.
 The test host alone enables completion and fixture eligibility. Production
 rollout and Polish Pack acceptance remain work for 29.1/29.5; no live provider
 call, production flag change or deployment is part of this implementation.
+
+## Polish binding verification (2026-11-15)
+
+Implemented after `121bc48` (29.2). Policy tests cover exact retained versions,
+ending/outcome pairs, null/unknown identities and unchanged English bindings.
+PostgreSQL acceptance runs the actual authored routes for all three endings in
+1.0.0, authored 1.1.0 and provider-disabled generated 1.1.0: nine completed runs.
+Each receives the same reviewed offer, owner guards, idempotent acceptance and
+minimal empty-metrics cell projection. Mission completion/interaction tables
+remain empty; the rest alternative cannot be accepted as a Mission.
+
+The full backend reactor verify passes **107 server tests**, including migration,
+restart/reconciliation, deletion, fabricated results, reserved keys and the real
+Spring/PostgreSQL/Chromium suite. Polish browser routes check both catalog codes,
+explicit offline non-text Mission acceptance and acknowledgement, dismissal
+without a write, localized no-Mission rest, separate cell effects and existing
+daily-cap/recovery checks. UI coverage remains **139 passing tests**; workflow
+build/static sync passes. No new migration/DTO and no live provider calls.
+29.5 release acceptance and production rollout remain pending.
