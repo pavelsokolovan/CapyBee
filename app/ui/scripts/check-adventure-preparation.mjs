@@ -1,3 +1,4 @@
+import {checkPolishPack} from './polish-authored-pack.mjs';
 import {checkCompletion} from './game-completion.mjs';
 import {checkHexMap} from './game-hex-map.mjs';
 import {checkRecovery} from './game-recovery.mjs';
@@ -105,6 +106,7 @@ try {
  await page.getByRole('button',{name:/Adventures/}).click();await page.getByRole('button',{name:'Continue',exact:true}).count().then(async count=>{if(count)await page.getByRole('button',{name:'Continue',exact:true}).click();});
  await checkHexMap({page,context,base,requests});
  await checkCompletion({page,context,base,requests});
+ await checkPolishPack({page,context,base,requests});
  await checkRecovery({page,context,base,requests,logs});
  console.log('PASS: Spring-served preparation, private review, 360px/desktop, explicit start, reload/continue, browser Back and storage');
 }catch(error){console.error('Browser acceptance assertion failed; story and request bodies omitted.');console.error('Status:',await page.locator('.game-run [role=status]').textContent({timeout:1000}).catch(()=>null));console.error('Queue metadata:',await page.evaluate(async()=>{const r=indexedDB.open('keyval-store');const db=await new Promise(resolve=>r.onsuccess=()=>resolve(r.result));if(!db.objectStoreNames.contains('keyval'))return [];const values=await new Promise(resolve=>{const r=db.transaction('keyval').objectStore('keyval').getAll();r.onsuccess=()=>resolve(r.result);});db.close();return values.filter(v=>v?.type==='gameCommand').map(v=>({id:v.clientId,poll:v.poll,status:v.status,attempts:v.attempts,notBefore:v.notBefore}));}));throw error;}finally{await browser.close();}

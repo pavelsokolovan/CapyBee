@@ -60,3 +60,12 @@ The final suite includes visual inspection of the desktop HEX map and 360px
 200%-zoom list screenshots. `git diff --check` passes. Generated static/build
 metadata is excluded from the implementation commit, as in the earlier client
 implementation commits.
+
+
+## Authored Polish follow-up
+
+[29.1 acceptance](game-polish-authored-pack-acceptance.md) adds the real
+`capybee-new-hive` 1.0.0 Pack and exercises it through these shared components,
+including map movement, exact reload and all resolutions in EN/PL shells. The
+original evidence above retains its historical fixture/dependency limits.
+Generation and final product release acceptance remain separate.

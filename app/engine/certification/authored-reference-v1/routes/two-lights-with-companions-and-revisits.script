@@ -1,0 +1,20 @@
+
+/move old-lantern
+/move hive-square
+visit-lantern
+carry-light
+
+meet-mela
+help-mela
+
+meet-borys
+help-borys
+
+meet-luna
+help-luna
+
+meet-mela
+wave-mela
+visit-workshop
+tie-rail
+keep-two-lights

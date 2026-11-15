@@ -92,7 +92,7 @@ export function AdventurePreparation({owner,locale,onClose,onRunReady,flow:provi
     {!state.loading&&!state.games.length&&!state.message?<p>{copy.empty}</p>:null}
     {state.games.map(game=><button type="button" className="play-game-row" key={`${game.kind}:${game.kind==='DYNAMIC'?game.profile.id:game.pack.id}`}
       disabled={state.loading||!compatible(game)||!state.caps?.viewFeatures.includes('canAdvance')} onClick={()=>select(game)}>
-      <span><strong>{titleOf(game)||copy.unsupported}</strong><small>{!compatible(game)?copy.unsupported:game.kind==='DYNAMIC'?copy.dynamic:copy.authored}</small></span>
+      <span><strong>{titleOf(game)||copy.unsupported}</strong><small>{!compatible(game)?copy.unsupported:game.kind==='DYNAMIC'?copy.dynamic:copy.authored}</small>{game.kind==='PACK'&&game.pack.locales.length===1?<small>{copy.locale}: {new Intl.DisplayNames([locale],{type:'language'}).of(game.pack.locales[0])}</small>:null}</span>
     </button>)}
     <button type="button" className="secondary-button" onClick={()=>void flow.load()} disabled={state.loading}>{copy.retry}</button>
    </>:null}

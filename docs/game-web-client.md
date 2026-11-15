@@ -4,8 +4,9 @@ The Play entry uses one renderer and the existing authenticated sync loop for
 Pack and dynamic adventures. The engine owns mechanics, legal commands,
 accepted story text, objectives, places and results. The source-neutral place
 map is implemented by Spec 29.3. The host Mission/daily-cell bridge is documented in
-[Spec 29.4 acceptance](game-completion-bridge.md). The CapyBee Polish Pack (29.1)
-remains a separate dependency.
+[Spec 29.4 acceptance](game-completion-bridge.md). The provider-free Polish Pack is
+[implemented in 29.1](game-polish-authored-pack-acceptance.md); optional generation
+and its reviewed host eligibility bindings remain separate work.
 
 ## Public place map
 
@@ -29,12 +30,22 @@ has no connection to this fictional board. Discovered characters and speech
 continue through the shared scene renderer for every source.
 
 The existing Play catalog/preparation/start path renders any installed Pack,
-including the future Polish Pack, without another controller or source-specific
-renderer. This checkout does not contain 29.1's Pack; the test-only HEX variant
-of the dungeon validates this path without pretending to ship Polish content.
+including the authored Polish Pack, without another controller or source-specific
+renderer. The integrated 29.1 suite now exercises that Pack through the same
+map/list and scene boundary; the earlier HEX dungeon fixture remains a separate
+malformed/long-label interaction check.
 Current dynamic profiles disable places; synthetic dynamic public-view tests
 exercise map parity without changing those profile capabilities or enabling
 generation. See [29.3 acceptance evidence](game-hex-map-acceptance.md).
+
+The `capybee-new-hive` 1.0.0 authored resources are embedded under
+`game-packs/capybee-new-hive` by the server build. Development/operator catalog
+allowlisting uses the existing `capybee.game.pack-ids` setting; no production
+flag or provider is enabled by packaging this Pack. The CLI distribution includes
+the same Pack and strict authored route scripts. Keep the existing English Pack
+and its versions for saved runs. See the Pack inventory for proposed optional
+Mission bindings; this authored-content part does not turn those proposals into
+host reward writes.
 
 ## Configuration and audience
 

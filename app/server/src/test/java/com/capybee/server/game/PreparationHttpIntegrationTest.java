@@ -104,6 +104,8 @@ class PreparationHttpIntegrationTest {
     static PackRegistry packs(){
         var packs=new java.util.ArrayList<>(List.of("fixture-minimal","fixture-text-dungeon","fixture-text-input","fixture-generated").stream().map(id -> new PackLoader(Engine.sectionValidators()).load(
                 new PackId(id),new DirectoryPackSource(Path.of("../engine/fixtures/game-packs/"+id)))).toList());
+        packs.add(new PackLoader(Engine.sectionValidators()).load(new PackId("capybee-new-hive"),
+                new ClasspathPackSource(PreparationHttpIntegrationTest.class.getClassLoader(),"game-packs/capybee-new-hive")));
         // Test-only HEX presentation over the same engine mechanics as the dungeon.
         var base=new DirectoryPackSource(Path.of("../engine/fixtures/game-packs/fixture-text-dungeon"));
         var overrides=new DirectoryPackSource(Path.of("src/test/resources/game-packs/fixture-hex"));

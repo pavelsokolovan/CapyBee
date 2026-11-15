@@ -27,8 +27,9 @@ foreach($old in @($archive,"$archive.sha256",(Join-Path $distributionRoot 'candi
 foreach($directory in @('bin','packs','profiles','certification','docs')){New-Item -ItemType Directory -Force (Join-Path $distribution $directory)|Out-Null}
 Copy-Item -LiteralPath $cliJar -Destination (Join-Path $distribution 'bin\engine-cli.jar')
 Copy-Item -LiteralPath (Join-Path $engine 'reference-game-packs\lanterns-of-willow-marsh') -Destination (Join-Path $distribution 'packs') -Recurse
+Copy-Item -LiteralPath (Join-Path $engine 'reference-game-packs\capybee-new-hive') -Destination (Join-Path $distribution 'packs') -Recurse
 Copy-Item -LiteralPath (Join-Path $engine 'generator-profiles\generic-adventure') -Destination (Join-Path $distribution 'profiles') -Recurse
-foreach($suite in @('willow-marsh-v1','dynamic-v1','dynamic-live-v1')){Copy-Item -LiteralPath (Join-Path $engine "certification\$suite") -Destination (Join-Path $distribution 'certification') -Recurse}
+foreach($suite in @('willow-marsh-v1','dynamic-v1','dynamic-live-v1','authored-reference-v1')){Copy-Item -LiteralPath (Join-Path $engine "certification\$suite") -Destination (Join-Path $distribution 'certification') -Recurse}
 Copy-Item -LiteralPath (Join-Path $engine 'CERTIFICATION.md') -Destination (Join-Path $distribution 'docs\CERTIFICATION.md')
 Copy-Item -LiteralPath (Join-Path $engine 'OPERATIONS.md') -Destination (Join-Path $distribution 'docs\OPERATIONS.md')
 Copy-Item -LiteralPath (Join-Path $engine 'LICENSE.txt') -Destination $distribution;Copy-Item -LiteralPath (Join-Path $engine 'NOTICE.txt') -Destination $distribution

@@ -122,6 +122,19 @@
               </resources>
             </configuration>
           </execution>
+          <execution>
+            <id>embed-authored-reference-pack</id>
+            <phase>process-resources</phase>
+            <goals><goal>copy-resources</goal></goals>
+            <configuration>
+              <outputDirectory>${project.build.outputDirectory}/game-packs/capybee-new-hive</outputDirectory>
+              <resources><resource>
+                <directory>${project.basedir}/../engine/reference-game-packs/capybee-new-hive</directory>
+                <filtering>false</filtering>
+                <includes><include>pack.json</include><include>strings/**</include><include>scenes/**</include><include>rules.json</include><include>places.json</include></includes>
+              </resource></resources>
+            </configuration>
+          </execution>
         </executions>
       </plugin>
       <plugin>

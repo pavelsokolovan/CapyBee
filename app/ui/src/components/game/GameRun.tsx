@@ -21,6 +21,7 @@ export function GameRun({run,owner,locale,onAnother,controller:provided}:{run:Ga
  const submit=controller.submit.bind(controller);
  const cancel=()=>{dialog.current?.close();abandon.current?.focus();};
  return <section className="game-run" lang={state.run.locale}><h3 tabIndex={-1} ref={heading}>{view&&'story' in view?view.story?.title??c.scene:c.scene}</h3>
+ <p>{adventureCopy[locale].locale}: {new Intl.DisplayNames([locale],{type:'language'}).of(state.run.locale)}</p>
  {initialized&&state.message==='saved'?<p>{adventureCopy[locale].ready}</p>:null}<p role="status" aria-live="polite">{initialized?c[state.message]:c.checking}</p>{unsupported?<p>{c.unsupported}</p>:null}{state.run.status!=='ACTIVE'&&!ended?<p>{c.unavailable}</p>:null}
  {view?<><SceneBlocks view={view} locale={locale}/>{initialized&&(!locked||state.pending)?<SceneActions key={state.run.revision} view={view} locale={locale} locked={locked} selection={state.selection} submit={submit}/>:null}
  <ScenePanels view={view} locale={locale} locked={locked} submit={submit}/>{ended?<SceneResult view={view} locale={locale}/>:null}</>:null}

@@ -25,8 +25,10 @@ The current allowlist is `lanterns-of-willow-marsh` version `1.0.0`:
 
 Catalog titles/time hints use existing EN/PL localization. No new catalog entry
 or generated title, instruction, reflection, URL or identifier is created.
-The Polish Pack from 29.1 is still absent; its exact identities/outcomes require
-reviewed bindings when that dependency is installed. The HTTP fixture's minimal
+The authored Polish Pack from 29.1 now provides reviewed binding proposals in
+[its inventory](../app/engine/reference-game-packs/capybee-new-hive/CONTENT-INVENTORY.md).
+Those proposals do not activate host eligibility; applying its exact
+identities/outcomes to this allowlist remains separate integration work. The HTTP fixture's minimal
 Pack bindings are test-only, not production eligibility.
 
 ## DTOs and routes

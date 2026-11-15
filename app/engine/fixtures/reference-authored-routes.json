@@ -1,0 +1,205 @@
+{
+  "schemaVersion": 1,
+  "packs": [
+    {
+      "packId": "capybee-new-hive",
+      "version": "1.0.0",
+      "locale": "pl",
+      "resourceFingerprint": "2d3440263967bb1b12b2efc4a938cef2925713930f9a54655a37882c3241d439",
+      "places": 7,
+      "outcomes": [
+        "new-path",
+        "two-lights",
+        "rest-here"
+      ],
+      "rejectedMove": "small-crossing",
+      "stateKeyFields": [
+        "sceneId",
+        "flags",
+        "currentPlaceId"
+      ],
+      "routes": [
+        {
+          "id": "new-path-without-companions",
+          "outcome": "new-path",
+          "commands": [
+            {
+              "type": "ADVANCE"
+            },
+            {
+              "type": "CHOOSE",
+              "id": "visit-workshop"
+            },
+            {
+              "type": "CHOOSE",
+              "id": "tie-rail"
+            },
+            {
+              "type": "CHOOSE",
+              "id": "light-new-path"
+            }
+          ],
+          "expectedFlags": {
+            "rail-ready": true,
+            "mela-joined": false,
+            "borys-joined": false,
+            "luna-joined": false
+          },
+          "requiredText": "Nowa ścieżka."
+        },
+        {
+          "id": "two-lights-with-companions-and-revisits",
+          "outcome": "two-lights",
+          "commands": [
+            {
+              "type": "ADVANCE"
+            },
+            {
+              "type": "MOVE",
+              "id": "old-lantern"
+            },
+            {
+              "type": "MOVE",
+              "id": "hive-square"
+            },
+            {
+              "type": "CHOOSE",
+              "id": "visit-lantern"
+            },
+            {
+              "type": "CHOOSE",
+              "id": "carry-light"
+            },
+            {
+              "type": "ADVANCE"
+            },
+            {
+              "type": "CHOOSE",
+              "id": "meet-mela"
+            },
+            {
+              "type": "CHOOSE",
+              "id": "help-mela"
+            },
+            {
+              "type": "ADVANCE"
+            },
+            {
+              "type": "CHOOSE",
+              "id": "meet-borys"
+            },
+            {
+              "type": "CHOOSE",
+              "id": "help-borys"
+            },
+            {
+              "type": "ADVANCE"
+            },
+            {
+              "type": "CHOOSE",
+              "id": "meet-luna"
+            },
+            {
+              "type": "CHOOSE",
+              "id": "help-luna"
+            },
+            {
+              "type": "ADVANCE"
+            },
+            {
+              "type": "CHOOSE",
+              "id": "meet-mela"
+            },
+            {
+              "type": "CHOOSE",
+              "id": "wave-mela"
+            },
+            {
+              "type": "CHOOSE",
+              "id": "visit-workshop"
+            },
+            {
+              "type": "CHOOSE",
+              "id": "tie-rail"
+            },
+            {
+              "type": "CHOOSE",
+              "id": "keep-two-lights"
+            }
+          ],
+          "expectedFlags": {
+            "remembered-home": true,
+            "rail-ready": true,
+            "mela-joined": true,
+            "borys-joined": true,
+            "luna-joined": true
+          },
+          "requiredText": "Dwa światła."
+        },
+        {
+          "id": "rest-without-encounters",
+          "outcome": "rest-here",
+          "commands": [
+            {
+              "type": "ADVANCE"
+            },
+            {
+              "type": "CHOOSE",
+              "id": "rest-now"
+            }
+          ],
+          "expectedFlags": {
+            "rail-ready": false,
+            "mela-joined": false,
+            "borys-joined": false,
+            "luna-joined": false
+          },
+          "requiredText": "Odpoczynek na dziś."
+        },
+        {
+          "id": "optional-encounters-can-be-declined",
+          "outcome": "rest-here",
+          "commands": [
+            {
+              "type": "ADVANCE"
+            },
+            {
+              "type": "CHOOSE",
+              "id": "meet-mela"
+            },
+            {
+              "type": "CHOOSE",
+              "id": "wave-mela"
+            },
+            {
+              "type": "CHOOSE",
+              "id": "meet-borys"
+            },
+            {
+              "type": "CHOOSE",
+              "id": "wave-borys"
+            },
+            {
+              "type": "CHOOSE",
+              "id": "meet-luna"
+            },
+            {
+              "type": "CHOOSE",
+              "id": "wave-luna"
+            },
+            {
+              "type": "CHOOSE",
+              "id": "rest-now"
+            }
+          ],
+          "expectedFlags": {
+            "mela-joined": false,
+            "borys-joined": false,
+            "luna-joined": false
+          },
+          "requiredText": "Odpoczynek na dziś."
+        }
+      ]
+    }
+  ]
+}

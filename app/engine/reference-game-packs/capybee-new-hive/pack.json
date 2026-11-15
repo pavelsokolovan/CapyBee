@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "capybee-new-hive",
+  "version": "1.0.0",
+  "name": "CapyBee — Nowy ul, dwa światła",
+  "description": "Krótka, spokojna wyprawa po planszy plastra miodu. Historia po polsku, bez generowania AI.",
+  "locales": [
+    "pl"
+  ],
+  "defaultLocale": "pl",
+  "features": [
+    "PLACES"
+  ],
+  "startInputs": [],
+  "contentPolicy": {
+    "freeTextAllowed": false
+  },
+  "files": [
+    "strings/pl.json",
+    "scenes/pl/story.json",
+    "rules.json",
+    "places.json"
+  ]
+}
