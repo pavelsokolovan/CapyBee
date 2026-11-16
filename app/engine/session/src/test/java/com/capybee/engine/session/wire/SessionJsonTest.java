@@ -13,6 +13,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SessionJsonTest {
+    @Test void placeEntryFieldsRoundTripThroughSummariesAndCommandOutcomes() throws IOException {
+        try (var input = getClass().getResourceAsStream("/wire/run-place-entry.json")) {
+            var summary = SessionJson.decode(new String(input.readAllBytes(), StandardCharsets.UTF_8), RunSummaryDto.class);
+            assertThat(summary.view().places().movementHint()).isEqualTo("Choose or pause.");
+            assertThat(summary.view().places().places().get(1).moveBehavior()).isEqualTo("ENTER_SCENE");
+            assertThat(SessionJson.decode(SessionJson.encode(summary), RunSummaryDto.class)).isEqualTo(summary);
+            for (String outcome : List.of("APPLIED", "REPLAYED", "REJECTED")) {
+                var command = new CommandOutcomeDto(UUID.randomUUID(), outcome, !outcome.equals("REJECTED"), 4, 4, "ACTIVE", summary.view(), 2, List.of(), List.of());
+                assertThat(SessionJson.decode(SessionJson.encode(command), CommandOutcomeDto.class)).isEqualTo(command);
+            }
+            assertThat(SessionJson.encode(summary)).doesNotContain("sceneId", "allowedSceneIds", "requires", "unmetHintKey");
+        }
+    }
     @Test void sharedPresentationGoldenIsAValidPublicSummary() throws IOException {
         try (var input = getClass().getResourceAsStream("/wire/run-presentation.json")) {
             var summary = SessionJson.decode(new String(input.readAllBytes(), StandardCharsets.UTF_8), RunSummaryDto.class);

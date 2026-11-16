@@ -52,13 +52,14 @@ export function decodeView(value: unknown, schema: unknown): GameView {
   // Coordinates are optional presentation hints; malformed hints use the list.
   if(v.places != null) {
     const p=object(v.places);
-    return {...decoded, places:{...p, places:array(p.places).map(item=>{
+    return {...decoded, places:{...p, movementHint:optionalHint(p.movementHint), places:array(p.places).map(item=>{
       const place=object(item);
-      return {...place, x:Number.isSafeInteger(place.x)?place.x:null, y:Number.isSafeInteger(place.y)?place.y:null};
+      return {...place, moveBehavior:place.moveBehavior === 'ENTER_SCENE' || place.moveBehavior === 'LOCATION_ONLY' ? place.moveBehavior : null, moveHint:optionalHint(place.moveHint), x:Number.isSafeInteger(place.x)?place.x:null, y:Number.isSafeInteger(place.y)?place.y:null};
     })}} as unknown as GameView;
   }
   return decoded as unknown as GameView;
 }
+function optionalHint(value: unknown) {return typeof value === 'string' && value.trim().length > 0 && value.length <= 2000 ? value : null;}
 export function decodeSummary(value: unknown): GameRunSummaryDto {
   const v=object(value); text(v.runId);member(v.status,statuses);integer(v.revision);text(v.locale);text(v.updatedAt);
   if(v.viewSchema !== 1 && v.viewSchema !== 2) throw new GameContractError();

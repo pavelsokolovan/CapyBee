@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {checkBoardRoute} from './game-honeycomb-board.mjs';
 import {assertCompanionUI,holdCompanionChoice,captureCompanionEvidence} from './game-companions.mjs';
 
 export async function checkPolishPack({page,context,base,requests}) {
@@ -61,7 +62,7 @@ export async function checkPolishPack({page,context,base,requests}) {
   await game.getByRole('button',{name:/Start another adventure|Rozpocznij inną przygodę/}).waitFor();
   const runId=requests.filter(r=>r.url.endsWith('/api/game/runs')&&r.body.packId==='capybee-new-hive').at(-1).body.id;
   const run=await (await context.request.get(`${base}/api/game/runs/${runId}`)).json();
-  assert.equal(run.status,'ENDED');assert.equal(run.endReason,'COMPLETED');assert.equal(run.view.outcome,outcome);assert.equal(run.packVersion,'1.2.0');
+  assert.equal(run.status,'ENDED');assert.equal(run.endReason,'COMPLETED');assert.equal(run.view.outcome,outcome);assert.equal(run.packVersion,'1.3.0');
   await assertCompanionUI({page,game,run});
   const panel=game.locator('.game-completion');await panel.waitFor();
   const completion=await (await context.request.get(`${base}/api/game/runs/${runId}/completion`)).json();
@@ -69,7 +70,7 @@ export async function checkPolishPack({page,context,base,requests}) {
   assert.equal(completion.suggestionKey,key);assert.equal(completion.suggestionVersion,1);
   if(key==='rest'){
    assert.equal(completion.mission,null);assert.equal(await panel.getByRole('button',{name:'Wybierz tę Misję',exact:true}).count(),0);
-   await panel.getByText('Możesz tu odpocząć. Nie ma Misji do przyjęcia.',{exact:true}).waitFor();
+   await panel.getByText(/^(Możesz tu odpocząć\. Nie ma Misji do przyjęcia\.|You can rest here\. There is no Mission to accept\.)$/).waitFor();
   }else{
    assert.equal(completion.mission.code,key);
    if(outcome==='new-path'){
@@ -86,9 +87,12 @@ export async function checkPolishPack({page,context,base,requests}) {
 
  };
  await start();await choose('Continue');
- await game.getByText('Places',{exact:true}).click();assert.equal(await game.locator('.game-place-list li').count(),7);
- assert.equal(await game.getByRole('button',{name:'Go to: Mostek Dwóch Świateł',exact:true}).isDisabled(),true);
- await choose('Go to: Latarnia Wspomnień');await choose('Go to: Polana Nowego Ula');
+ await checkBoardRoute({page,context,base,requests});
+ await choose('Na dziś wybieram odpoczynek');await ending('rest-here');
+ await start();await choose('Continue');
+ assert.equal(await game.locator('.game-board [data-place-id]').count(),7);
+ assert.equal(await game.getByRole('button',{name:'Visit: Mostek Dwóch Świateł',exact:true}).isDisabled(),true);
+ await choose('Visit: Latarnia Wspomnień');await choose('Visit: Polana Nowego Ula');
  const current=await (await context.request.get(base+'/api/game/runs/current')).json(),posts=requests.length;
  assertPublic(current);assert.deepEqual(current.view.presentation.characters.map(c=>c.id),['actor:hive-guide'],'map movement disclosed a future hero');
  await page.reload();await page.getByRole('button',{name:'Play',exact:true}).click();await page.getByRole('button',{name:/Adventures/}).click();

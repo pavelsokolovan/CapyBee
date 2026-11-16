@@ -289,3 +289,20 @@ expressions, commands, URLs, or new rule implementations. Initial publication
 is atomic, and resume needs neither the original profile nor a provider.
 Offline mode never claims a fresh dynamic game; use an explicitly reviewed Pack
 fallback where one is configured.
+
+### Opt-in destination encounters (places schema 2)
+
+Schema-1 `MOVE` remains location-only. Schema 2 requires a place `entry`
+(`sceneId`, optional bounded rule `requires` with localized `unmetHintKey`) and
+map `navigation` (`allowedSceneIds`, localized `unavailableHintKey`). The same
+rule evaluator authorizes both advertised moves and command execution. One
+accepted `MOVE` prepares the target through the existing fallback pipeline,
+then enters it with shared entry effects/objectives and the final location.
+`GO_TO` remains an explicit relocation and never recursively enters a scene.
+
+Public view schema 2 adds optional `moveBehavior`, `moveHint` and
+`movementHint`; binding IDs and conditions stay private. See
+[Spec 30.3](../../docs/specifications/30.3-playable-honeycomb-board-instruction.md).
+Current Polish reference Pack 1.3.0 and strict scripts are under
+`reference-game-pack-versions/` and `certification/honeycomb-board-v1/`.
+The earlier authored route suite targets retained 1.0.0.

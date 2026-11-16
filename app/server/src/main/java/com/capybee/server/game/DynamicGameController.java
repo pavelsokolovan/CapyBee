@@ -183,7 +183,7 @@ public class DynamicGameController {
         return noStore(Map.of("schemaVersion", 1, "clientEnabled", webEnabled, "gameEnabled", gameEnabled,
                 "packStartEnabled", gameEnabled, "packGenerationEnabled", gameEnabled && generationEnabled && ageKnown,
                 "dynamicStartEnabled", dynamic, "supportedViewSchemas", List.of(1, 2),
-                "viewFeatures", List.of("canAdvance", "presentation-v1"), "disclosureRevision", 1, "dynamicCancelMode", "BEST_EFFORT"));
+                "viewFeatures", List.of("canAdvance", "presentation-v1", "place-entry-v1"), "disclosureRevision", 1, "dynamicCancelMode", "BEST_EFFORT"));
     }
 
     private void requireSameOrigin(String origin) {

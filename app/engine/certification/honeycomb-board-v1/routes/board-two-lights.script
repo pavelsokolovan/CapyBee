@@ -1,0 +1,16 @@
+
+/move old-lantern
+carry-light
+
+/move quiet-meadow
+help-mela
+
+/move reed-bank
+help-borys
+
+/move willow-glen
+help-luna
+
+/move hive-workshop
+tie-rail
+keep-two-lights

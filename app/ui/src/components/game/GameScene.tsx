@@ -3,7 +3,7 @@ import type {GameView,GameCommand} from '../../game/gameApi';
 import {runCopy} from './runCopy';
 import {GamePlaces} from './GamePlaces';
 import {GameCharacterHistory} from './GameCharacters';
-type Props={view:GameView;locale:'en'|'pl';locked:boolean;selection?:string;submit:(command:GameCommand)=>void};
+type Props={hidePlaces?:boolean;view:GameView;locale:'en'|'pl';locked:boolean;selection?:string;submit:(command:GameCommand)=>void};
 export function SceneBlocks({view,locale}:{view:GameView;locale:'en'|'pl'}) {
  const cast='characters' in view?view.characters:[];
  return <div>{view.blocks.map((block,i)=>{
@@ -26,12 +26,12 @@ export function SceneActions({view,locale,locked,selection,submit}:Props){
  {view.canAdvance===true?<button type="button" onClick={()=>submit({type:'ADVANCE'})}>{copy.continue}</button>:null}
  </fieldset></div>;
 }
-export function ScenePanels({view,locale,locked,submit}:Props){
+export function ScenePanels({view,locale,locked,submit,hidePlaces=false}:Props){
  const c=runCopy[locale],p=view.places;
  return <aside>{view.objectives.length?<details><summary>{c.objectives}</summary>{view.objectives.map(o=><div key={o.id}><strong>{o.label}</strong><p>{'description' in o?o.description:null}</p><p>{o.state}</p></div>)}</details>:null}
  <GameCharacterHistory view={view} locale={locale}/>
  {view.status.length?<details><summary>{c.status}</summary><dl>{view.status.map(s=><div key={s.id}><dt>{s.label}</dt><dd>{s.value}</dd></div>)}</dl></details>:null}
- {p?.places.length?<GamePlaces places={p} locale={locale} locked={locked} submit={submit}/>:null}</aside>;
+ {!hidePlaces&&p?.places.length?<GamePlaces places={p} locale={locale} locked={locked} submit={submit}/>:null}</aside>;
 }
 export function SceneResult({view,locale}:{view:GameView;locale:'en'|'pl'}) {
  const result='result' in view?view.result:null,c=runCopy[locale];

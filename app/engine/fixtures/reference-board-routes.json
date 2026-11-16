@@ -1,0 +1,119 @@
+{
+  "packId": "capybee-new-hive",
+  "version": "1.3.0",
+  "locale": "pl",
+  "resourceFingerprint": "916198585c1b4e514c8d97c3e0a33971d9f93bdc8d5f906f71efe89c9848eef3",
+  "routes": [
+    {
+      "id": "board-new-path",
+      "outcome": "new-path",
+      "commands": [
+        {
+          "type": "ADVANCE"
+        },
+        {
+          "type": "MOVE",
+          "id": "hive-workshop"
+        },
+        {
+          "type": "CHOOSE",
+          "id": "tie-rail"
+        },
+        {
+          "type": "CHOOSE",
+          "id": "light-new-path"
+        }
+      ]
+    },
+    {
+      "id": "board-two-lights",
+      "outcome": "two-lights",
+      "commands": [
+        {
+          "type": "ADVANCE"
+        },
+        {
+          "type": "MOVE",
+          "id": "old-lantern"
+        },
+        {
+          "type": "CHOOSE",
+          "id": "carry-light"
+        },
+        {
+          "type": "ADVANCE"
+        },
+        {
+          "type": "MOVE",
+          "id": "quiet-meadow"
+        },
+        {
+          "type": "CHOOSE",
+          "id": "help-mela"
+        },
+        {
+          "type": "ADVANCE"
+        },
+        {
+          "type": "MOVE",
+          "id": "reed-bank"
+        },
+        {
+          "type": "CHOOSE",
+          "id": "help-borys"
+        },
+        {
+          "type": "ADVANCE"
+        },
+        {
+          "type": "MOVE",
+          "id": "willow-glen"
+        },
+        {
+          "type": "CHOOSE",
+          "id": "help-luna"
+        },
+        {
+          "type": "ADVANCE"
+        },
+        {
+          "type": "MOVE",
+          "id": "hive-workshop"
+        },
+        {
+          "type": "CHOOSE",
+          "id": "tie-rail"
+        },
+        {
+          "type": "CHOOSE",
+          "id": "keep-two-lights"
+        }
+      ]
+    },
+    {
+      "id": "board-neighbors-rest",
+      "outcome": "rest-here",
+      "commands": [
+        {
+          "type": "ADVANCE"
+        },
+        {
+          "type": "MOVE",
+          "id": "quiet-meadow"
+        },
+        {
+          "type": "MOVE",
+          "id": "reed-bank"
+        },
+        {
+          "type": "CHOOSE",
+          "id": "wave-borys"
+        },
+        {
+          "type": "CHOOSE",
+          "id": "rest-now"
+        }
+      ]
+    }
+  ]
+}

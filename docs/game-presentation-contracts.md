@@ -88,3 +88,17 @@ no discovery from MOVE, replay parity and exact reload through actual HTTP.
 
 See [acceptance evidence](game-presentation-contracts-acceptance.md) for executed
 checks, resource fingerprints, artifact verification and limits.
+
+## Movement and encounter entry
+
+Spec 30.3 keeps view schema 2 and artwork schema 1. Optional public place fields
+`moveBehavior` (`LOCATION_ONLY` or `ENTER_SCENE`) and `moveHint`, plus map-level
+`movementHint`, describe accepted movement behavior without exposing scene
+bindings, allowed scene IDs, rule conditions or flag names. Capabilities include
+`place-entry-v1`. Unknown behavior uses generic move wording; invalid optional
+hints are omitted independently of valid story/actions.
+
+Only `availableMoves` authorizes destination controls. A queued `MOVE` leaves
+the accepted location, encounter, character metadata and party unchanged until
+one accepted server revision arrives. Pack 1.3.0 opts into bound encounters;
+retained Packs keep location-only movement. React does not branch on versions.

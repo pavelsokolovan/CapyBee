@@ -1,0 +1,26 @@
+.game-board { min-width: 0; margin-block: 16px; padding: 8px 0; }
+.game-board h4 { margin-block: 8px; }
+.game-board .game-hex-map { display: grid; position: relative; gap: 16px 2px; }
+.game-board .game-hex-map .game-place { padding: 0 2px 8px; border: 0; background: transparent; }
+.game-board .game-hex-map .game-place::before { display: none; }
+.game-board-art { display: block; width: 100%; max-width: 120px; min-width: 64px; margin: 0 auto 4px; }
+.game-board .game-place strong { display: block; overflow-wrap: anywhere; }
+.game-board .game-place p { font-size: .875rem; line-height: 1.4; margin-block: 4px; }
+.game-board .game-place button { padding: 8px 2px; margin-block: 6px; font-size: .875rem; }
+.game-board-player { position: absolute; z-index: 1; width: 36px; height: 41px; margin: 0; padding: 0; transform: translate(-50%, -50%); pointer-events: none; }
+.game-board-player svg { width: 100%; height: 100%; }
+.game-board-announcement:empty { margin: 0; }
+@media (prefers-reduced-motion: reduce) { .game-board-player { transition: none !important; } }
+@media (forced-colors: active) {
+ .game-board .game-place { border: 1px solid CanvasText !important; }
+ .game-board .game-place-current { border: 3px double CanvasText !important; }
+}
+.game-board .game-hex-map .game-board-controls { display: flex; width: 100%; }
+.game-board .game-hex-map .game-board-controls button { width: 50%; min-width: 44px; padding: 4px 0; font-size: .75rem; }
+.game-board .game-hex-map .game-place > p { font-size: .75rem; }
+.game-board .game-board-cell-hint { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.game-board-gates { padding-inline-start: 1.25rem; }
+
+/* Reserve state space so accepted movement does not shift the tile centers. */
+.game-board .game-hex-map .game-board-place-state { display: flex; flex-direction: column; min-height: 64px; }
+.game-board .game-hex-map .game-board-place-state p { font-size: .75rem; line-height: 1.4; margin: 2px 0; }

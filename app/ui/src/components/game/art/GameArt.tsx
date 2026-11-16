@@ -42,7 +42,7 @@ export function GameMotif({assetId, ...a11y}: ArtAccessibility & {assetId?: Moti
 
 export type TileState = 'current' | 'visited' | 'available' | 'unavailable' | 'selected' | 'pending';
 /** Presentation only; the host supplies semantic state text and owns all interaction. */
-export function GameTileArt({assetId, states = []}: {assetId?: TerrainId; states?: readonly TileState[]}) {
+export function GameTileArt({assetId, states = [], playerAssetId = "character.capy", showPlayer = true}: {assetId?: TerrainId; states?: readonly TileState[]; playerAssetId?: CharacterId | null; showPlayer?: boolean}) {
   const current = states.includes('current');
   return <span className="game-tile-art" data-states={states.join(' ')} aria-hidden="true">
     <GameTerrain assetId={assetId} decorative/>
@@ -51,7 +51,7 @@ export function GameTileArt({assetId, states = []}: {assetId?: TerrainId; states
       {current && <polygon points={hexPoints} transform="translate(6 7) scale(.9)" className="game-tile-inset"/>}
       {states.includes('selected') && <polygon points={hexPoints} transform="translate(14 16) scale(.77)" className="game-tile-inset"/>}
     </svg>
-    {current && <span className="game-tile-marker"><GameCharacter assetId="character.capy" variant="marker" decorative/></span>}
+    {current && showPlayer && <span className="game-tile-marker"><GameCharacter assetId={playerAssetId} variant="marker" decorative/></span>}
     {states.includes('visited') && <span className="game-tile-visited">✓</span>}
   </span>;
 }

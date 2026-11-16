@@ -70,6 +70,6 @@ Pack 1.2.0 and earlier resources, engine/server production code, recruitment
 flags, command contracts, storage and provider settings are unchanged. Tests
 use deterministic fixtures; no live generation provider is required.
 
-Spec 30.3 remains a board draft. This implements 30.4 independently through
-30.2's public contracts. Illustrated encounter composition, generation/prefetch
+Spec 30.4 shipped independently through 30.2's public contracts. The board
+implementation is recorded in [30.3's acceptance](game-honeycomb-board-acceptance.md). Illustrated encounter composition, generation/prefetch
 and complete visual release acceptance remain 30.5–30.7.

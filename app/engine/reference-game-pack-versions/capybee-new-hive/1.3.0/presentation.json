@@ -1,0 +1,164 @@
+{
+  "schemaVersion": 1,
+  "playerAssetId": "character.capy",
+  "characters": [
+    {
+      "id": "actor:hive-guide",
+      "slotId": "hive-guide",
+      "assetId": "character.capy",
+      "sceneIds": [
+        "arrival",
+        "board",
+        "lantern",
+        "memory-light",
+        "mela",
+        "mela-thanks",
+        "borys",
+        "borys-thanks",
+        "luna",
+        "luna-thanks",
+        "workshop",
+        "crossing",
+        "ending-new",
+        "ending-two",
+        "ending-rest"
+      ],
+      "nameKey": "character.hive-guide.name",
+      "descriptionKey": "character.hive-guide.description"
+    },
+    {
+      "id": "actor:mela-bee",
+      "slotId": "mela-bee",
+      "assetId": "character.mela-bee",
+      "sceneIds": [
+        "mela",
+        "mela-thanks"
+      ],
+      "nameKey": "character.mela-bee.name",
+      "descriptionKey": "character.mela-bee.description",
+      "traitKey": "character.mela-bee.trait",
+      "needKey": "character.mela-bee.need",
+      "recruitedFlag": "mela-joined"
+    },
+    {
+      "id": "actor:borys-beaver",
+      "slotId": "borys-beaver",
+      "assetId": "character.borys-beaver",
+      "sceneIds": [
+        "borys",
+        "borys-thanks"
+      ],
+      "nameKey": "character.borys-beaver.name",
+      "descriptionKey": "character.borys-beaver.description",
+      "traitKey": "character.borys-beaver.trait",
+      "needKey": "character.borys-beaver.need",
+      "recruitedFlag": "borys-joined"
+    },
+    {
+      "id": "actor:luna-moth",
+      "slotId": "luna-moth",
+      "assetId": "character.luna-moth",
+      "sceneIds": [
+        "luna",
+        "luna-thanks"
+      ],
+      "nameKey": "character.luna-moth.name",
+      "descriptionKey": "character.luna-moth.description",
+      "traitKey": "character.luna-moth.trait",
+      "needKey": "character.luna-moth.need",
+      "recruitedFlag": "luna-joined"
+    }
+  ],
+  "scenes": [
+    {
+      "sceneId": "arrival",
+      "backdropAssetId": "backdrop.hive-clearing"
+    },
+    {
+      "sceneId": "board",
+      "backdropAssetId": "backdrop.hive-clearing"
+    },
+    {
+      "sceneId": "lantern",
+      "backdropAssetId": "backdrop.lantern-grove"
+    },
+    {
+      "sceneId": "memory-light",
+      "backdropAssetId": "backdrop.lantern-grove"
+    },
+    {
+      "sceneId": "mela",
+      "backdropAssetId": "backdrop.quiet-meadow"
+    },
+    {
+      "sceneId": "mela-thanks",
+      "backdropAssetId": "backdrop.quiet-meadow"
+    },
+    {
+      "sceneId": "borys",
+      "backdropAssetId": "backdrop.reed-bank"
+    },
+    {
+      "sceneId": "borys-thanks",
+      "backdropAssetId": "backdrop.reed-bank"
+    },
+    {
+      "sceneId": "luna",
+      "backdropAssetId": "backdrop.willow-glen"
+    },
+    {
+      "sceneId": "luna-thanks",
+      "backdropAssetId": "backdrop.willow-glen"
+    },
+    {
+      "sceneId": "workshop",
+      "backdropAssetId": "backdrop.hive-workshop"
+    },
+    {
+      "sceneId": "crossing",
+      "backdropAssetId": "backdrop.small-crossing"
+    },
+    {
+      "sceneId": "ending-new",
+      "backdropAssetId": "backdrop.small-crossing"
+    },
+    {
+      "sceneId": "ending-two",
+      "backdropAssetId": "backdrop.small-crossing"
+    },
+    {
+      "sceneId": "ending-rest",
+      "backdropAssetId": "backdrop.hive-clearing"
+    }
+  ],
+  "places": [
+    {
+      "placeId": "hive-square",
+      "terrainAssetId": "terrain.meadow"
+    },
+    {
+      "placeId": "old-lantern",
+      "terrainAssetId": "terrain.lantern"
+    },
+    {
+      "placeId": "quiet-meadow",
+      "terrainAssetId": "terrain.meadow"
+    },
+    {
+      "placeId": "reed-bank",
+      "terrainAssetId": "terrain.water"
+    },
+    {
+      "placeId": "willow-glen",
+      "terrainAssetId": "terrain.willow"
+    },
+    {
+      "placeId": "hive-workshop",
+      "terrainAssetId": "terrain.workshop"
+    },
+    {
+      "placeId": "small-crossing",
+      "terrainAssetId": "terrain.crossing"
+    }
+  ]
+}

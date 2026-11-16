@@ -724,15 +724,53 @@ final class RunImpl implements Run {
         if (!isConnected(currentPlaceId, placeId)) {
             return reject("PLACE_NOT_CONNECTED", "Place is not directly connected: " + placeId);
         }
-        step++;
-        currentPlaceId = placeId;
-        if (!visitedPlaces.contains(placeId)) visitedPlaces.add(placeId);
-        List<Event> events = new ArrayList<>();
-        List<Issue> issues = new ArrayList<>();
-        evaluateObjectives(events, issues);
-        if (endRequested) finish(EndReason.COMPLETED, scene(sceneId));
-        updatedAt = clock.instant();
-        return new StepResult(true, view(), events, issues);
+        PlaceDef destination = placeMap.places().stream().filter(p -> p.id().equals(placeId)).findFirst().orElseThrow();
+        if (!moveAllowed(destination)) return reject("PLACE_UNAVAILABLE", "Movement is unavailable");
+        Scene target = destination.entry() == null ? null : resolveTarget(destination.entry().sceneId());
+        if (destination.entry() != null && target == null) return reject("SCENE_RESOLUTION_FAILED", "The destination could not be prepared");
+        // Preparation may spend generation budget, but never changes accepted mechanics.
+        Map<String, List<String>> savedSets = new LinkedHashMap<>();
+        sets.forEach((key, values) -> savedSets.put(key, List.copyOf(values)));
+        RunState before = new RunState(sceneId, visited, ended, endReason, counters, flags, savedSets,
+                objectives, outcome, currentPlaceId, visitedPlaces);
+        long previousStep = step;
+        Instant previousTime = updatedAt;
+        boolean previousEndRequested = endRequested;
+        String previousRequestedOutcome = requestedOutcome;
+        try {
+            step++;
+            currentPlaceId = placeId;
+            if (!visitedPlaces.contains(placeId)) visitedPlaces.add(placeId);
+            List<Event> events = new ArrayList<>();
+            List<Issue> issues = new ArrayList<>();
+            if (target != null) enterTarget(destination.entry().sceneId(), target, events, issues);
+            else {
+                evaluateObjectives(events, issues);
+                if (endRequested) finish(EndReason.COMPLETED, scene(sceneId));
+            }
+            View accepted = view();
+            updatedAt = clock.instant();
+            return new StepResult(true, accepted, events, issues);
+        } catch (RuntimeException failure) {
+            sceneId = before.sceneId(); currentPlaceId = before.currentPlaceId();
+            visited.clear(); visited.addAll(before.visited()); visitedPlaces.clear(); visitedPlaces.addAll(before.visitedPlaces());
+            counters.clear(); counters.putAll(before.counters()); flags.clear(); flags.putAll(before.flags());
+            sets.clear(); before.sets().forEach((key, values) -> sets.put(key, new LinkedHashSet<>(values)));
+            objectives.clear(); objectives.putAll(before.objectives()); outcome = before.outcome();
+            ended = before.ended(); endReason = before.endReason(); step = previousStep; updatedAt = previousTime;
+            endRequested = previousEndRequested; requestedOutcome = previousRequestedOutcome;
+            // Do not roll back generation artifacts, usage or token budgets.
+            return reject("SCENE_RESOLUTION_FAILED", "The destination could not be entered");
+        }
+    }
+
+    private boolean navigationAllowed() {
+        return placeMap.navigation() == null || placeMap.navigation().allowedSceneIds().contains(sceneId);
+    }
+
+    private boolean moveAllowed(PlaceDef place) {
+        return !ended && !place.id().equals(currentPlaceId) && isConnected(currentPlaceId, place.id())
+                && navigationAllowed() && (place.entry() == null || place.entry().requires() == null || evaluate(place.entry().requires()));
     }
 
     private boolean isConnected(String from, String to) {
@@ -750,20 +788,24 @@ final class RunImpl implements Run {
             String description = place.descriptionKey() == null ? null : resolve(place.descriptionKey());
             Integer x = place.position() == null ? null : place.position().x();
             Integer y = place.position() == null ? null : place.position().y();
-            placeViews.add(new PlaceView(place.id(), resolve(place.labelKey()), description, x, y));
+            String hint = place.entry() != null && place.entry().requires() != null && !evaluate(place.entry().requires())
+                    ? resolve(place.entry().unmetHintKey()) : null;
+            placeViews.add(new PlaceView(place.id(), resolve(place.labelKey()), description, x, y,
+                    place.entry() == null ? "LOCATION_ONLY" : "ENTER_SCENE", hint));
         }
         List<PlaceLinkView> links = placeMap.links().stream()
                 .map(link -> new PlaceLinkView(link.from(), link.to(), link.bidirectional())).toList();
         List<String> availableMoves = new ArrayList<>();
         if (!runEnded) {
             for (PlaceDef place : placeMap.places()) {
-                if (!place.id().equals(currentPlaceId) && isConnected(currentPlaceId, place.id())) {
+                if (moveAllowed(place)) {
                     availableMoves.add(place.id());
                 }
             }
         }
         return new PlacesView(currentPlaceId, placeViews, links, availableMoves, visitedPlaces,
-                placeMap.layoutKind().name());
+                placeMap.layoutKind().name(), !runEnded && !navigationAllowed()
+                        ? resolve(placeMap.navigation().unavailableHintKey()) : null);
     }
 
     private String resolve(String key) { return strings.getOrDefault(key, key); }

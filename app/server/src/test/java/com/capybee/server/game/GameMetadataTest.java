@@ -19,7 +19,7 @@ class GameMetadataTest {
                 Path.of("../ui/src/game/fixtures/contracts.json")));
         var profile = com.capybee.engine.session.wire.SessionJson.convert(fixtures.get("profile"), DynamicGameController.ProfileDto.class);
         assertThat(com.capybee.engine.session.wire.SessionJson.tree(com.capybee.engine.session.wire.SessionJson.encode(profile))).isEqualTo(fixtures.get("profile"));
-        for (String name : List.of("pack", "dynamic")) {
+        for (String name : List.of("pack", "dynamic", "placeEntry")) {
             var dto = com.capybee.engine.session.wire.SessionJson.convert(fixtures.get(name),
                     com.capybee.engine.session.wire.RunSummaryDto.class);
             assertThat(com.capybee.engine.session.wire.SessionJson.tree(
@@ -54,7 +54,7 @@ class GameMetadataTest {
         assertThat(metadata.metadataLocale()).isEqualTo("pl");assertThat(metadata.steps()).isNotEmpty();
         assertThat(metadata.inputs()).anyMatch(input -> input.kind().equals("ENUM_SET") && input.maxItems() == 2);
         assertThat(controller.capabilities(auth).getBody()).containsEntry("clientEnabled",false).containsEntry("dynamicStartEnabled",true);
-        assertThat(controller.capabilities(auth).getBody()).containsEntry("viewFeatures",List.of("canAdvance","presentation-v1"))
+        assertThat(controller.capabilities(auth).getBody()).containsEntry("viewFeatures",List.of("canAdvance","presentation-v1","place-entry-v1"))
                 .containsEntry("supportedViewSchemas",List.of(1,2));
         assertThatThrownBy(()->controller.profile(auth,"classic-detective",Locale.ENGLISH)).isInstanceOf(com.capybee.engine.session.SessionException.class);
         child.setBirthYear(null);

@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "capability": "development",
+  "liveProviders": false,
+  "packs": [
+    {
+      "version": "1.0.0",
+      "indexedFiles": 5,
+      "resourceSha256": "2d3440263967bb1b12b2efc4a938cef2925713930f9a54655a37882c3241d439",
+      "serverJarParity": true,
+      "cliDirectoryParity": true
+    },
+    {
+      "version": "1.1.0",
+      "indexedFiles": 29,
+      "resourceSha256": "5386da058bcbb458c0341579c817cb71abf0b7f019d99c5a008cbfaa5b14432a",
+      "serverJarParity": true,
+      "cliDirectoryParity": true
+    },
+    {
+      "version": "1.2.0",
+      "indexedFiles": 31,
+      "resourceSha256": "fcc77f64ad4ea557f4f142c7f3ce904f1774af26aab22323ff65ae8c1498560c",
+      "serverJarParity": true,
+      "cliDirectoryParity": true
+    },
+    {
+      "version": "1.3.0",
+      "indexedFiles": 31,
+      "resourceSha256": "916198585c1b4e514c8d97c3e0a33971d9f93bdc8d5f906f71efe89c9848eef3",
+      "serverJarParity": true,
+      "cliDirectoryParity": true
+    }
+  ],
+  "coldCliRoutes": [
+    {
+      "id": "board-new-path",
+      "outcome": "new-path",
+      "freshProcesses": 2,
+      "providerDisabled": true,
+      "passed": true
+    },
+    {
+      "id": "board-two-lights",
+      "outcome": "two-lights",
+      "freshProcesses": 2,
+      "providerDisabled": true,
+      "passed": true
+    },
+    {
+      "id": "board-neighbors-rest",
+      "outcome": "rest-here",
+      "freshProcesses": 2,
+      "providerDisabled": true,
+      "passed": true
+    }
+  ],
+  "serverUiParity": true,
+  "uiStaticFiles": 25,
+  "retainedAuthoredScriptsPassed": true,
+  "artifacts": {
+    "candidateId": "0.1.0-SNAPSHOT-16c654b8bf46-2032e21f2ac8",
+    "capability": "development",
+    "gitCommit": "16c654b8bf460745760ada4c8af6e486ee384273",
+    "dirty": true,
+    "archive": {
+      "file": "capybee-engine-cli-0.1.0-SNAPSHOT.zip",
+      "sha256": "2032e21f2ac854c7722143542dbaefc1a34e4ff9684a11c283443f246d6dda63"
+    },
+    "cliJarSha256": "42f6d29018eb5048b6df15572bcf68bfa61ac6d075b7a36fe7454910fd96daa9",
+    "serverJarSha256": "13713b98bf100b9c3bc796769df0ff229d8e9c801b384015384294a177237442",
+    "cliSbomSha256": "5f4b68f9e26cc80b5ec14a8f32b5b8286dfe3a9405b40c62a075c96082ecbc26",
+    "serverSbomSha256": "614fbc8e16e2a4c6e3131dfda472cc17538f62248406274e881d1f6f7b8cd430"
+  }
+}

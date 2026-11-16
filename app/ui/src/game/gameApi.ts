@@ -129,9 +129,9 @@ export interface GamePackInfoDto {
 export type GameSource = { kind: 'PACK'; packId: string; packVersion: string }
   | { kind: 'DYNAMIC'; profileId: string; profileVersion: string; gameFingerprint: string };
 export interface PlacesView {
-  currentPlaceId: string; places: Array<{id: string; label: string; description?: string | null; x: number | null; y: number | null}>;
+  currentPlaceId: string; places: Array<{id: string; label: string; description?: string | null; x: number | null; y: number | null; moveBehavior?: string | null; moveHint?: string | null}>;
   links: Array<{from: string; to: string; bidirectional: boolean}>;
-  availableMoves: string[]; visitedPlaceIds: string[]; layoutKind: string;
+  availableMoves: string[]; visitedPlaceIds: string[]; layoutKind: string; movementHint?: string | null;
 }
 export interface SetupInput {
   id: string; kind: 'ENUM' | 'ENUM_SET' | 'FREE_TEXT'; label: string; help: string; required: boolean;

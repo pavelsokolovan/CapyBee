@@ -5,6 +5,11 @@ import com.capybee.engine.pack.Pack;
 import com.capybee.engine.pack.PackFeature;
 import com.capybee.engine.pack.PackValidationContext;
 import com.capybee.engine.places.PlaceDef;
+import com.capybee.engine.places.PlaceEntry;
+import com.capybee.engine.places.PlaceNavigation;
+import com.capybee.engine.rules.Condition;
+import com.capybee.engine.rules.json.RulesParser;
+import com.capybee.engine.rules.json.RuleStrings;
 import com.capybee.engine.places.PlaceLayoutKind;
 import com.capybee.engine.places.PlaceLinkDef;
 import com.capybee.engine.places.PlaceMap;
@@ -58,18 +63,24 @@ public final class PlacesParser {
             error(context, "PLACES_FIELD_INVALID", FILE, "", "Expected places object");
             return null;
         }
-        unknown(root, context, "", "schemaVersion", "startPlace", "layout", "places", "links");
         Integer schemaVersion = integer(root.get("schemaVersion"), context, "/schemaVersion");
-        if (schemaVersion != null && schemaVersion != 1) invalid(context, "/schemaVersion", "Expected schema version 1");
+        boolean entries = Integer.valueOf(2).equals(schemaVersion);
+        unknown(root, context, "", entries ? new String[]{"schemaVersion", "startPlace", "layout", "places", "links", "navigation"} : new String[]{"schemaVersion", "startPlace", "layout", "places", "links"});
+        if (schemaVersion != null && schemaVersion != 1 && schemaVersion != 2) invalid(context, "/schemaVersion", "Expected schema version 1 or 2");
         String startPlace = id(root.get("startPlace"), context, "/startPlace");
         if (startPlace != null) reference(context, startPlace, "/startPlace");
         PlaceLayoutKind layoutKind = parseLayout(root.get("layout"), context);
-        List<PlaceDef> places = parsePlaces(root.get("places"), pack, context);
+        List<PlaceDef> places = parsePlaces(root.get("places"), pack, context, entries);
         List<PlaceLinkDef> links = parseLinks(root.get("links"), context);
+        if (entries && context != null) {
+            // Legacy unknown fields remain warnings; schema 2 is a closed mechanics contract.
+            rejectUnknownV2(root, context);
+        }
+        PlaceNavigation navigation = entries ? parseNavigation(root.get("navigation"), pack, context) : null;
         if (startPlace != null) checkReachability(startPlace, places, links, context);
-        if (schemaVersion == null || schemaVersion != 1 || startPlace == null || layoutKind == null
-                || places.isEmpty() || root.get("links") == null) return null;
-        return new PlaceMap(schemaVersion, startPlace, layoutKind, places, links);
+        if (schemaVersion == null || (schemaVersion != 1 && schemaVersion != 2) || startPlace == null || layoutKind == null
+                || places.isEmpty() || root.get("links") == null || entries && navigation == null) return null;
+        return new PlaceMap(schemaVersion, startPlace, layoutKind, places, links, navigation);
     }
 
     private static PlaceLayoutKind parseLayout(JsonNode node, PackValidationContext context) {
@@ -91,7 +102,7 @@ public final class PlacesParser {
         }
     }
 
-    private static List<PlaceDef> parsePlaces(JsonNode node, Pack pack, PackValidationContext context) {
+    private static List<PlaceDef> parsePlaces(JsonNode node, Pack pack, PackValidationContext context, boolean entries) {
         List<PlaceDef> places = new ArrayList<>();
         if (node == null || !node.isArray() || node.size() < 1 || node.size() > 128) {
             invalid(context, "/places", "Expected 1-128 places");
@@ -104,7 +115,8 @@ public final class PlacesParser {
                 invalid(context, pointer, "Expected place object");
                 continue;
             }
-            unknown(item, context, pointer, "id", "labelKey", "descriptionKey", "position");
+            unknown(item, context, pointer, entries ? new String[]{"id", "labelKey", "descriptionKey", "position", "entry"} : new String[]{"id", "labelKey", "descriptionKey", "position"});
+            PlaceEntry entry = entries ? parseEntry(item.get("entry"), pack, context, pointer + "/entry") : null;
             String id = id(item.get("id"), context, pointer + "/id");
             String labelKey = stringKey(item.get("labelKey"), context, pointer + "/labelKey");
             String descriptionKey = item.has("descriptionKey")
@@ -122,10 +134,75 @@ public final class PlacesParser {
             }
             PlacePosition position = parsePosition(item.get("position"), context, pointer + "/position");
             if (id != null && labelKey != null && (!item.has("descriptionKey") || descriptionKey != null)) {
-                places.add(new PlaceDef(id, labelKey, descriptionKey, position));
+                places.add(new PlaceDef(id, labelKey, descriptionKey, position, entry));
             }
         }
         return places;
+    }
+
+    private static void rejectUnknownV2(JsonNode root, PackValidationContext context) {
+        closed(root, context, "", "schemaVersion", "startPlace", "layout", "navigation", "places", "links");
+        closed(root.path("layout"), context, "/layout", "kind");
+        closed(root.path("navigation"), context, "/navigation", "allowedSceneIds", "unavailableHintKey");
+        int i = 0;
+        for (JsonNode place : root.path("places")) {
+            String p = "/places/" + i++;
+            closed(place, context, p, "id", "labelKey", "descriptionKey", "position", "entry");
+            closed(place.path("entry"), context, p + "/entry", "sceneId", "requires", "unmetHintKey");
+            closed(place.path("position"), context, p + "/position", "x", "y");
+        }
+        i = 0;
+        for (JsonNode link : root.path("links")) closed(link, context, "/links/" + i++, "from", "to", "bidirectional");
+    }
+
+    private static void closed(JsonNode node, PackValidationContext context, String pointer, String... allowed) {
+        for (var field : node.properties()) if (!Set.of(allowed).contains(field.getKey()))
+            invalid(context, pointer + "/" + token(field.getKey()), "Unknown mechanics field");
+    }
+
+    private static PlaceNavigation parseNavigation(JsonNode node, Pack pack, PackValidationContext context) {
+        String pointer = "/navigation";
+        if (node == null || !node.isObject()) {invalid(context, pointer, "Expected navigation object"); return null;}
+        unknown(node, context, pointer, "allowedSceneIds", "unavailableHintKey");
+        JsonNode ids = node.get("allowedSceneIds");
+        List<String> scenes = new ArrayList<>();
+        if (ids == null || !ids.isArray() || ids.size() > 128) invalid(context, pointer, "Expected at most 128 allowed scene IDs");
+        else for (int i = 0; i < ids.size(); i++) {
+            String scene = id(ids.get(i), context, pointer + "/allowedSceneIds/" + i);
+            if (scene == null) continue;
+            if (scenes.contains(scene)) invalid(context, pointer, "Duplicate allowed scene ID");
+            else scenes.add(scene);
+            sceneReference(pack, context, scene, pointer + "/allowedSceneIds/" + i);
+        }
+        String hint = localizedKey(node.get("unavailableHintKey"), pack, context, pointer + "/unavailableHintKey");
+        return ids == null || !ids.isArray() || ids.size() > 128 || hint == null ? null : new PlaceNavigation(scenes, hint);
+    }
+
+    private static PlaceEntry parseEntry(JsonNode node, Pack pack, PackValidationContext context, String pointer) {
+        if (node == null || !node.isObject()) {invalid(context, pointer, "Expected entry object"); return null;}
+        unknown(node, context, pointer, "sceneId", "requires", "unmetHintKey");
+        String scene = id(node.get("sceneId"), context, pointer + "/sceneId");
+        if (scene != null) sceneReference(pack, context, scene, pointer + "/sceneId");
+        Condition condition = node.has("requires") ? RulesParser.parseCondition(node.get("requires"), pack, context, FILE, pointer + "/requires") : null;
+        String hint = node.has("requires") ? localizedKey(node.get("unmetHintKey"), pack, context, pointer + "/unmetHintKey") : null;
+        if (!node.has("requires") && node.has("unmetHintKey")) invalid(context, pointer, "Hint requires a condition");
+        return scene == null ? null : new PlaceEntry(scene, condition, hint);
+    }
+
+    private static String localizedKey(JsonNode node, Pack pack, PackValidationContext context, String pointer) {
+        String key = stringKey(node, context, pointer);
+        if (key != null) for (LocaleTag locale : pack.manifest().locales()) {
+            stringReference(context, key, locale, pointer);
+            // Hint text must be present and nonblank in every declared locale.
+            String value = RuleStrings.load(pack, locale).get(key);
+            if (value == null || value.isBlank()) invalid(context, pointer, "Expected nonblank localized hint");
+        }
+        return key;
+    }
+
+    private static void sceneReference(Pack pack, PackValidationContext context, String scene, String pointer) {
+        if (context != null) for (LocaleTag locale : pack.manifest().locales())
+            context.references().reference("scene:" + locale.value(), scene, FILE, pointer);
     }
 
     private static PlacePosition parsePosition(JsonNode node, PackValidationContext context, String pointer) {

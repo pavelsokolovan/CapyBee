@@ -1,0 +1,20 @@
+{
+  "title": "Mały przystanek",
+  "narration": "W Warsztacie Plastra czeka krótka poręcz z trzciny. CapyBee sprawdza węzeł razem z tobą. Pomoc zwierzęcych towarzyszy jest miła, ale wyprawa jest dostępna również bez tych spotkań.",
+  "dialogue": [],
+  "choices": [
+    {
+      "id": "tie-rail",
+      "label": "Wiążę poręcz i ruszam do mostku"
+    },
+    {
+      "id": "back-to-board",
+      "label": "Wracam na polanę"
+    },
+    {
+      "id": "rest-now",
+      "label": "Na dziś wybieram odpoczynek"
+    }
+  ],
+  "continuityFacts": []
+}

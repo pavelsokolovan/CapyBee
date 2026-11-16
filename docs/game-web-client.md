@@ -170,3 +170,18 @@ Content-free outcomes and environment details are recorded in
 [28.4 acceptance evidence](game-web-client-acceptance.md). GitHub Actions runs
 the deterministic suite on pushes and pull requests; its browser installation
 and the portable UI sync are part of the ordinary build job.
+
+### Illustrated navigation
+
+With valid public HEX coordinates and presentation metadata, `GameRun` displays
+one expanded illustrated `GamePlaces` board before the current moment. A single
+player marker follows accepted positions; it never predicts queued movement.
+Inspection and the semantic list toggle are read-only. Small containers fall
+back to the same place controls as a list. Missing presentation retains the
+previous expandable text/map panel.
+
+An `ENTER_SCENE` destination sends one existing `MOVE`; the engine returns the
+encounter in that accepted revision. User-origin accepted entry focuses the
+shared moment heading. Background reconciliation and location-only movement
+preserve useful map focus. The controller, owner guards, queue and uncertain
+command recovery remain shared with other game commands.

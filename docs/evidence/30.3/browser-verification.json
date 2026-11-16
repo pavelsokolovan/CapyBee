@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "packVersion": "1.3.0",
+  "mobileWidth": 360,
+  "places": 7,
+  "minTerrain": 64,
+  "minPlayer": 32,
+  "oneMoveAtomicEntry": true,
+  "adjacentAnimationMs": 200,
+  "pendingRetained": true,
+  "offlineUncertainReload": true,
+  "replay": true,
+  "stalePeerSelection": true,
+  "listParity": true,
+  "zoom": "200%",
+  "reducedMotion": true,
+  "forcedColors": true,
+  "hiddenArtwork": true,
+  "liveProvider": false
+}
