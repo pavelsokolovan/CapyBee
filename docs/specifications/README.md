@@ -93,9 +93,11 @@ list. The current implementation boundary is:
 - [30.1](30.1-visual-design-and-svg-catalog-instruction.md) — fixed SVG catalog, React artwork renderers and development/test gallery.
 - [30.2](30.2-public-presentation-contracts-instruction.md) — optional public artwork, character traits/needs and accepted companion contracts (implemented, Pack 1.2.0).
 - [30.3](30.3-playable-honeycomb-board-instruction.md) — primary illustrated board, visible accepted Capy movement and atomic destination-to-encounter entry (draft).
+- [30.4](30.4-befriend-and-recruit-instruction.md) — public character portraits, traits/needs and accepted recruited-party display (implemented).
 
-Specs 30.4–30.7 remain follow-ups described in the intent, covering companion
-portraits/party, illustrated encounters, generation/prefetch and visual release.
+Specs 30.5–30.7 remain follow-ups described in the intent, covering illustrated
+encounters, generation/prefetch and visual release. Spec 30.3 remains a board
+draft; 30.4 uses the implemented 30.2 contracts independently of that board.
 
 ### Roadmap reconciliation
 

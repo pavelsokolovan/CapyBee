@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "packVersion": "1.2.0",
+  "acceptedPartyMembers": 3,
+  "mobileWidth": 360,
+  "zoom": "200%",
+  "keyboardHistory": true,
+  "forcedColors": true,
+  "hiddenArtTextParity": true,
+  "reducedMotion": true,
+  "desktopWidth": 1280,
+  "liveProviders": false
+}

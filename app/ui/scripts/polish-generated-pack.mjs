@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {assertCompanionUI,captureCompanionEvidence} from './game-companions.mjs';
 
 export async function checkPolishGeneration({page,context,base,requests,logs}) {
  const idea='Fikcyjna baśń srebrnego liścia '+crypto.randomUUID().replace(/[0-9]/g,d=>String.fromCharCode(107+Number(d)));
@@ -32,6 +33,16 @@ export async function checkPolishGeneration({page,context,base,requests,logs}) {
   return JSON.stringify({local:localStorage,session:sessionStorage,history:history.state,url:location.href,values});
  });assert.equal(stores.includes(idea),false);assert.equal(logs.some(line=>line.includes(idea)),false);
  const game=page.locator('.game-run');
+ await game.getByRole('button',{name:'Continue',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.game-run [role=status]')?.textContent==='Saved');
+ for(const label of ['Odwiedzam Melę na Cichej Łące','Siadam na chwilę i słucham Meli']){
+  await game.getByRole('button',{name:label,exact:true}).click();await page.waitForFunction(()=>document.querySelector('.game-run [role=status]')?.textContent==='Saved');
+  const run=await (await context.request.get(`${base}/api/game/runs/current`)).json();await assertCompanionUI({page,game,run});
+ }
+ const joined=await (await context.request.get(`${base}/api/game/runs/current`)).json();assert.equal(joined.view.presentation.party.length,1);
+ await captureCompanionEvidence({page,game,run:joined,label:'generated-joined'});
+ await page.reload();await page.getByRole('button',{name:'Play',exact:true}).click();await page.getByRole('button',{name:/Adventures/}).click();
+ await page.getByRole('button',{name:'Continue',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.game-run [role=status]')?.textContent==='Saved');
+ const joinedResume=await (await context.request.get(`${base}/api/game/runs/current`)).json();assert.deepEqual(joinedResume.view,joined.view);await assertCompanionUI({page,game,run:joinedResume});
  await game.getByRole('button',{name:'Continue',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.game-run [role=status]')?.textContent==='Saved');
  await game.getByRole('button',{name:'Na dziś wybieram odpoczynek',exact:true}).click();await game.getByRole('button',{name:'Start another adventure',exact:true}).waitFor();
  console.log('PASS: Polish generated Pack explicit consent, Unicode limit, offline wish, masked review, lost response, one operation, exact reload and private storage exclusions');

@@ -2,6 +2,7 @@ import {useEffect,useState} from 'react';
 import type {GameView,GameCommand} from '../../game/gameApi';
 import {runCopy} from './runCopy';
 import {GamePlaces} from './GamePlaces';
+import {GameCharacterHistory} from './GameCharacters';
 type Props={view:GameView;locale:'en'|'pl';locked:boolean;selection?:string;submit:(command:GameCommand)=>void};
 export function SceneBlocks({view,locale}:{view:GameView;locale:'en'|'pl'}) {
  const cast='characters' in view?view.characters:[];
@@ -26,9 +27,9 @@ export function SceneActions({view,locale,locked,selection,submit}:Props){
  </fieldset></div>;
 }
 export function ScenePanels({view,locale,locked,submit}:Props){
- const c=runCopy[locale],cast='characters' in view?view.characters:[],p=view.places;
+ const c=runCopy[locale],p=view.places;
  return <aside>{view.objectives.length?<details><summary>{c.objectives}</summary>{view.objectives.map(o=><div key={o.id}><strong>{o.label}</strong><p>{'description' in o?o.description:null}</p><p>{o.state}</p></div>)}</details>:null}
- {cast.length?<details><summary>{c.characters}</summary>{cast.map(x=><div key={x.id}><strong>{x.name}</strong><p>{x.description}</p>{x.inCurrentScene?<p>{c.here}</p>:null}</div>)}</details>:null}
+ <GameCharacterHistory view={view} locale={locale}/>
  {view.status.length?<details><summary>{c.status}</summary><dl>{view.status.map(s=><div key={s.id}><dt>{s.label}</dt><dd>{s.value}</dd></div>)}</dl></details>:null}
  {p?.places.length?<GamePlaces places={p} locale={locale} locked={locked} submit={submit}/>:null}</aside>;
 }

@@ -8,6 +8,7 @@ import {adventureCopy} from '../../game/adventureCopy';
 import {runCopy} from './runCopy';
 import './gameRun.css';
 import {GameCompletion} from './GameCompletion';
+import {GameCurrentCharacters, GameParty} from './GameCharacters';
 export function GameRun({run,owner,locale,onAnother,controller:provided}:{run:GameRunSummaryDto;owner:string;locale:'en'|'pl';onAnother:()=>void;controller?:RunController}){
  const [initialized,setInitialized]=useState(false);
  const [controller]=useState(()=>provided??new RunController(run,new GameTransport(()=>owner,()=>restoreGameSession(owner)),owner));
@@ -23,7 +24,8 @@ export function GameRun({run,owner,locale,onAnother,controller:provided}:{run:Ga
  return <section className="game-run" lang={state.run.locale}><h3 tabIndex={-1} ref={heading}>{view&&'story' in view?view.story?.title??c.scene:c.scene}</h3>
  <p>{adventureCopy[locale].locale}: {new Intl.DisplayNames([locale],{type:'language'}).of(state.run.locale)}</p>
  {initialized&&state.message==='saved'?<p>{adventureCopy[locale].ready}</p>:null}<p role="status" aria-live="polite">{initialized?c[state.message]:c.checking}</p>{unsupported?<p>{c.unsupported}</p>:null}{state.run.status!=='ACTIVE'&&!ended?<p>{c.unavailable}</p>:null}
- {view?<><SceneBlocks view={view} locale={locale}/>{initialized&&(!locked||state.pending)?<SceneActions key={state.run.revision} view={view} locale={locale} locked={locked} selection={state.selection} submit={submit}/>:null}
+ {view?<><GameParty view={view} locale={locale} runId={state.run.runId} revision={state.run.revision} ready={initialized} announce={initialized&&!locked&&state.message==='saved'}/>
+ <SceneBlocks view={view} locale={locale}/><GameCurrentCharacters view={view} locale={locale}/>{initialized&&(!locked||state.pending)?<SceneActions key={state.run.revision} view={view} locale={locale} locked={locked} selection={state.selection} submit={submit}/>:null}
  <ScenePanels view={view} locale={locale} locked={locked} submit={submit}/>{ended?<SceneResult view={view} locale={locale}/>:null}</>:null}
  {state.retryable?<button type="button" onClick={()=>void controller.retryUnsent()}>{c.retry}</button>:null}
  {state.cancellable?<button type="button" onClick={()=>void controller.removeUnsent()}>{c.remove}</button>:null}

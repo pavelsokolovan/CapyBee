@@ -1,0 +1,29 @@
+.game-current-characters, .game-party { border: 1px solid #bca67c; border-radius: 16px; padding: 16px; margin-block: 16px; }
+.game-current-characters h4, .game-party h4 { margin: 0 0 12px; font-size: 1rem; line-height: 1.4; }
+.game-character-list, .game-party-members { list-style: none; margin: 0; padding: 0; }
+.game-character-list { display: grid; gap: 12px; }
+.game-character-list > li { min-width: 0; }
+.game-character-card { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: start; gap: 12px;
+  padding: 12px; border-radius: 12px; background: #fdf6e3; color: #2e2413; min-width: 0; overflow-wrap: anywhere; }
+.game-character-portrait { width: 64px; height: 64px; }
+.game-character-card h4, .game-character-card h5 { font-size: 1rem; line-height: 1.4; margin: 0 0 4px; }
+.game-character-copy { min-width: 0; }
+.game-character-card dl { margin: 8px 0 0; }
+.game-character-card dt { font-size: .875rem; font-weight: 600; color: #6c5a3a; margin-top: 8px; }
+.game-character-card dd { margin: 0; }
+.game-character-card p { margin-block: 4px; }
+.game-character-card .game-character-joined, .game-character-card .game-character-here { font-size: .875rem; color: #6c5a3a; }
+.game-character-history .game-character-card { margin-block: 12px; }
+.game-character-card-history { grid-template-columns: 40px minmax(0, 1fr); }
+.game-character-card-history .game-character-portrait { width: 40px; height: 40px; }
+.game-party-members { display: flex; flex-wrap: wrap; gap: 8px; }
+.game-party-members li { display: flex; align-items: center; gap: 8px; flex: 0 1 10rem; min-width: 0; max-width: 100%;
+  padding: 8px; border-radius: 12px; background: #fdf6e3; overflow-wrap: anywhere; }
+.game-party-members strong { min-width: 0; }
+.game-party-portrait { display: block; width: 40px; height: 40px; flex: 0 0 40px; }
+.game-party-empty { margin: 0; color: #6c5a3a; }
+.game-party-announcement:empty { margin: 0; }
+@media (forced-colors: active) {
+  .game-character-card, .game-party-members li { color: CanvasText; background: Canvas; }
+  .game-current-characters, .game-party { border-color: CanvasText; }
+}

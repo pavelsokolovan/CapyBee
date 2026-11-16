@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {assertCompanionUI,holdCompanionChoice,captureCompanionEvidence} from './game-companions.mjs';
 
 export async function checkPolishPack({page,context,base,requests}) {
  const game=page.locator('.game-run');
@@ -16,18 +17,27 @@ export async function checkPolishPack({page,context,base,requests}) {
   assert.equal(JSON.stringify(p).includes('recruitedFlag'),false);assert.equal(JSON.stringify(p).includes('sceneIds'),false);
  };
  const choose=async label=>{
-  await game.getByRole('button',{name:label,exact:true}).click();await saved();
+  if(label==='Siadam na chwilę i słucham Meli')await holdCompanionChoice({page,context,base,game,run:await currentRun(),requests,label});
+  else await game.getByRole('button',{name:label,exact:true}).click();
+  await saved();
   if(label==='Odwiedzam Melę na Cichej Łące'||label==='Siadam na chwilę i słucham Meli'){
    const run=await currentRun();assertPublic(run);const p=run.view.presentation,member=p.characters.find(c=>c.id==='actor:mela-bee');
+   await assertCompanionUI({page,game,run});
    assert.equal(member.trait,'Cierpliwa');assert.ok(member.need.length>0);assert.equal(member.assetId,'character.mela-bee');
    assert.equal(member.recruited,label==='Siadam na chwilę i słucham Meli');
+   await captureCompanionEvidence({page,game,run,label:member.recruited?'mela-joined':'mela-needs'});
    if(member.recruited){
     const command=requests.filter(r=>r.url.includes('/commands')).at(-1);
     const replay=await context.request.post(command.url,{data:command.body});assert.equal(replay.status(),200);
     const envelope=await replay.json();assert.deepEqual(envelope.view.presentation,p);
     const retained=await currentRun();assert.equal(retained.revision,run.revision);assert.deepEqual(retained.view.presentation,p);
+    await assertCompanionUI({page,game,run:retained});
+    await page.reload();await page.getByRole('button',{name:'Play',exact:true}).click();await page.getByRole('button',{name:/Adventures/}).click();
+    await page.getByRole('button',{name:'Continue',exact:true}).click();await saved();
+    const restored=await currentRun();assert.deepEqual(restored.view,run.view);await assertCompanionUI({page,game,run:restored});
    }
   }
+  if(label==='Układam z Luną znak z liści')await captureCompanionEvidence({page,game,run:await currentRun(),label:'all-companions',full:true});
  };
  const start=async(locale='en')=>{
   const another=game.getByRole('button',{name:locale==='en'?'Start another adventure':'Rozpocznij inną przygodę',exact:true});
@@ -44,6 +54,7 @@ export async function checkPolishPack({page,context,base,requests}) {
   assert.equal(starts[0].body.packId,'capybee-new-hive');assert.equal(starts[0].body.locale,'pl');assert.equal(starts[0].body.generated,false);
   assert.deepEqual(starts[0].body.startInputs,{'story-tone':'cozy',interests:'',mood:''});
   const run=await currentRun();assertPublic(run);assert.deepEqual(run.view.presentation.party,[]);
+  await assertCompanionUI({page,game,run});assert.equal(await game.locator('.game-party-members li').count(),0);
   assert.deepEqual(run.view.presentation.characters.map(c=>c.id),['actor:hive-guide']);
  };
  const ending=async outcome=>{
@@ -51,6 +62,7 @@ export async function checkPolishPack({page,context,base,requests}) {
   const runId=requests.filter(r=>r.url.endsWith('/api/game/runs')&&r.body.packId==='capybee-new-hive').at(-1).body.id;
   const run=await (await context.request.get(`${base}/api/game/runs/${runId}`)).json();
   assert.equal(run.status,'ENDED');assert.equal(run.endReason,'COMPLETED');assert.equal(run.view.outcome,outcome);assert.equal(run.packVersion,'1.2.0');
+  await assertCompanionUI({page,game,run});
   const panel=game.locator('.game-completion');await panel.waitFor();
   const completion=await (await context.request.get(`${base}/api/game/runs/${runId}/completion`)).json();
   const key=outcome==='new-path'?'say_thank_you_helper':outcome==='two-lights'?'listen_song_reminds_home':'rest';
