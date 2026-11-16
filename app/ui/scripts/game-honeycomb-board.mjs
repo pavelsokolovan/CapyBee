@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {checkExpedition} from './game-expeditions.mjs';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 const evidence=fileURLToPath(new URL('../../../docs/evidence/30.3/',import.meta.url));
@@ -55,6 +56,7 @@ export async function checkBoardRoute({page,context,base,requests}){
   const replay=await context.request.post(url,{data:writes[0].body});assert.equal(replay.status(),200);
   const same=await current(context,base);assert.equal(same.revision,run.revision);assert.deepEqual(same.view,run.view);
   await shot(page,'.game-current-characters','accepted-encounter');
+  await checkExpedition({page,game,requests});
  }finally{release();await context.unroute(url,handler);}
  // An offline neighboring move retains the accepted character and marker. Lose its acknowledgement after acceptance, then reload.
  const mela=await current(context,base);const pendingStart=requests.length;

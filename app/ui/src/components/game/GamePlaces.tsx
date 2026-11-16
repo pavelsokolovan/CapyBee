@@ -23,9 +23,9 @@ export function hexLayout(view: PlacesView) {
  return {columns, cells: cells.map(p => ({gridColumn: `${p.column - left + 1} / span 2`, gridRow: p.row - top + 1}))};
 }
 
-export function GamePlaces({places, locale, locked, submit, presentation, runId = '', revision = 0, pending = false}: {
+export function GamePlaces({places, locale, locked, submit, presentation, runId = '', revision = 0, pending = false, forceList = false}: {
  places: PlacesView; locale: 'en' | 'pl'; locked: boolean; submit: (command: GameCommand) => void;
- presentation?: GameViewV2['presentation']; runId?: string; revision?: number; pending?: boolean;
+ presentation?: GameViewV2['presentation']; runId?: string; revision?: number; pending?: boolean; forceList?: boolean;
 }) {
  const copy = runCopy[locale], board = boardCopy[locale], id = useId(), layout = hexLayout(places);
  const illustrated = !!presentation && !!layout;
@@ -36,7 +36,7 @@ export function GamePlaces({places, locale, locked, submit, presentation, runId 
  const opener = useRef<HTMLButtonElement | null>(null), heading = useRef<HTMLHeadingElement>(null), boardHeading = useRef<HTMLHeadingElement>(null);
  const previous = useRef<{runId:string;revision:number;place:string;mode:string;signature:string}|null>(null);
  const focusedPlace = useRef<string|null>(null), switched = useRef(false);
- const graphical = !!layout && !list && !(illustrated && narrow);
+ const graphical = !!layout && !list && !forceList && !(illustrated && narrow);
  const mode = graphical ? 'map' : 'list';
  const inspectLabel=illustrated ? board.inspect : copy.inspect;
  const signature = JSON.stringify(places.places.map(p=>[p.id,p.x,p.y]));
@@ -85,7 +85,7 @@ export function GamePlaces({places, locale, locked, submit, presentation, runId 
  const close = () => {setInspection(null); if(opener.current?.isConnected)opener.current.focus();else boardHeading.current?.focus();};
  const content = <>
   <p lang={locale}>{copy.mapHint}</p>
-  {layout ? <button type="button" lang={locale} aria-pressed={list} onClick={() => {switched.current=true;setList(!list);}}>{copy.placeList}</button> : null}
+  {layout && !forceList ? <button type="button" lang={locale} aria-pressed={list} onClick={() => {switched.current=true;setList(!list);}}>{copy.placeList}</button> : null}
   {places.movementHint ? <p>{places.movementHint}</p> : null}
   {illustrated && places.places.some(p=>p.moveBehavior==='ENTER_SCENE') ? <p lang={locale}>{board.entryHint}</p> : null}
   <ul ref={map} aria-label={copy.places} className={`game-place-list${graphical ? ' game-hex-map' : ''}${illustrated ? ' game-board-cells' : ''}`}

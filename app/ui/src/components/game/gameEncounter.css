@@ -1,0 +1,16 @@
+.game-encounter { min-width: 0; margin-block: 16px; }
+.game-art.game-encounter { border: 1px solid #bca67c; border-radius: 16px; }
+.game-encounter-backdrop { border-radius: 16px 16px 0 0; overflow: hidden; }
+.game-encounter-backdrop svg { display: block; width: 100%; height: auto; }
+.game-encounter-content { min-width: 0; }
+.game-art.game-encounter .game-encounter-content { padding: 16px; background: #fffdf7; color: #2e2413; border-radius: 0 0 16px 16px; }
+.game-encounter .game-current-characters { margin-block: 0 16px; }
+.game-encounter .game-actions button { min-height: 44px; margin-block: 4px; }
+.game-run[data-text-mode=true] :is(.game-encounter-backdrop,.game-character-portrait,.game-party-portrait) { display: none; }
+.game-run[data-text-mode=true] .game-character-card { grid-template-columns: minmax(0,1fr); }
+@media (forced-colors: active) {
+ .game-encounter-backdrop, .game-character-portrait, .game-party-portrait { display: none; }
+ .game-character-card { grid-template-columns: minmax(0,1fr); }
+ .game-art.game-encounter { border-color: CanvasText; }
+ .game-art.game-encounter .game-encounter-content { background: Canvas; color: CanvasText; }
+}

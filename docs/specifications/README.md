@@ -95,8 +95,9 @@ list. The current implementation boundary is:
 - [30.3](30.3-playable-honeycomb-board-instruction.md) — primary illustrated board, visible accepted Capy movement and atomic destination-to-encounter entry (implemented, Pack 1.3.0).
 - [30.4](30.4-befriend-and-recruit-instruction.md) — public character portraits, traits/needs and accepted recruited-party display (implemented).
 
-Specs 30.5–30.7 remain follow-ups described in the intent, covering illustrated
-encounters, generation/prefetch and visual release. Specs 30.3 and 30.4 share
+- [30.5](30.5-illustrated-expeditions-instruction.md) — illustrated current encounters and accessible text mode (implemented).
+
+Specs 30.6–30.7 remain follow-ups covering generation/prefetch and visual release. Specs 30.3 and 30.4 share
 the implemented 30.2 contracts for the board, encounters and recruited party.
 
 ### Roadmap reconciliation

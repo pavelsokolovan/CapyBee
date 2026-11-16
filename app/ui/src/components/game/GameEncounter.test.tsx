@@ -1,0 +1,40 @@
+import {act} from 'react';
+import {createRoot,type Root} from 'react-dom/client';
+import {beforeEach,afterEach,it,expect,vi} from 'vitest';
+import {GameRun} from './GameRun';
+import {companionView} from '../../game/fixtures/companionViews';
+import type {GameRunSummaryDto} from '../../game/gameApi';
+import type {RunController,RunState} from '../../game/runController';
+(globalThis as typeof globalThis & {IS_REACT_ACT_ENVIRONMENT:boolean}).IS_REACT_ACT_ENVIRONMENT=true;
+let host:HTMLDivElement,root:Root;
+beforeEach(()=>{host=document.createElement('div');document.body.append(host);root=createRoot(host);});
+afterEach(async()=>{await act(async()=>root.unmount());host.remove();});
+it.each(['en','pl'] as const)('composes accepted art and preserves draft, focus and commands on %s text-mode switches',async locale=>{
+ const view=companionView();view.presentation!.backdropAssetId='backdrop.reed-bank';view.input={mode:'CHOICE_OR_TEXT',maxChars:200};
+ const run:GameRunSummaryDto={runId:'one',source:{kind:'PACK',packId:'fixture',packVersion:'1.0.0'},packId:'fixture',packVersion:'1.0.0',locale:'pl',status:'ACTIVE',revision:0,updatedAt:'2026-11-16T00:00:00Z',viewSchema:2,view};
+ let state:RunState={run,pending:false,message:'saved'};const listeners=new Set<()=>void>();
+ const controller={getSnapshot:()=>state,subscribe:(fn:()=>void)=>{listeners.add(fn);return()=>{listeners.delete(fn);};},initialize:vi.fn(async()=>{}),detach:vi.fn(),submit:vi.fn()};
+ await act(async()=>root.render(<GameRun run={run} owner="owner" locale={locale} controller={controller as unknown as RunController} onAnother={vi.fn()}/>));
+ expect(host.querySelectorAll('.game-encounter-backdrop svg')).toHaveLength(1);expect(host.querySelectorAll('.game-current-characters')).toHaveLength(1);expect(host.querySelectorAll('fieldset')).toHaveLength(1);
+ const area=host.querySelector('textarea')!;const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value')!.set!;
+ await act(async()=>{setter.call(area,'A quiet fictional wish');area.dispatchEvent(new Event('input',{bubbles:true}));});
+ const toggle=[...host.querySelectorAll('button')].find(b=>b.textContent===(locale==='en'?'Text mode':'Tryb tekstowy'))!;toggle.focus();
+ await act(async()=>toggle.click());expect(host.querySelector('.game-run')?.getAttribute('data-text-mode')).toBe('true');expect(document.activeElement).toBe(toggle);expect(host.querySelector('textarea')).toBe(area);expect(area.value).toBe('A quiet fictional wish');expect(controller.submit).not.toHaveBeenCalled();
+ await act(async()=>toggle.click());expect(host.querySelector('textarea')).toBe(area);expect(area.value).toBe('A quiet fictional wish');
+ await act(async()=>{state={...state,pending:true,message:'waiting'};listeners.forEach(fn=>fn());});
+ expect(host.querySelector('.game-block')?.textContent).toContain('We can take our time.');expect(host.querySelector('fieldset')?.disabled).toBe(true);
+ expect(host.querySelector('.game-encounter-backdrop svg')?.getAttribute('aria-hidden')).toBe('true');
+ await act(async()=>toggle.click());
+ await act(async()=>{state={run:{...run,runId:'two'},pending:false,message:'saved'};listeners.forEach(fn=>fn());});
+ expect(host.querySelector('.game-run')?.getAttribute('data-text-mode')).toBe('false');
+});
+it('retains the legacy text renderer without a presentation promise',async()=>{
+ const {GameEncounter}=await import('./GameEncounter');const view=companionView();delete view.presentation;
+ await act(async()=>root.render(<GameEncounter view={view}><p>Readable story</p></GameEncounter>));expect(host.querySelector('svg')).toBeNull();expect(host.textContent).toBe('Readable story');
+});
+
+it('uses neutral catalog artwork for unknown backdrop IDs without external resources',async()=>{
+ const {GameEncounter}=await import('./GameEncounter');const view=companionView();view.presentation!.backdropAssetId='https://invalid.example/art.svg' as never;
+ await act(async()=>root.render(<GameEncounter view={view}><p>Accepted story</p></GameEncounter>));
+ expect(host.querySelectorAll('svg')).toHaveLength(1);expect(host.querySelector('image,script,img')).toBeNull();expect(host.innerHTML).not.toContain('invalid.example');
+});

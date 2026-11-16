@@ -9,12 +9,15 @@ import {runCopy} from './runCopy';
 import './gameRun.css';
 import {GamePlaces,hexLayout} from './GamePlaces';
 import {boardCopy} from './boardCopy';
+import {GameEncounter,encounterCopy} from './GameEncounter';
 import {GameCompletion} from './GameCompletion';
 import {GameCurrentCharacters, GameParty} from './GameCharacters';
 export function GameRun({run,owner,locale,onAnother,controller:provided}:{run:GameRunSummaryDto;owner:string;locale:'en'|'pl';onAnother:()=>void;controller?:RunController}){
  const [initialized,setInitialized]=useState(false);
+ const [textPreference,setTextPreference]=useState<{runId:string;enabled:boolean}|null>(null);
  const [controller]=useState(()=>provided??new RunController(run,new GameTransport(()=>owner,()=>restoreGameSession(owner)),owner));
  const state=useSyncExternalStore(controller.subscribe,controller.getSnapshot),c=runCopy[locale],view=state.run.view;
+ const textMode=textPreference?.runId===state.run.runId&&textPreference.enabled;
  const heading=useRef<HTMLHeadingElement>(null),runHeading=useRef<HTMLHeadingElement>(null),abandon=useRef<HTMLButtonElement>(null),dialog=useRef<HTMLDialogElement>(null);
  useEffect(()=>{let alive=true;void controller.initialize().then(()=>{if(alive)setInitialized(true);}).catch(()=>{});return()=>{alive=false;controller.detach();};},[controller]);
 
@@ -44,11 +47,11 @@ export function GameRun({run,owner,locale,onAnother,controller:provided}:{run:Ga
   }
  },[state.run.runId,state.run.revision,state.pending,state.message,ended]);
  const cancel=()=>{dialog.current?.close();abandon.current?.focus();};
- return <section className="game-run" lang={state.run.locale}><h3 tabIndex={-1} ref={illustrated?runHeading:heading}>{view&&'story' in view?view.story?.title??c.scene:c.scene}</h3>
+ return <section className="game-run" data-text-mode={textMode} lang={state.run.locale}><h3 tabIndex={-1} ref={illustrated?runHeading:heading}>{view&&'story' in view?view.story?.title??c.scene:c.scene}</h3>
  <p>{adventureCopy[locale].locale}: {new Intl.DisplayNames([locale],{type:'language'}).of(state.run.locale)}</p>
  {initialized&&state.message==='saved'?<p>{adventureCopy[locale].ready}</p>:null}<p role="status" aria-live="polite">{initialized?c[state.message]:c.checking}</p>{unsupported?<p>{c.unsupported}</p>:null}{state.run.status!=='ACTIVE'&&!ended?<p>{c.unavailable}</p>:null}
- {view?<>{illustrated?<GamePlaces places={view.places!} presentation={presentation} runId={state.run.runId} revision={state.run.revision} pending={state.pending} locale={locale} locked={locked&&!ended} submit={submit}/>:null}<GameParty view={view} locale={locale} runId={state.run.runId} revision={state.run.revision} ready={initialized} announce={initialized&&!locked&&state.message==='saved'}/>
- {illustrated?<h4 tabIndex={-1} ref={heading} lang={locale}>{boardCopy[locale].moment}</h4>:null}<SceneBlocks view={view} locale={locale}/><GameCurrentCharacters view={view} locale={locale}/>{initialized&&(!locked||state.pending)?<SceneActions key={state.run.revision} view={view} locale={locale} locked={locked} selection={state.selection} submit={submit}/>:null}
+ {view?<>{presentation?<button type="button" lang={locale} aria-pressed={textMode} onClick={()=>setTextPreference({runId:state.run.runId,enabled:!textMode})}>{encounterCopy[locale].text}</button>:null}{illustrated?<GamePlaces places={view.places!} presentation={presentation} runId={state.run.runId} revision={state.run.revision} pending={state.pending} forceList={textMode} locale={locale} locked={locked&&!ended} submit={submit}/>:null}<GameParty view={view} locale={locale} runId={state.run.runId} revision={state.run.revision} ready={initialized} announce={initialized&&!locked&&state.message==='saved'}/>
+ {illustrated?<h4 tabIndex={-1} ref={heading} lang={locale}>{boardCopy[locale].moment}</h4>:null}<GameEncounter view={view}><GameCurrentCharacters view={view} locale={locale}/><SceneBlocks view={view} locale={locale}/>{initialized&&(!locked||state.pending)?<SceneActions key={state.run.revision} view={view} locale={locale} locked={locked} selection={state.selection} submit={submit}/>:null}</GameEncounter>
  <ScenePanels hidePlaces={illustrated} view={view} locale={locale} locked={locked} submit={submit}/>{ended?<SceneResult view={view} locale={locale}/>:null}</>:null}
  {state.retryable?<button type="button" onClick={()=>void controller.retryUnsent()}>{c.retry}</button>:null}
  {state.cancellable?<button type="button" onClick={()=>void controller.removeUnsent()}>{c.remove}</button>:null}
