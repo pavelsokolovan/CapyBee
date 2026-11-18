@@ -111,5 +111,17 @@ try {
  await checkPolishPack({page,context,base,requests});
  await checkPolishGeneration({page,context,base,requests,logs});
  await checkRecovery({page,context,base,requests,logs});
+ // A new worker must notify an already-running renderer, without discarding drafts automatically.
+ await page.evaluate(()=>navigator.serviceWorker.ready);
+ const writesBeforeUpdate=requests.length,focusBeforeUpdate=await page.evaluate(()=>document.activeElement?.tagName);
+ await page.evaluate(()=>navigator.serviceWorker.dispatchEvent(new Event('controllerchange')));
+ const update=page.getByRole('button',{name:'Reload app',exact:true});await update.waitFor();
+ assert.equal(await page.evaluate(()=>document.activeElement?.tagName),focusBeforeUpdate);
+ assert.equal(requests.length,writesBeforeUpdate);
+ await Promise.all([page.waitForEvent('load'),update.click()]);
+ await page.getByRole('button',{name:'Play',exact:true}).waitFor();
+ assert.equal(await page.locator('.app-update-notice').count(),0);
+ assert.equal(requests.length,writesBeforeUpdate,'updating the renderer submitted a game command');
+ console.log('PASS: PWA controller update notice, no forced reload or game writes, explicit reload');
  console.log('PASS: Spring-served preparation, private review, 360px/desktop, explicit start, reload/continue, browser Back and storage');
 }catch(error){console.error('Browser acceptance assertion failed; story and request bodies omitted.');console.error('Phase:',await page.locator('[data-preparation-phase]').getAttribute('data-preparation-phase').catch(()=>null));console.error('HTTP metadata:',JSON.stringify(statuses.slice(-8)));console.error('Status:',await page.locator('.game-run [role=status]').textContent({timeout:1000}).catch(()=>null));console.error('Queue metadata:',await page.evaluate(async()=>{const r=indexedDB.open('keyval-store');const db=await new Promise(resolve=>r.onsuccess=()=>resolve(r.result));if(!db.objectStoreNames.contains('keyval'))return [];const values=await new Promise(resolve=>{const r=db.transaction('keyval').objectStore('keyval').getAll();r.onsuccess=()=>resolve(r.result);});db.close();return values.filter(v=>v?.type==='gameCommand').map(v=>({id:v.clientId,poll:v.poll,status:v.status,attempts:v.attempts,notBefore:v.notBefore}));}));throw error;}finally{await browser.close();}

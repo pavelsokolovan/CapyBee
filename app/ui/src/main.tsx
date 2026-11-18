@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import {AppUpdateNotice} from './components/AppUpdateNotice';
 import './styles.css';
 
 // The preview is absent from ordinary production builds and never changes gameplay routing.
@@ -10,6 +11,6 @@ const Gallery = artPreview ? React.lazy(() => import('./components/game/art/Game
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    {Gallery ? <React.Suspense fallback={null}><Gallery /></React.Suspense> : <App />}
+    {Gallery ? <React.Suspense fallback={null}><Gallery /></React.Suspense> : <><App /><AppUpdateNotice /></>}
   </React.StrictMode>
 );

@@ -1,0 +1,5 @@
+.app-update-notice { position:fixed; z-index:3000; inset: auto 12px calc(76px + env(safe-area-inset-bottom)); max-width:560px; margin-inline:auto; padding:16px; border:2px solid #765321; border-radius:16px; background:#fffdf7; color:#2e2413; box-shadow:0 4px 20px #0003; overflow-wrap:anywhere; }
+.app-update-notice p { margin:0 0 8px; }
+.app-update-notice button { min-height:44px; padding:10px 16px; border:2px solid currentColor; border-radius:10px; font:inherit; color:inherit; background:#fdf6e3; }
+.app-update-notice button:focus-visible { outline:3px solid currentColor; outline-offset:3px; }
+@media (forced-colors:active) { .app-update-notice,.app-update-notice button { color:CanvasText; background:Canvas; border-color:CanvasText; } }
