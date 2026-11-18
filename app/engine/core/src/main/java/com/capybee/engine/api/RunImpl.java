@@ -231,9 +231,15 @@ final class RunImpl implements Run {
         Scene current = scene(sceneId);
         if (current == null) return List.of();
         LinkedHashSet<String> candidates = new LinkedHashSet<>();
-        current.options().forEach(option -> addPrefetchCandidate(candidates, option.next()));
-        addPrefetchCandidate(candidates, current.next());
-        current.branches().forEach(branch -> addPrefetchCandidate(candidates, branch.next()));
+        current.options().stream().filter(this::isEnabled).forEach(option -> addPrefetchCandidate(candidates, option.next()));
+        if (current.options().isEmpty() && current.next() != null) {
+            String next = current.next();
+            for (SceneBranch branch : current.branches())
+                if (ConditionEvaluator.evaluate(branch.condition(), ruleStateView(step + 1))) {next = branch.next(); break;}
+            addPrefetchCandidate(candidates, next);
+        }
+        if (placeMap != null) for (PlaceDef place : placeMap.places())
+            if (place.entry() != null && moveAllowed(place)) addPrefetchCandidate(candidates, place.entry().sceneId());
         return List.copyOf(candidates);
     }
 
@@ -411,13 +417,15 @@ final class RunImpl implements Run {
         }
     }
 
-    private RuleStateView ruleStateView() {
+    private RuleStateView ruleStateView() { return ruleStateView(step); }
+
+    private RuleStateView ruleStateView(long projectedStep) {
         return new RuleStateView() {
             public int counter(String id) { return counters.getOrDefault(id, 0); }
             public boolean flag(String id) { return flags.getOrDefault(id, false); }
             public Set<String> set(String id) { return sets.getOrDefault(id, new LinkedHashSet<>()); }
             public boolean visitedScene(String id) { return visited.contains(id); }
-            public long step() { return step; }
+            public long step() { return projectedStep; }
             public boolean atPlace(String id) { return id.equals(currentPlaceId); }
             public boolean visitedPlace(String id) { return visitedPlaces.contains(id); }
         };

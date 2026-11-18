@@ -1,0 +1,20 @@
+{
+  "title": "Mały przystanek",
+  "narration": "Luna to uważna ćma. Potrzebuje czytelnego znaku, żeby znaleźć miejsce odpoczynku przy drodze. „Lubię wiedzieć, gdzie można przysiąść” — mówi spod liścia.",
+  "dialogue": [],
+  "choices": [
+    {
+      "id": "help-luna",
+      "label": "Układam z Luną znak z liści"
+    },
+    {
+      "id": "wave-luna",
+      "label": "Macham na pożegnanie i idę dalej"
+    },
+    {
+      "id": "rest-now",
+      "label": "Na dziś wybieram odpoczynek"
+    }
+  ],
+  "continuityFacts": []
+}

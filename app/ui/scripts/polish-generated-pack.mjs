@@ -18,7 +18,7 @@ export async function checkPolishGeneration({page,context,base,requests,logs}) {
  await page.unroute('**/api/game/pack-starts');
  assert.equal(requests.filter(r=>r.url.endsWith('/api/game/pack-starts')).length,before+1);
  const body=requests.filter(r=>r.url.endsWith('/api/game/pack-starts')).at(-1).body;
- assert.equal(body.suggestion,idea);assert.equal(body.confirmed,true);assert.equal(body.packVersion,'1.3.0');assert.equal(body.disclosureRevision,1);assert.equal(body.selections['story-tone'][0],'cozy');
+ assert.equal(body.suggestion,idea);assert.equal(body.confirmed,true);assert.equal(body.packVersion,'1.4.0');assert.equal(body.disclosureRevision,1);assert.equal(body.selections['story-tone'][0],'cozy');
  const current=await (await context.request.get(`${base}/api/game/runs/current`)).json();assert.equal(current.source.kind,'PACK');assert.ok(current.view.story);
  await page.reload();await page.getByRole('button',{name:'Play',exact:true}).click();await page.getByRole('button',{name:/Adventures/}).click();
  await page.getByRole('button',{name:'Continue',exact:true}).click();await page.locator('.game-run').waitFor();

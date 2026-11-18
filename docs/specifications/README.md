@@ -97,7 +97,9 @@ list. The current implementation boundary is:
 
 - [30.5](30.5-illustrated-expeditions-instruction.md) — illustrated current encounters and accessible text mode (implemented).
 
-Specs 30.6–30.7 remain follow-ups covering generation/prefetch and visual release. Specs 30.3 and 30.4 share
+- [30.6](30.6-generation-and-prefetch-instruction.md) — theme-grounded illustration context and bounded legal next-scene prefetch (implemented, Pack 1.4.0).
+
+Spec 30.7 remains the visual release acceptance follow-up. Specs 30.3 and 30.4 share
 the implemented 30.2 contracts for the board, encounters and recruited party.
 
 ### Roadmap reconciliation

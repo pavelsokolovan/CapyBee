@@ -21,7 +21,7 @@ export async function checkBoardRoute({page,context,base,requests}){
  await mkdir(evidence,{recursive:true});
  await page.emulateMedia({reducedMotion:'no-preference',forcedColors:'none'});
  const game=page.locator('.game-run'),board=game.locator('.game-board');
- const initial=await current(context,base);assert.equal(initial.packVersion,'1.3.0');
+ const initial=await current(context,base);assert.equal(initial.packVersion,'1.4.0');
  assert.equal(await board.count(),1);assert.equal(await game.locator('.game-places').count(),1);
  assert.equal(await board.locator('[data-place-id]').count(),7);assert.equal(await board.locator('.game-tile-marker').count(),0);
  assert.equal(await board.locator('.game-board-player').count(),1);assert.equal(await board.locator('.game-hex-map').evaluate(n=>getComputedStyle(n).display),'grid');
@@ -101,6 +101,6 @@ export async function checkBoardRoute({page,context,base,requests}){
  await page.emulateMedia({forcedColors:'active'});await shot(page,'.game-board','board-forced-colors');assert.deepEqual(await board.locator('[data-place-id] > strong').allTextContents(),names);
  const art=await page.addStyleTag({content:'.game-board svg{visibility:hidden!important}'});assert.deepEqual(await board.locator('[data-place-id] > strong').allTextContents(),names);await art.evaluate(n=>n.remove());
  await page.emulateMedia({forcedColors:'none',reducedMotion:'no-preference'});await page.setViewportSize({width:1280,height:1000});await shot(page,'.game-board','board-desktop');await page.setViewportSize({width:360,height:800});
- await writeFile(`${evidence}browser-verification.json`,JSON.stringify({schemaVersion:1,packVersion:'1.3.0',mobileWidth:360,places:7,minTerrain:64,minPlayer:32,oneMoveAtomicEntry:true,adjacentAnimationMs:200,pendingRetained:true,offlineUncertainReload:true,replay:true,stalePeerSelection:true,listParity:true,zoom:'200%',reducedMotion:true,forcedColors:true,hiddenArtwork:true,liveProvider:false},null,2)+'\n');
+ await writeFile(`${evidence}browser-verification.json`,JSON.stringify({schemaVersion:1,packVersion:'1.4.0',mobileWidth:360,places:7,minTerrain:64,minPlayer:32,oneMoveAtomicEntry:true,adjacentAnimationMs:200,pendingRetained:true,offlineUncertainReload:true,replay:true,stalePeerSelection:true,listParity:true,zoom:'200%',reducedMotion:true,forcedColors:true,hiddenArtwork:true,liveProvider:false},null,2)+'\n');
  console.log('PASS: primary seven-place illustrated board, one MOVE/encounter, pending, offline uncertain reload, replay, peer conflict, keyboard, list/zoom and art fallbacks');
 }

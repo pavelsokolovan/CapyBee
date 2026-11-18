@@ -587,6 +587,19 @@ public final class GenerationPipeline {
         if (stage == GenerationCatalog.Stage.QUEST) context.put("objectiveIds", templateFor(stage, slot).objectiveIds());
         if (stage == GenerationCatalog.Stage.SCENE) {
             context.put("sceneId", slot.sceneId());
+            if (stageArtifacts.containsKey(GenerationCatalog.Stage.THEME))
+                context.put("theme", stageArtifacts.get(GenerationCatalog.Stage.THEME).payload());
+            var art = com.capybee.engine.content.json.PresentationParser.parse(pack);
+            if (art != null) {
+                Map<String, Object> illustration = new LinkedHashMap<>();
+                illustration.put("catalogVersion", art.catalogVersion());
+                if (art.playerAssetId() != null) illustration.put("playerAssetId", art.playerAssetId());
+                art.scenes().stream().filter(binding -> binding.sceneId().equals(slot.sceneId())).findFirst()
+                    .ifPresent(binding -> illustration.put("backdropAssetId", binding.backdropAssetId()));
+                illustration.put("characterAssetIds", art.characters().stream().filter(c -> c.sceneIds().contains(slot.sceneId()))
+                    .map(com.capybee.engine.content.PresentationDefinition.CharacterDef::assetId).distinct().toList());
+                context.put("trustedIllustration", illustration);
+            }
             context.put("trustedChoiceIds", slot.choiceIds());
             if (fullGame()) {
                 context.put("phaseId", slot.phaseId()); context.put("storyRole", slot.storyRole());

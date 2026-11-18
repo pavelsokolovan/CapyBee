@@ -7,7 +7,7 @@ import static org.assertj.core.api.Assertions.*;
 class GameCompletionPolicyTest {
     final GameCompletionPolicy policy=new GameCompletionPolicy();
     @Test void exactPolishEndingPairsHaveReviewedVersionOneBindings() {
-        for(String version:List.of("1.0.0","1.1.0","1.2.0","1.3.0")) {
+        for(String version:List.of("1.0.0","1.1.0","1.2.0","1.3.0","1.4.0")) {
             assertThat(policy.suggest("capybee-new-hive",version,"new-path","ending-new")).contains(new GameCompletionPolicy.Suggestion("say_thank_you_helper",1));
             assertThat(policy.suggest("capybee-new-hive",version,"two-lights","ending-two")).contains(new GameCompletionPolicy.Suggestion("listen_song_reminds_home",1));
             assertThat(policy.suggest("capybee-new-hive",version,"rest-here","ending-rest")).contains(new GameCompletionPolicy.Suggestion(GameCompletionPolicy.REST,1));
