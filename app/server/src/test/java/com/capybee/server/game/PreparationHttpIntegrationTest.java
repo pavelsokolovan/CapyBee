@@ -52,7 +52,9 @@ import static org.assertj.core.api.Assertions.*;
  "capybee.game.generation-enabled=true","capybee.game.dynamic.enabled=true","capybee.game.dynamic.profile-ids=generic-adventure",
  "capybee.game.command-hmac-key=preparation-fixture-key-32-bytes-long","capybee.game.sync-wait-ms=0",
  "capybee.game.limits.profile-calls-per-day=1000","capybee.game.pack-preparation.enabled=true","capybee.game.pack-preparation.provider-approved=true",
- "capybee.game.completion.enabled=true","capybee.game.dynamic.starts-per-hour=100","spring.session.jdbc.initialize-schema=never"})
+ "capybee.game.completion.enabled=true","capybee.game.dynamic.starts-per-hour=100",
+ // The browser drives multiple complete stories as one fixture owner at automation speed.
+ "capybee.game.limits.commands-per-minute=300","spring.session.jdbc.initialize-schema=never"})
 @org.springframework.test.annotation.DirtiesContext(classMode=org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 @Import(PreparationHttpIntegrationTest.FixtureConfiguration.class)
 @org.junit.jupiter.api.extension.ExtendWith(org.springframework.boot.test.system.OutputCaptureExtension.class)

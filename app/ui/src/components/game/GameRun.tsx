@@ -57,12 +57,12 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
   intention.current=null;
   if(state.message!=='saved'||requested.runId!==state.run.runId)return;
   if(episode&&episodeMap.current)episodeMap.current.open=false;
-  if(episode||requested.command.type!=='MOVE'||requested.entry||ended)heading.current?.focus();
+  if(episode||expedition||requested.command.type!=='MOVE'||requested.entry||ended)heading.current?.focus();
   else {
    const cell=[...document.querySelectorAll<HTMLElement>('.game-run [data-place-id]')].find(n=>n.dataset.placeId===view?.places?.currentPlaceId);
    cell?.querySelector<HTMLButtonElement>('button')?.focus();
   }
- },[state.run.runId,state.run.revision,state.pending,state.message,ended,episode,hasSceneHeading,view?.places?.currentPlaceId]);
+ },[state.run.runId,state.run.revision,state.pending,state.message,ended,episode,expedition,hasSceneHeading,view?.places?.currentPlaceId]);
  const cancel=()=>{dialog.current?.close();abandon.current?.focus();};
  const storyTitle=view&&'story' in view ? view.story?.title : null;
  const title=episode ? anonymousNoteTitle : storyTitle??(expedition?hiveExpeditionTitle:c.scene);
@@ -74,7 +74,7 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
   ? (!episode||state.message!=='saved'||saveVisible ? c[state.message] : '') : c.checking}</p>;
  const actions=view&&initialized&&(!locked||state.pending)?<SceneActions key={state.run.revision} view={view}
   locale={controlsLocale} locked={locked} selection={state.selection} submit={submit}/>:null;
- const board=illustrated&&view?.places?<GamePlaces places={view.places} presentation={presentation}
+ const board=(illustrated||expedition)&&view?.places?.places.length?<GamePlaces places={view.places} presentation={presentation} compact={expedition}
   runId={state.run.runId} revision={state.run.revision} pending={state.pending} forceList={textMode}
   locale={locale} locked={locked&&!ended} submit={submit}/>:null;
  const party=view?<GameParty view={view} locale={locale} runId={state.run.runId} revision={state.run.revision}
@@ -104,7 +104,7 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
  <SceneBlocks view={view} locale={locale}/>{actions}
  </GameEncounter>
  {expedition?<><GameCurrentCharacters view={view} locale={locale} collapsible/>{party}</>:null}
- <ScenePanels hidePlaces={illustrated} view={view} locale={locale} locked={locked} submit={submit}/>{ended?<SceneResult view={view} locale={locale}/>:null}</>:episode?status:null}
+ <ScenePanels hidePlaces={illustrated||expedition} view={view} locale={locale} locked={locked} submit={submit}/>{ended?<SceneResult view={view} locale={locale}/>:null}</>:episode?status:null}
  {state.retryable?<button type="button" onClick={()=>void controller.retryUnsent()}>{c.retry}</button>:null}
  {state.cancellable?<button type="button" onClick={()=>void controller.removeUnsent()}>{c.remove}</button>:null}
  {state.pending?<button type="button" onClick={()=>void controller.check()}>{c.check}</button>:null}

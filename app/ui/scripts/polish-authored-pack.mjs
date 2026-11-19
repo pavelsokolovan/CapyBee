@@ -60,7 +60,7 @@ export async function checkPolishPack({page,context,base,requests}) {
    assert.ok(action.height>=44&&action.width>=44);
    await game.getByRole('heading',{name:'Polana Nowego Ula',exact:true}).waitFor();
    const map=game.locator('.game-scene-map');
-   assert.equal(await map.locator('summary').textContent(),locale==='en'?'Map':'Mapa');
+   assert.equal(await map.locator(':scope > summary').textContent(),locale==='en'?'Map':'Mapa');
    assert.equal(await map.evaluate(node=>node.open),false);
    assert.equal(await game.locator('.game-board').isVisible(),false);
    assert.equal(await game.locator('.game-current-characters').evaluate(node=>node.open),false);
@@ -112,7 +112,12 @@ export async function checkPolishPack({page,context,base,requests}) {
  await start();await choose('Continue');
  await openExpeditionMap(game);
  assert.equal(await game.locator('.game-board [data-place-id]').count(),7);
- assert.equal(await game.getByRole('button',{name:'Visit: Mostek Dwóch Świateł',exact:true}).isDisabled(),true);
+ const bridge=game.locator('[data-place-id="small-crossing"]');
+ const prerequisite=(await currentRun()).view.places.places.find(place=>place.id==='small-crossing').moveHint;
+ assert.ok(prerequisite);
+ await bridge.getByText(prerequisite,{exact:true}).waitFor();
+ assert.equal(await bridge.getByRole('button').count(),0);
+ assert.equal(await game.getByText(prerequisite,{exact:true}).count(),1);
  await choose('Visit: Latarnia Wspomnień');await choose('Visit: Polana Nowego Ula');
  const current=await (await context.request.get(base+'/api/game/runs/current')).json(),posts=requests.length;
  assertPublic(current);assert.deepEqual(current.view.presentation.characters.map(c=>c.id),['actor:hive-guide'],'map movement disclosed a future hero');
@@ -132,7 +137,11 @@ export async function checkPolishPack({page,context,base,requests}) {
  await page.getByRole('button',{name:'Back to Play',exact:true}).click();
  await Promise.all([page.waitForResponse(r=>r.url().endsWith('/api/child-profile')&&r.request().method()==='PATCH'&&r.status()===200),page.locator('.locale-control select').first().selectOption('pl')]);
  await page.getByRole('button',{name:'Graj',exact:true}).click();await page.getByRole('button',{name:/Przygody/}).click();
- await start('pl');await choose('Dalej');await choose('Na dziś wybieram odpoczynek');await ending('rest-here');
+ await start('pl');await choose('Dalej');await openExpeditionMap(game);
+ await game.locator('[aria-current="location"]').getByText('Tu jesteś',{exact:true}).waitFor();
+ await game.getByRole('button',{name:'Idź: Cicha Łąka',exact:true}).waitFor();
+ await game.locator('.game-scene-map > summary').click();
+ await choose('Na dziś wybieram odpoczynek');await ending('rest-here');
  await page.emulateMedia({reducedMotion:'reduce'});await game.evaluate(n=>n.style.zoom='2');
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth));
  await game.evaluate(n=>n.style.zoom='1');await page.screenshot({path:'/tmp/291-polish-rest-360.png'});

@@ -44,6 +44,24 @@ it('uses public hint precedence and generic wording for unknown behavior, retain
  v.places!.movementHint=null;await render();expect(host.querySelectorAll('[data-place-id]')[1].textContent).toContain('Prepare path.');
  v.places!.places[1].moveBehavior='FUTURE';v.presentation=null;await render();expect(button('Przejdź do: River')).toBeDefined();expect(host.querySelector('svg')).toBeNull();
 });
+it('keeps compact travel available in a text-only fallback and shows a locked prerequisite once',async()=>{
+ const v=view(),submit=vi.fn(),places=v.places!;
+ places.places.push({id:'bridge',label:'Bridge',x:null,y:null,moveHint:'Build a rail.'});
+ const draw=async(locked:boolean)=>act(async()=>root.render(<GamePlaces places={places} compact locale="en" locked={locked} submit={submit}/>));
+ await draw(false);
+ expect(host.querySelector('.game-hex-map')).toBeNull();
+ expect(host.querySelector('[aria-current=location]')?.textContent).toContain("You're here");
+ expect(host.querySelector('[data-place-id="bridge"]')?.textContent).toContain('Build a rail.');
+ expect(host.querySelectorAll('[data-place-id] button')).toHaveLength(1);
+ expect(host.textContent?.match(/Build a rail\./g)).toHaveLength(1);
+ await draw(true);
+ expect(button('Visit: River').disabled).toBe(true);
+ await act(async()=>button('Visit: River').click());
+ expect(submit).not.toHaveBeenCalled();
+ await draw(false);
+ await act(async()=>button('Visit: River').click());
+ expect(submit).toHaveBeenCalledExactlyOnceWith({type:'MOVE',placeId:'river'});
+});
 it.each(['ENTER_SCENE','LOCATION_ONLY'])('keeps pending/rejected state and sends only one MOVE, then focuses accepted %s appropriately',async behavior=>{
  const initial=view();initial.places!.places[1].moveBehavior=behavior;
  const run:GameRunSummaryDto={runId:'run',source:{kind:'PACK',packId:'fixture',packVersion:'1.0.0'},packId:'fixture',packVersion:'1.0.0',status:'ACTIVE',locale:'en',revision:0,updatedAt:'2026-11-16T00:00:00Z',viewSchema:2,view:initial};

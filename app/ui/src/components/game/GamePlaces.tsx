@@ -23,9 +23,9 @@ export function hexLayout(view: PlacesView) {
  return {columns, cells: cells.map(p => ({gridColumn: `${p.column - left + 1} / span 2`, gridRow: p.row - top + 1}))};
 }
 
-export function GamePlaces({places, locale, locked, submit, presentation, runId = '', revision = 0, pending = false, forceList = false}: {
+export function GamePlaces({places, locale, locked, submit, presentation, runId = '', revision = 0, pending = false, forceList = false, compact = false}: {
  places: PlacesView; locale: 'en' | 'pl'; locked: boolean; submit: (command: GameCommand) => void;
- presentation?: GameViewV2['presentation']; runId?: string; revision?: number; pending?: boolean; forceList?: boolean;
+ presentation?: GameViewV2['presentation']; runId?: string; revision?: number; pending?: boolean; forceList?: boolean; compact?: boolean;
 }) {
  const copy = runCopy[locale], board = boardCopy[locale], id = useId(), layout = hexLayout(places);
  const illustrated = !!presentation && !!layout;
@@ -36,11 +36,12 @@ export function GamePlaces({places, locale, locked, submit, presentation, runId 
  const opener = useRef<HTMLButtonElement | null>(null), heading = useRef<HTMLHeadingElement>(null), boardHeading = useRef<HTMLHeadingElement>(null);
  const previous = useRef<{runId:string;revision:number;place:string;mode:string;signature:string}|null>(null);
  const focusedPlace = useRef<string|null>(null), switched = useRef(false);
- const graphical = !!layout && !list && !forceList && !(illustrated && narrow);
+ const graphical = !!layout && !list && !forceList && !(illustrated && narrow) && (!compact || illustrated);
  const mode = graphical ? 'map' : 'list';
  const inspectLabel=illustrated ? board.inspect : copy.inspect;
  const signature = JSON.stringify(places.places.map(p=>[p.id,p.x,p.y]));
  const inspected = places.places.find(place => place.id === inspection);
+ const described = compact ? places.places.filter(place=>place.description) : [];
  useLayoutEffect(() => { if (inspection !== null) heading.current?.focus(); }, [inspection]);
  useLayoutEffect(() => {
   if (!illustrated || !container.current || !layout) return;
@@ -84,10 +85,11 @@ export function GamePlaces({places, locale, locked, submit, presentation, runId 
  }, [places.currentPlaceId, revision, runId, mode, signature, illustrated, board.arrived, locked]);
  const close = () => {setInspection(null); if(opener.current?.isConnected)opener.current.focus();else boardHeading.current?.focus();};
  const content = <>
-  <p lang={locale}>{copy.mapHint}</p>
-  {layout && !forceList ? <button type="button" lang={locale} aria-pressed={list} onClick={() => {switched.current=true;setList(!list);}}>{copy.placeList}</button> : null}
+  {!compact ? <p lang={locale}>{copy.mapHint}</p> : null}
+  {layout && !forceList && (!compact || illustrated && !narrow) ? <button type="button" lang={locale}
+   aria-pressed={list} onClick={() => {switched.current=true;setList(!list);}}>{copy.placeList}</button> : null}
   {places.movementHint ? <p>{places.movementHint}</p> : null}
-  {illustrated && places.places.some(p=>p.moveBehavior==='ENTER_SCENE') ? <p lang={locale}>{board.entryHint}</p> : null}
+  {!compact && illustrated && places.places.some(p=>p.moveBehavior==='ENTER_SCENE') ? <p lang={locale}>{board.entryHint}</p> : null}
   <ul ref={map} aria-label={copy.places} className={`game-place-list${graphical ? ' game-hex-map' : ''}${illustrated ? ' game-board-cells' : ''}`}
     onFocusCapture={event=>{const cell=(event.target as HTMLElement).closest<HTMLElement>('[data-place-id]');if(cell)focusedPlace.current=cell.dataset.placeId??null;}}
     style={graphical ? {gridTemplateColumns: `repeat(${layout!.columns}, minmax(0, 1fr))`} : undefined}>
@@ -96,27 +98,43 @@ export function GamePlaces({places, locale, locked, submit, presentation, runId 
     const legal = places.availableMoves.includes(place.id), hint = `${id}-${index}`;
     const entry = place.moveBehavior === 'ENTER_SCENE';
     const terrain = presentation?.places.find(p=>p.placeId===place.id)?.terrainAssetId;
+    const verb = entry ? board.enter : copy.move;
+    const travel = <button type="button" lang={locale} disabled={locked || !legal} aria-label={`${verb}: ${place.label}`}
+      aria-describedby={compact ? undefined : hint}
+      onClick={() => {if (!locked && legal) submit({type: 'MOVE', placeId: place.id});}}>
+     {compact || illustrated && graphical ? verb : `${verb}: ${place.label}`}
+    </button>;
     return <li key={`${place.id}-${index}`} data-place-id={place.id} className={`game-place${current ? ' game-place-current' : ''}`}
-      style={graphical ? layout!.cells[index] : undefined} aria-current={current ? 'location' : undefined}>
+      style={graphical ? layout!.cells[index] : undefined} aria-current={current ? 'location' : undefined}
+      data-travel-state={compact ? (current ? 'current' : legal ? 'reachable' : 'unavailable') : undefined}>
      {illustrated && graphical ? <span className="game-board-art"><GameTileArt assetId={terrain} showPlayer={false}
        states={[current?'current':legal?'available':'unavailable',...(visited?['visited' as const]:[]),...(inspection===place.id?['selected' as const]:[]),...(current&&pending?['pending' as const]:[])]}/></span> : null}
      <strong>{place.label}</strong>
+     {compact ? <div className="game-board-travel">
+      {current ? <span lang={locale}>{board.youAreHere}</span> : legal ? travel :
+       <span lang={place.moveHint ? undefined : locale}>{place.moveHint ?? board.noRoute}</span>}
+      {!current && visited ? <small lang={locale}>{copy.visited}</small> : null}
+     </div> : <>
      <span className="game-board-place-state">{current ? <p lang={locale}>◉ {copy.current}</p> : null}{visited ? <p lang={locale}>✓ {copy.visited}</p> : null}</span>
      <span className="game-board-controls"><button type="button" lang={locale} aria-label={`${inspectLabel}: ${place.label}`} onClick={event => {opener.current = event.currentTarget; setInspection(place.id);}}>{illustrated && graphical ? inspectLabel : `${inspectLabel}: ${place.label}`}</button>
-     <button type="button" lang={locale} disabled={locked || !legal} aria-label={`${entry ? board.enter : copy.move}: ${place.label}`} aria-describedby={hint}
-       onClick={() => {if (!locked && places.availableMoves.includes(place.id)) submit({type: 'MOVE', placeId: place.id});}}>{illustrated && graphical ? (entry ? board.enter : copy.move) : `${entry ? board.enter : copy.move}: ${place.label}`}</button></span>
+     {travel}</span>
      <p className={illustrated && graphical ? "game-board-cell-hint" : undefined} id={hint}>{locked ? <span lang={locale}>{copy.mapLocked}</span> : (places.movementHint ?? (!legal && place.moveHint)) || <span lang={locale}>{legal ? (entry ? board.entryHint : copy.moveAvailable) : copy.moveUnavailable}</span>}</p>
+     </>}
     </li>;
    })}
    {illustrated && graphical && marker ? <li className="game-board-player" data-current-place={places.currentPlaceId} aria-hidden="true" style={{left:marker.left,top:marker.top,transition:marker.animate?'left 200ms ease, top 200ms ease':'none'}}>
     <GameCharacter assetId={presentation!.playerAssetId} variant="marker" decorative/>
    </li> : null}
   </ul>
-  {illustrated && graphical ? <>
+  {!compact && illustrated && graphical ? <>
    {locked ? <p lang={locale}>{copy.mapLocked}</p> : null}
    {places.places.some(p=>p.moveHint) ? <ul className="game-board-gates">{places.places.filter(p=>p.moveHint).map(p=><li key={p.id}><strong>{p.label}:</strong> {p.moveHint}</li>)}</ul> : null}
   </> : null}
   <p className="game-board-announcement" role="status" aria-live="polite" aria-atomic="true" lang={locale}>{announcement}</p>
+  {described.length ? <details className="game-board-descriptions">
+   <summary lang={locale}>{board.aboutPlaces}</summary>
+   <dl>{described.map(place=><div key={place.id}><dt>{place.label}</dt><dd>{place.description}</dd></div>)}</dl>
+  </details> : null}
   {inspected ? <section className="game-place-inspection" aria-labelledby={`${id}-inspection`}
     onKeyDown={event => {if (event.key === 'Escape') {event.stopPropagation(); close();}}}>
    <h4 id={`${id}-inspection`} tabIndex={-1} ref={heading}>{inspected.label}</h4>
@@ -124,7 +142,8 @@ export function GamePlaces({places, locale, locked, submit, presentation, runId 
    <button type="button" lang={locale} onClick={close}>{copy.backToPlaces}</button>
   </section> : null}
  </>;
- return illustrated ? <section ref={container} className="game-art game-places game-board" aria-labelledby={`${id}-board`}>
-  <h4 id={`${id}-board`} ref={boardHeading} tabIndex={-1} lang={locale}>{board.title}</h4>{content}
+ return illustrated || compact ? <section ref={container} className={`game-art game-places game-board${compact ? ' game-board-compact' : ''}`} aria-labelledby={`${id}-board`}>
+  <h4 id={`${id}-board`} ref={boardHeading} className={compact ? 'game-visually-hidden' : undefined}
+   tabIndex={-1} lang={locale}>{board.title}</h4>{content}
  </section> : <details className="game-places"><summary lang={locale}>{copy.places}</summary>{content}</details>;
 }

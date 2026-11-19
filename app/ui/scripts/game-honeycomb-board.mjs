@@ -6,7 +6,7 @@ const evidence=fileURLToPath(new URL('../../../docs/evidence/30.3/',import.meta.
 const current=async(context,base)=>(await context.request.get(base+'/api/game/runs/current')).json();
 export async function openExpeditionMap(game) {
  const map=game.locator('.game-scene-map');
- if (!await map.evaluate(node=>node.open)) await map.locator('summary').click();
+ if (!await map.evaluate(node=>node.open)) await map.locator(':scope > summary').click();
 }
 async function accepted(page,context,base,placeId,revision){
  await page.waitForFunction(({placeId,revision})=>{
@@ -42,10 +42,20 @@ export async function checkBoardRoute({page,context,base,requests}){
  assert.ok(await board.locator('.game-board-player').evaluate(n=>n.getBoundingClientRect().width>=32));
  await shot(page,'.game-board','board-mobile');
  const beforeInspect=requests.length;
- await board.getByRole('button',{name:'Look: Cicha Łąka',exact:true}).click();
- assert.equal(await board.locator('.game-place-inspection h4').evaluate(n=>n===document.activeElement),true);
- await page.keyboard.press('Escape');assert.equal(await board.getByRole('button',{name:'Look: Cicha Łąka',exact:true}).evaluate(n=>n===document.activeElement),true);
+ const descriptions=board.locator('.game-board-descriptions');
+ const meadow=initial.view.places.places.find(place=>place.id==='quiet-meadow');
+ assert.equal(await descriptions.getByText(meadow.description,{exact:true}).isVisible(),false);
+ await descriptions.locator('summary').focus();await page.keyboard.press('Enter');
+ await descriptions.getByText(meadow.description,{exact:true}).waitFor();
+ await page.keyboard.press('Enter');
+ assert.equal(await descriptions.evaluate(node=>node.open),false);
  assert.equal(requests.length,beforeInspect);
+ assert.equal(await board.locator('[aria-current=location]').getByText("You're here",{exact:true}).isVisible(),true);
+ assert.equal(await board.getByText(/Fictional places in this adventure/).count(),0);
+ const travel=await board.locator('[data-place-id]').evaluateAll(tiles=>
+  tiles.map(tile=>[tile.dataset.placeId,tile.querySelectorAll('button').length]));
+ assert.deepEqual(travel,initial.view.places.places.map(place=>
+  [place.id,Number(initial.view.places.availableMoves.includes(place.id))]));
  // Hold the one MOVE before the server receives it. Nothing in the accepted view may move early.
  const from=await current(context,base),url=`${base}/api/game/runs/${from.runId}/commands`;
  let release;const barrier=new Promise(resolve=>{release=resolve;});
@@ -53,10 +63,12 @@ export async function checkBoardRoute({page,context,base,requests}){
  await context.route(url,handler);const before=requests.length;
  try{
   const outgoing=page.waitForRequest(r=>r.url()===url&&r.method()==='POST');
-  await board.getByRole('button',{name:'Visit: Cicha Łąka',exact:true}).click();await outgoing;
+  const visit=board.getByRole('button',{name:'Visit: Cicha Łąka',exact:true});
+  await visit.focus();await page.keyboard.press('Enter');await outgoing;
   await game.getByText('Saving / checking',{exact:true}).waitFor();
   assert.equal(await board.locator('[aria-current=location]').getAttribute('data-place-id'),'hive-square');
   assert.equal(await board.locator('.game-board-player').getAttribute('data-current-place'),'hive-square');
+  assert.ok(await board.locator('[data-place-id] button').evaluateAll(buttons=>buttons.every(button=>button.disabled)));
   assert.equal(await game.locator('.game-current-characters').innerText().then(s=>s.includes('Mela')),false);
   assert.equal((await current(context,base)).revision,from.revision);
   await shot(page,'.game-board','destination-pending');release();
@@ -107,7 +119,13 @@ export async function checkBoardRoute({page,context,base,requests}){
  assert.equal((await current(context,base)).revision,peerRun.revision);assert.equal((await current(context,base)).view.presentation.party.length,0);
  // Recovery uses a changed status; subsequent read-only inspection and mode controls remain usable.
  const names=await board.locator('[data-place-id] > strong').allTextContents();
+ const menu=()=>board.locator('[data-place-id]').evaluateAll(tiles=>tiles.map(tile=>[
+  tile.dataset.placeId,tile.dataset.travelState,tile.querySelector('button')?.getAttribute('aria-label'),
+  tile.querySelector('.game-board-travel').innerText
+ ]));
+ const mapMenu=await menu();
  await board.getByRole('button',{name:'Show place list',exact:true}).click();assert.deepEqual(await board.locator('[data-place-id] > strong').allTextContents(),names);
+ assert.deepEqual(await menu(),mapMenu);
  assert.equal(await board.locator('.game-board-player').count(),0);await shot(page,'.game-board','board-list');
  await board.getByRole('button',{name:'Show place list',exact:true}).click();
  await page.emulateMedia({reducedMotion:'reduce'});assert.equal(await board.locator('.game-board-player').evaluate(n=>getComputedStyle(n).transitionDuration),'0s');

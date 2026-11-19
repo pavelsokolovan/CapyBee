@@ -106,6 +106,7 @@ the implemented 30.2 contracts for the board, encounters and recruited party.
 
 - [31](31-capybee-anonymous-note-episode-instruction.md) — The Anonymous Note, a short Polish mystery with two playable routes.
 - [32](32-capybee-scene-first-expeditions-instruction.md) — Scene-first play for Nowy ul, dwa światła.
+- [33](33-capybee-clear-travel-map-instruction.md) — Clear destinations, one travel button and local route hints.
 
 ### Roadmap reconciliation
 

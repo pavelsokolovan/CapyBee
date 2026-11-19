@@ -85,7 +85,10 @@ export function AdventurePreparation({owner,locale,onClose,onRunReady,flow:provi
   onKeyDown={event=>{
    if(event.key==='Escape'&&!composing){event.preventDefault();close();}
    if(event.key==='Tab'){
-    const nodes=Array.from(panel.current?.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select,textarea,summary,a[href]')??[]).filter(node=>!node.closest('dialog:not([open])')&&!node.closest('fieldset:disabled')&&(!node.closest('details:not([open])')||node.matches('summary')));
+    const nodes=Array.from(panel.current?.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select,textarea,summary,a[href]')??[]).filter(node=>{
+     const content=node.matches('details > summary')?node.parentElement?.parentElement:node;
+     return !node.closest('dialog:not([open]),fieldset:disabled')&&!content?.closest('details:not([open])');
+    });
     if(!nodes?.length)return;const first=nodes[0],last=nodes[nodes.length-1];
     if(event.shiftKey&&(document.activeElement===first||document.activeElement===heading.current)){event.preventDefault();last.focus();}
     else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
