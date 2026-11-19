@@ -4,7 +4,8 @@ import { decodeCapabilities, decodePack, decodeProfile, decodeSummary, object } 
 import { type GameReply, type OperationMarker } from '../offline/syncEngine';
 import { compatible, compatibleAnswers, transientPack, initialAnswers, startBody, type Adventure, type Answers } from './preparation';
 import type { AdventureMessage } from './adventureCopy';
-export type StartPhase='catalog'|'setup'|'review'|'waiting'|'ready'|'unknown'|'needsInput'|'fallback'|'cancelled'|'failed'|'signin';
+import {hasActiveAdventure} from './savedAdventure';
+export type StartPhase='catalog'|'setup'|'review'|'waiting'|'resuming'|'ready'|'unknown'|'needsInput'|'fallback'|'cancelled'|'failed'|'signin';
 export interface StartState {
  phase:StartPhase; loading:boolean; message?:AdventureMessage; caps?:GameCapabilities; games:Adventure[];
  current:GameRunSummaryDto|null; ready:GameRunSummaryDto|null; selected:Adventure|null;
@@ -58,22 +59,36 @@ export class AdventureStart {
  }
  private remember(marker:OperationMarker) {this.marker=marker;}
  private forget() {if(this.marker)sessionStorage.removeItem(`game-operation:${this.owner}:${this.marker.id}`);this.marker=undefined;}
- async load(recover=true) {
-  const epoch=++this.generation;this.update({loading:true,message:undefined});
+ async load(recover=true,resumeRunId?:string) {
+  const epoch=++this.generation;
+  this.update({loading:true,message:undefined,...(resumeRunId?{phase:'resuming'}:{})});
   try {
    const caps=decodeCapabilities(successful(await this.transport.read('/api/game/capabilities')));
    if(epoch!==this.generation)return;
    this.update({caps});
-   if(!caps.gameEnabled){this.update({loading:false,message:'disabled',games:[]});return;}
+   if(!caps.gameEnabled||resumeRunId&&!caps.clientEnabled){
+    this.update({phase:'catalog',loading:false,message:'disabled',games:[]});return;
+   }
+   const marker=recover ? storedStart(this.owner) : undefined;
+   const currentRequest=this.transport.read('/api/game/runs/current');
+   if(resumeRunId&&!marker){
+    const current=await currentRequest.catch(()=>null);
+    if(epoch!==this.generation)return;
+    if(current?.status===200){
+     const run=decodeSummary(current.body);
+     if(run.runId===resumeRunId&&hasActiveAdventure(run,caps)){this.handoff(run);return;}
+    }
+   }
    const calls=await Promise.allSettled([
-    this.transport.read('/api/game/runs/current'),this.transport.read('/api/game/packs'),this.transport.read('/api/game/generator-profiles')]);
+    currentRequest,this.transport.read('/api/game/packs'),this.transport.read('/api/game/generator-profiles')]);
    if(epoch!==this.generation)return;
-   const patch:Partial<StartState>={loading:false}; const games:Adventure[]=[];
+   const patch:Partial<StartState>={loading:false,...(resumeRunId?{phase:'catalog'}:{})}; const games:Adventure[]=[];
    const [current,packs,profiles]=calls;
    if(current.status==='fulfilled'){
     if(current.value.status===200)patch.current=decodeSummary(current.value.body);
     else if(current.value.status===404)patch.current=null;
     else patch.message=current.value.status===401?'signin':'unavailable';
+    if(resumeRunId&&!marker&&!patch.message)patch.message='resumeChanged';
    }else patch.message=message(current.reason);
    if(packs.status==='fulfilled' && packs.value.status===200 && caps.packStartEnabled && Array.isArray(packs.value.body))
     for(const pack of packs.value.body.slice(0,64))games.push({kind:'PACK',pack:pack as GamePackInfoDto});
@@ -82,9 +97,8 @@ export class AdventureStart {
     for(const profile of profiles.value.body)games.push({kind:'DYNAMIC',profile:decodeProfile(profile)});
    else if(profiles.status==='rejected' || profiles.status==='fulfilled' && profiles.value.status>=500)patch.message='unavailable';
    patch.games=games;this.update(patch);
-   const marker=recover ? storedStart(this.owner) : undefined;
    if(marker){this.remember(marker);await this.check();}
-  } catch(error){if(epoch===this.generation){if(message(error)==='signin')this.signIn();else this.update({loading:false,message:message(error)});}}
+  } catch(error){if(epoch===this.generation){if(message(error)==='signin')this.signIn();else this.update({loading:false,message:message(error),...(resumeRunId?{phase:'catalog'}:{})});}}
  }
  select(game:Adventure) {
   if(this.sending || this.value.phase==='waiting' || !compatible(game))return;
@@ -153,7 +167,7 @@ export class AdventureStart {
  }
  private handoff(value:unknown) {
   const run=decodeSummary(value);this.forget();this.pollAbort?.abort();
-  this.update({phase:'ready',ready:run,current:run,clearIdea:this.value.clearIdea+1});this.ready(run);
+  this.update({phase:'ready',loading:false,ready:run,current:run,clearIdea:this.value.clearIdea+1});this.ready(run);
  }
  private async accept(reply:GameReply) {
   const epoch=this.generation;

@@ -1650,6 +1650,22 @@ a:hover {
   color: var(--muted);
 }
 
+.adventure-resume {
+  background: #eaf3e8;
+  border-color: #9ebba9;
+  min-height: 44px;
+}
+
+.adventure-resume .play-game-icon {
+  flex-shrink: 0;
+  color: #285745;
+  background: #d8e9dd;
+}
+
+.adventure-resume .play-game-copy {
+  overflow-wrap: anywhere;
+}
+
 .play-game-arrow {
   font-size: 1.4rem;
   color: var(--accent-strong);

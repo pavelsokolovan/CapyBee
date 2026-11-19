@@ -5,8 +5,9 @@ import {RunController} from '../../game/runController';
 import {restoreGameSession} from '../../game/restoreGameSession';
 import {SceneBlocks,SceneActions,ScenePanels,SceneResult} from './GameScene';
 import {adventureCopy} from '../../game/adventureCopy';
-import {anonymousNotePackId,anonymousNoteTitle} from '../../game/anonymousNote';
-import {hiveExpeditionPackId,hiveExpeditionTitle} from '../../game/hiveExpedition';
+import {anonymousNotePackId} from '../../game/anonymousNote';
+import {hiveExpeditionPackId} from '../../game/hiveExpedition';
+import {adventureLocation,adventureTitle} from '../../game/savedAdventure';
 import {EpisodeMap} from './EpisodeMap';
 import {runCopy} from './runCopy';
 import './gameRun.css';
@@ -41,7 +42,7 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
  const presentation=view&&'presentation' in view?view.presentation:null;
  const illustrated=!episode&&!!view?.places&&!!presentation&&!!hexLayout(view.places);
  const hasSceneHeading=illustrated||(expedition&&!!view);
- const currentLocation=view?.places?.places.find(place=>place.id===view.places?.currentPlaceId)?.label;
+ const currentLocation=adventureLocation(view);
  const intention=useRef<{command:GameCommand;revision:number;runId:string;entry:boolean}|null>(null);
  const focusBaseline=useRef<string|null>(null);
  const submit=(command:GameCommand)=>{
@@ -64,8 +65,7 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
   }
  },[state.run.runId,state.run.revision,state.pending,state.message,ended,episode,expedition,hasSceneHeading,view?.places?.currentPlaceId]);
  const cancel=()=>{dialog.current?.close();abandon.current?.focus();};
- const storyTitle=view&&'story' in view ? view.story?.title : null;
- const title=episode ? anonymousNoteTitle : storyTitle??(expedition?hiveExpeditionTitle:c.scene);
+ const title=adventureTitle(state.run)??c.scene;
  const endingLabel=view?.endReason==='ABANDONED' ? c.abandoned : 'Zagadka rozwiązana';
  const textToggle=presentation?<button type="button" lang={controlsLocale} aria-pressed={textMode}
   onClick={()=>setTextPreference({runId:state.run.runId,enabled:!textMode})}>{encounterCopy[controlsLocale].text}</button>:null;

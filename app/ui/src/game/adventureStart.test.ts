@@ -89,6 +89,39 @@ describe('confirmed starts',()=>{
  });
 });
 
+describe('resume from Play',()=>{
+ it('opens the matching accepted run without loading the catalog or issuing a command',async()=>{
+  const {flow,transport,handoff}=harness();
+  vi.mocked(transport.read).mockImplementation(async path=>({status:200,body:path.endsWith('/current')?contracts.pack:caps}));
+  await flow.load(true,contracts.pack.runId);
+  expect(flow.getSnapshot()).toMatchObject({phase:'ready',loading:false,ready:{runId:contracts.pack.runId,revision:contracts.pack.revision}});
+  expect(vi.mocked(transport.read).mock.calls.flat()).toEqual(['/api/game/capabilities','/api/game/runs/current']);
+  expect(handoff).toHaveBeenCalledTimes(1);
+  expect(transport.transient).not.toHaveBeenCalled();
+ });
+ it('shows the catalog when the preview no longer matches the active run',async()=>{
+  const {flow,transport,handoff}=harness();
+  const newer={...contracts.dynamic,runId:'623fc3d8-69e6-400d-943b-fea37699b793'};
+  vi.mocked(transport.read).mockImplementation(async path=>({status:200,
+   body:path.endsWith('/current')?newer:path.endsWith('/capabilities')?caps:[]}));
+  await flow.load(true,contracts.pack.runId);
+  expect(flow.getSnapshot()).toMatchObject({phase:'catalog',message:'resumeChanged',current:{runId:newer.runId}});
+  expect(handoff).not.toHaveBeenCalled();
+  expect(transport.transient).not.toHaveBeenCalled();
+ });
+ it('recovers an unresolved start before considering the saved preview',async()=>{
+  sessionStorage.setItem('game-operation:owner:request',JSON.stringify({owner:'owner',id:'request',path:'/api/game/dynamic-starts',createdAt:1}));
+  const {flow,transport,handoff}=harness();
+  vi.mocked(transport.read).mockImplementation(async path=>({status:200,body:path.endsWith('/current')?contracts.pack:
+   path.endsWith('/capabilities')?caps:path.endsWith('/request')?contracts.started:[]}));
+  await flow.load(true,contracts.pack.runId);
+  expect(transport.read).toHaveBeenCalledWith('/api/game/dynamic-starts/request');
+  expect(flow.getSnapshot().ready?.runId).toBe(contracts.started.run.runId);
+  expect(handoff).toHaveBeenCalledTimes(1);
+  expect(transport.transient).not.toHaveBeenCalled();
+ });
+});
+
 describe('late work and subsequent attempts',()=>{
  it('does not send after the player leaves during identity review',async()=>{
   const {flow,transport}=harness();await flow.load();flow.select(dynamic);flow.review();

@@ -20,8 +20,10 @@ export class GameTransport {
   private revisions=new Map<string,{revision:number; content:string}>();
   constructor(private owner:()=>string|null, private restore:()=>Promise<void>) {}
   detach() { this.generation++;this.aborts.forEach(a=>a.abort());this.aborts.clear();this.active.clear(); }
-  async read(path:string):Promise<GameReply> { return this.request(path,'GET'); }
-  private async request(path:string,method:string,body?:unknown):Promise<GameReply> {
+  async read(path:string,{restoreSession=true}:{restoreSession?:boolean}={}):Promise<GameReply> {
+    return this.request(path,'GET',undefined,restoreSession);
+  }
+  private async request(path:string,method:string,body?:unknown,restoreSession=true):Promise<GameReply> {
     if(!/^\/api\/game\/[A-Za-z0-9/_-]+$/.test(path))throw new Error('GAME_PATH_INVALID');
     const owner=this.owner(), generation=this.generation;
     if(!owner || !ownerAllowed(owner))throw new Error('GAME_OWNER_CHANGED');
@@ -33,7 +35,7 @@ export class GameTransport {
       let res=await fetch(path,{method,credentials:'include',cache:'no-store',signal:controller.signal,
         headers:{'X-Game-Owner':owner,'Accept-Language':this.language,...(body === undefined ? {} : {'Content-Type':'application/json'})},
         ...(body === undefined ? {} : {body:JSON.stringify(body)})});
-      if(res.status === 401) {
+      if(res.status === 401 && restoreSession) {
         this.restoring ??= this.restore().finally(()=>{this.restoring=undefined;});
         await this.restoring;
         // A restoration never silently replays a mutation.

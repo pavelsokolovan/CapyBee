@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 
 export async function checkAnonymousNote({page, context, base, requests}) {
   const episode = page.locator('.game-episode');
+  const shortcut = page.locator('.adventure-resume');
+  const play = page.getByRole('button', {name: 'Play', exact: true});
   const action = name => episode.getByRole('button', {name, exact: true});
   const openCatalog = async () => {
-    await page.getByRole('button', {name: 'Play', exact: true}).click();
+    await play.click();
     await page.getByRole('button', {name: /Adventures/}).click();
   };
   const readCurrent = async () => {
@@ -69,8 +71,55 @@ export async function checkAnonymousNote({page, context, base, requests}) {
     const accepted = await readCurrent();
     const beforeReload = requests.length;
     await page.reload();
-    await openCatalog();
-    await page.getByRole('button', {name: 'Continue', exact: true}).click();
+    if (withMap) {
+      await play.click();
+      await shortcut.getByText('Cicha Łąka', {exact: true}).waitFor();
+      assert.equal(await shortcut.getByText('Tajemnicza wiadomość', {exact: true}).isVisible(), true);
+      assert.equal(await shortcut.getByText('Resume adventure', {exact: true}).isVisible(), true);
+      assert.equal(await shortcut.getByText('Cicha Łąka', {exact: true}).getAttribute('lang'), 'pl');
+      await context.setOffline(true);
+      await page.evaluate(() => window.dispatchEvent(new Event('offline')));
+      await shortcut.waitFor({state: 'detached'});
+      await context.setOffline(false);
+      await page.evaluate(() => window.dispatchEvent(new Event('online')));
+      await shortcut.waitFor();
+
+      // The preview was accepted before the click. Simulate it becoming stale on the next read.
+      await page.evaluate(() => {
+        const fetchCurrent = window.fetch;
+        window.fetch = (input, options) => {
+          if (input === '/api/game/runs/current' && document.querySelector('[data-preparation-phase="resuming"]')) {
+            window.fetch = fetchCurrent;
+            return Promise.resolve(new Response(JSON.stringify({error: {code: 'RUN_NOT_FOUND'}}), {
+              status: 404, headers: {'Content-Type': 'application/json', 'Cache-Control': 'no-store'}
+            }));
+          }
+          return fetchCurrent.call(window, input, options);
+        };
+      });
+      await shortcut.focus();
+      await page.keyboard.press('Enter');
+      await page.getByText('Your saved adventure changed. Choose an adventure below.', {exact: true}).waitFor();
+      assert.equal(await episode.count(), 0);
+      await page.getByRole('button', {name: 'Back to Play', exact: true}).click();
+      await page.locator('.adventure-overlay').waitFor({state: 'detached'});
+      await page.waitForFunction(() => document.activeElement?.classList.contains('adventure-resume'));
+
+      const catalogReads = [];
+      const watchCatalog = request => {
+        if (/\/api\/game\/(packs|generator-profiles)$/.test(request.url()) && request.method() === 'GET') {
+          catalogReads.push(request.url());
+        }
+      };
+      page.on('request', watchCatalog);
+      await page.keyboard.press('Enter');
+      await episode.getByText(new RegExp(clue)).waitFor();
+      page.off('request', watchCatalog);
+      assert.deepEqual(catalogReads, []);
+    } else {
+      await openCatalog();
+      await page.getByRole('button', {name: 'Continue', exact: true}).click();
+    }
     await episode.getByText(new RegExp(clue)).waitFor();
     const restored = await readCurrent();
     assert.equal(restored.revision, accepted.revision);
@@ -84,10 +133,12 @@ export async function checkAnonymousNote({page, context, base, requests}) {
     assert.equal(ending.endReason, 'COMPLETED');
     await action('Wróć do gier').click();
     await page.locator('.adventure-overlay').waitFor({state: 'detached'});
+    await shortcut.waitFor({state: 'detached'});
+    if (withMap)await page.waitForFunction(() => document.activeElement?.querySelector('strong')?.textContent === 'Adventures');
     await openCatalog();
     await page.getByRole('button', {name: /Tajemnicza wiadomość/}).waitFor();
   }
 
   await page.setViewportSize(originalViewport);
-  console.log('PASS: Anonymous Note direct start, both branches, map and scene travel, text mode, phone layout and exact reload');
+  console.log('PASS: Anonymous Note both branches, text mode, fresh Play shortcut, stale and offline handling, focus, exact reload and catalog resume');
 }

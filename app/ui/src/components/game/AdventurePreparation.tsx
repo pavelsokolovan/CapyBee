@@ -5,13 +5,14 @@ import {GameTransport} from '../../offline/syncEngine';
 import {AdventureStart} from '../../game/adventureStart';
 import {adventureCopy} from '../../game/adventureCopy';
 import {compatible,transientPack,effective,inputsOf,localesOf,titleOf,validation,codePoints,type Adventure} from '../../game/preparation';
-import {anonymousNotePackId,anonymousNoteTitle} from '../../game/anonymousNote';
-import {hiveExpeditionPackId,hiveExpeditionTitle} from '../../game/hiveExpedition';
+import {anonymousNotePackId} from '../../game/anonymousNote';
+import {hiveExpeditionPackId} from '../../game/hiveExpedition';
+import {adventureLocation,adventureTitle} from '../../game/savedAdventure';
 import {GameRun} from './GameRun';
 import {restoreGameSession} from '../../game/restoreGameSession';
 
-type Props={owner:string;locale:'en'|'pl';onClose:()=>void;onRunReady?:(run:GameRunSummaryDto)=>void;flow?:AdventureStart};
-export function AdventurePreparation({owner,locale,onClose,onRunReady,flow:provided}:Props) {
+type Props={owner:string;locale:'en'|'pl';onClose:()=>void;resumeRunId?:string;onRunReady?:(run:GameRunSummaryDto)=>void;flow?:AdventureStart};
+export function AdventurePreparation({owner,locale,onClose,resumeRunId,onRunReady,flow:provided}:Props) {
  const [flow]=useState(()=>provided??new AdventureStart(owner,locale,new GameTransport(()=>owner,()=>restoreGameSession(owner)),onRunReady));
  const state=useSyncExternalStore(flow.subscribe,flow.getSnapshot),copy=adventureCopy[locale];
  useEffect(()=>watchGameOwner(()=>{if(!ownerAllowed(owner)){flow.dispose();onClose();}}),[flow,owner,onClose]);
@@ -20,7 +21,7 @@ export function AdventurePreparation({owner,locale,onClose,onRunReady,flow:provi
  const [wish,setWish]=useState(''),[invalid,setInvalid]=useState(false),[composing,setComposing]=useState(false);
  const heading=useRef<HTMLHeadingElement>(null),panel=useRef<HTMLDivElement>(null);
  const closeRef=useRef(onClose);closeRef.current=onClose;
- useEffect(()=>{void flow.load();return()=>flow.dispose();},[flow]);
+ useEffect(()=>{void flow.load(true,resumeRunId);return()=>flow.dispose();},[flow,resumeRunId]);
  useEffect(()=>{void flow.shellLocale(locale);},[flow,locale]);
  useEffect(()=>{setWish('');},[state.clearIdea]);
  useLayoutEffect(()=>{if(state.phase!=='ready')heading.current?.focus();},[state.phase,state.step]);
@@ -76,11 +77,9 @@ export function AdventurePreparation({owner,locale,onClose,onRunReady,flow:provi
  const sceneFirstReady=episodeReady||(state.phase==='ready'&&state.ready?.packId===hiveExpeditionPackId);
  const panelCopy=episodeReady?adventureCopy.pl:copy;
  const openingEpisode=selected?.kind==='PACK'&&selected.pack.id===anonymousNotePackId&&state.loading;
- const currentStory=state.current?.view;
- const savedTitle=state.current?.packId===anonymousNotePackId ? anonymousNoteTitle
-  : (currentStory&&'story' in currentStory ? currentStory.story?.title : null)
-    ?? (state.current?.packId===hiveExpeditionPackId ? hiveExpeditionTitle : copy.saved);
- const activeCurrent=state.caps?.gameEnabled&&state.current&&['ACTIVE','PREPARING'].includes(state.current.status);
+ const activeCurrent=state.caps?.gameEnabled&&state.current&&['ACTIVE','PREPARING'].includes(state.current.status)?state.current:null;
+ const savedTitle=activeCurrent&&adventureTitle(activeCurrent);
+ const savedLocation=adventureLocation(activeCurrent?.view);
  return <div className="adventure-overlay" role="dialog" data-preparation-phase={state.phase} aria-modal="true" aria-labelledby="adventure-title" ref={panel}
   onKeyDown={event=>{
    if(event.key==='Escape'&&!composing){event.preventDefault();close();}
@@ -98,11 +97,12 @@ export function AdventurePreparation({owner,locale,onClose,onRunReady,flow:provi
    <header lang={episodeReady?'pl':locale}><h2 id="adventure-title" tabIndex={-1} ref={heading}>{panelCopy.title}</h2><button type="button" onClick={close}>{panelCopy.close}</button></header>
    {sessionStorage.getItem('game-reconfirm')?<p>{locale==='pl'?'Sprawdź zapisaną grę. Potwierdź ponownie przed rozpoczęciem.':'Check the saved game. Confirm again before starting.'}</p>:null}
    {state.message?<p role="status">{copy[state.message]}</p>:null}
-   {state.loading?<p role="status">{copy.loading}</p>:null}
+   {state.loading?<p role="status">{state.phase==='resuming'?copy.resuming:copy.loading}</p>:null}
    {state.message==='signin'?<a href="/oauth2/authorization/google">{copy.signInAction}</a>:null}
    {state.phase==='catalog'||state.phase==='signin'?<>
-    {activeCurrent?<section><h3>{savedTitle}</h3>
-     <p>{new Intl.DisplayNames([locale],{type:'language'}).of(state.current!.locale)}</p><button className="primary-button" onClick={()=>void flow.resume()}>{copy.continue}</button></section>:null}
+    {activeCurrent?<section><h3 lang={savedTitle?activeCurrent.locale:locale}>{savedTitle??copy.saved}</h3>
+     {savedLocation?<p lang={activeCurrent.locale}>{savedLocation}</p>:null}
+     <button type="button" className="primary-button" onClick={()=>void flow.resume()}>{copy.continue}</button></section>:null}
     <h3>{copy.newGame}</h3>
     {!state.loading&&!state.games.length&&!state.message?<p>{copy.empty}</p>:null}
     {state.games.map(game=><button type="button" className="play-game-row" key={`${game.kind}:${game.kind==='DYNAMIC'?game.profile.id:game.pack.id}`}
