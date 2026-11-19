@@ -71,3 +71,14 @@
  position: sticky; inset-block-start: 3rem; z-index: 1; padding: .35rem .65rem;
  border: 1px solid #bca67c; border-radius: .65rem; background: #fffdf7; color: #2e2413;
 }
+
+.game-episode-ending-title { scroll-margin-block-start: 4rem; }
+.game-episode-interest { border-block-start: 1px solid #bca67c; padding-block-start: .85rem; margin-block: .85rem; }
+.game-episode-interest button { width: 100%; font-weight: 700; }
+.game-episode-interest button[aria-pressed=true] { background: #285745; border-color: #285745; color: #fffdf7; }
+.game-episode-interest p { margin-block: .4rem; font-size: .875rem; }
+.game-episode-interest p:empty { margin: 0; }
+.game-episode-return { width: 100%; }
+@media (forced-colors: active) {
+ .game-episode-interest button[aria-pressed=true] { background: Highlight; border-color: Highlight; color: HighlightText; }
+}

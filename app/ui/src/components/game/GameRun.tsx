@@ -8,6 +8,7 @@ import {adventureCopy} from '../../game/adventureCopy';
 import {anonymousNotePackId} from '../../game/anonymousNote';
 import {hiveExpeditionPackId} from '../../game/hiveExpedition';
 import {adventureLocation,adventureTitle} from '../../game/savedAdventure';
+import {EpisodeInterest} from './EpisodeInterest';
 import {EpisodeMap} from './EpisodeMap';
 import {runCopy} from './runCopy';
 import './gameRun.css';
@@ -37,6 +38,8 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
  useEffect(()=>{let alive=true;void controller.initialize().then(()=>{if(alive)setInitialized(true);}).catch(()=>{});return()=>{alive=false;controller.detach();};},[controller]);
 
  const ended=!!view?.ended||state.run.status==='ENDED';
+ const episodeCompleted=episode&&state.run.status==='ENDED'&&view?.endReason==='COMPLETED';
+ const endingHeading=useRef<HTMLHeadingElement>(null);
  const unsupported=!view||typeof view.canAdvance!=='boolean'||!!(view.input?.mode==='TEXT'&&view.options.some(o=>o.enabled))||!!(view.places?.availableMoves.some(id=>!view.places?.places.some(p=>p.id===id)));
  const locked=!initialized||state.pending||state.run.status!=='ACTIVE'||!!view?.ended||unsupported;
  const presentation=view&&'presentation' in view?view.presentation:null;
@@ -51,19 +54,20 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
   return controller.submit(command);
  };
  useLayoutEffect(()=>{
-  if(focusBaseline.current!==state.run.runId){focusBaseline.current=state.run.runId;intention.current=null;(hasSceneHeading?runHeading:heading).current?.focus();return;}
+  if(focusBaseline.current!==state.run.runId){focusBaseline.current=state.run.runId;intention.current=null;(episodeCompleted?endingHeading:hasSceneHeading?runHeading:heading).current?.focus();return;}
   const requested=intention.current;
   if(!requested||state.pending)return;
   if(state.run.revision<=requested.revision){if(state.message==='rejected')intention.current=null;return;}
   intention.current=null;
   if(state.message!=='saved'||requested.runId!==state.run.runId)return;
   if(episode&&episodeMap.current)episodeMap.current.open=false;
-  if(episode||expedition||requested.command.type!=='MOVE'||requested.entry||ended)heading.current?.focus();
+  if(episodeCompleted)endingHeading.current?.focus();
+  else if(episode||expedition||requested.command.type!=='MOVE'||requested.entry||ended)heading.current?.focus();
   else {
    const cell=[...document.querySelectorAll<HTMLElement>('.game-run [data-place-id]')].find(n=>n.dataset.placeId===view?.places?.currentPlaceId);
    cell?.querySelector<HTMLButtonElement>('button')?.focus();
   }
- },[state.run.runId,state.run.revision,state.pending,state.message,ended,episode,expedition,hasSceneHeading,view?.places?.currentPlaceId]);
+ },[state.run.runId,state.run.revision,state.pending,state.message,ended,episode,episodeCompleted,expedition,hasSceneHeading,view?.places?.currentPlaceId]);
  const cancel=()=>{dialog.current?.close();abandon.current?.focus();};
  const title=adventureTitle(state.run)??c.scene;
  const endingLabel=view?.endReason==='ABANDONED' ? c.abandoned : 'Zagadka rozwiązana';
@@ -89,9 +93,10 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
  {view.places?.places.length&&!ended?<EpisodeMap places={view.places} locked={locked} submit={submit} details={episodeMap}/>:null}
  {textToggle}</div>
  <GameEncounter view={view} stage>
- {ended?<h4>{endingLabel}</h4>:null}
+ {ended?<h4 className="game-episode-ending-title" tabIndex={-1} ref={endingHeading}>{endingLabel}</h4>:null}
  <SceneBlocks view={view} locale={controlsLocale}/>{actions}
- {ended?<button type="button" className="game-episode-exit" onClick={onClose??onAnother}>{c.back}</button>:null}
+ {episodeCompleted?<EpisodeInterest key={state.run.runId}/>:null}
+ {ended?<button type="button" className={episodeCompleted?'game-episode-return':'game-episode-exit'} onClick={onClose??onAnother}>{c.back}</button>:null}
  </GameEncounter>{status}</>:<>
  {expedition?<div className="game-scene-tools">
   {board?<details className="game-scene-map"><summary lang={locale}>{boardCopy[locale].map}</summary>{board}</details>:null}

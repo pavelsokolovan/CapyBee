@@ -131,6 +131,30 @@ export async function checkAnonymousNote({page, context, base, requests}) {
     await episode.getByText(withMap ? /Twój rysunek pomógł/ : /To twoje odkrycie/).waitFor();
     const ending = await (await context.request.get(base + '/api/game/runs/' + accepted.runId)).json();
     assert.equal(ending.endReason, 'COMPLETED');
+    const endingHeading = episode.getByRole('heading', {name: 'Zagadka rozwiązana'});
+    assert.equal(await endingHeading.evaluate(node => node === document.activeElement), true);
+    const interest = action('Chcę kolejny odcinek');
+    const beforeInterest = requests.length;
+    const storage = () => page.evaluate(() => JSON.stringify([localStorage, sessionStorage]));
+    const savedStorage = await storage();
+    assert.equal(await interest.getAttribute('aria-pressed'), 'false');
+    if (withMap) {
+      await interest.focus();
+      await page.keyboard.press('Space');
+      assert.equal(await interest.evaluate(node => node === document.activeElement), true);
+      assert.equal(await interest.getAttribute('aria-pressed'), 'true');
+      await episode.getByText('Dzięki! Zaznaczono zainteresowanie.', {exact: true}).waitFor();
+      await action('Tryb tekstowy').click();
+      assert.equal(await art.isVisible(), false);
+      assert.equal(await interest.getAttribute('aria-pressed'), 'true');
+      await episode.getByText(/Twój rysunek pomógł/).waitFor();
+      await interest.click();
+      assert.equal(await interest.getAttribute('aria-pressed'), 'false');
+      assert.equal(await episode.getByText('Dzięki! Zaznaczono zainteresowanie.', {exact: true}).count(), 0);
+      await interest.click();
+    }
+    assert.equal(requests.length, beforeInterest);
+    assert.equal(await storage(), savedStorage);
     await action('Wróć do gier').click();
     await page.locator('.adventure-overlay').waitFor({state: 'detached'});
     await shortcut.waitFor({state: 'detached'});
@@ -138,6 +162,17 @@ export async function checkAnonymousNote({page, context, base, requests}) {
     await openCatalog();
     await page.getByRole('button', {name: /Tajemnicza wiadomość/}).waitFor();
   }
+
+  await page.getByRole('button', {name: /Tajemnicza wiadomość/}).click();
+  await action('Przeczytaj wiadomość').waitFor();
+  await action('Zakończ przygodę').click();
+  await episode.getByRole('dialog').getByRole('button', {name: 'Zakończ przygodę', exact: true}).click();
+  await episode.getByRole('heading', {name: 'Zakończono', exact: true}).waitFor();
+  assert.equal(await action('Chcę kolejny odcinek').count(), 0);
+  await action('Wróć do gier').click();
+  await page.locator('.adventure-overlay').waitFor({state: 'detached'});
+  await openCatalog();
+  await page.getByRole('button', {name: /Tajemnicza wiadomość/}).waitFor();
 
   await page.setViewportSize(originalViewport);
   console.log('PASS: Anonymous Note both branches, text mode, fresh Play shortcut, stale and offline handling, focus, exact reload and catalog resume');
