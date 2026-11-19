@@ -10,7 +10,7 @@ export function EpisodeMap({places, locked, submit, details}: {
 }) {
   const copy = runCopy.pl;
 
-  return <details ref={details} className="game-episode-map">
+  return <details ref={details} className="game-scene-map game-episode-map">
     <summary>Mapa</summary>
     <ul aria-label="Miejsca na mapie">
       {places.places.map(place => {

@@ -105,6 +105,7 @@ the implemented 30.2 contracts for the board, encounters and recruited party.
 ## Mobile-first authored episode
 
 - [31](31-capybee-anonymous-note-episode-instruction.md) — The Anonymous Note, a short Polish mystery with two playable routes.
+- [32](32-capybee-scene-first-expeditions-instruction.md) — Scene-first play for Nowy ul, dwa światła.
 
 ### Roadmap reconciliation
 

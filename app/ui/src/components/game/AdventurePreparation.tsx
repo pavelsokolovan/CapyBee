@@ -6,6 +6,7 @@ import {AdventureStart} from '../../game/adventureStart';
 import {adventureCopy} from '../../game/adventureCopy';
 import {compatible,transientPack,effective,inputsOf,localesOf,titleOf,validation,codePoints,type Adventure} from '../../game/preparation';
 import {anonymousNotePackId,anonymousNoteTitle} from '../../game/anonymousNote';
+import {hiveExpeditionPackId,hiveExpeditionTitle} from '../../game/hiveExpedition';
 import {GameRun} from './GameRun';
 import {restoreGameSession} from '../../game/restoreGameSession';
 
@@ -72,11 +73,13 @@ export function AdventurePreparation({owner,locale,onClose,onRunReady,flow:provi
   </fieldset>;
  };
  const episodeReady=state.phase==='ready'&&state.ready?.packId===anonymousNotePackId;
+ const sceneFirstReady=episodeReady||(state.phase==='ready'&&state.ready?.packId===hiveExpeditionPackId);
  const panelCopy=episodeReady?adventureCopy.pl:copy;
  const openingEpisode=selected?.kind==='PACK'&&selected.pack.id===anonymousNotePackId&&state.loading;
  const currentStory=state.current?.view;
  const savedTitle=state.current?.packId===anonymousNotePackId ? anonymousNoteTitle
-  : currentStory&&'story' in currentStory ? currentStory.story?.title??copy.saved : copy.saved;
+  : (currentStory&&'story' in currentStory ? currentStory.story?.title : null)
+    ?? (state.current?.packId===hiveExpeditionPackId ? hiveExpeditionTitle : copy.saved);
  const activeCurrent=state.caps?.gameEnabled&&state.current&&['ACTIVE','PREPARING'].includes(state.current.status);
  return <div className="adventure-overlay" role="dialog" data-preparation-phase={state.phase} aria-modal="true" aria-labelledby="adventure-title" ref={panel}
   onKeyDown={event=>{
@@ -88,7 +91,7 @@ export function AdventurePreparation({owner,locale,onClose,onRunReady,flow:provi
     else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
    }
   }}>
-  <div className={episodeReady?'adventure-panel adventure-episode-panel':'adventure-panel'}>
+  <div className={sceneFirstReady?'adventure-panel adventure-scene-panel':'adventure-panel'}>
    <header lang={episodeReady?'pl':locale}><h2 id="adventure-title" tabIndex={-1} ref={heading}>{panelCopy.title}</h2><button type="button" onClick={close}>{panelCopy.close}</button></header>
    {sessionStorage.getItem('game-reconfirm')?<p>{locale==='pl'?'Sprawdź zapisaną grę. Potwierdź ponownie przed rozpoczęciem.':'Check the saved game. Confirm again before starting.'}</p>:null}
    {state.message?<p role="status">{copy[state.message]}</p>:null}

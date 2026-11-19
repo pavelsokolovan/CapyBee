@@ -28,36 +28,46 @@
  .game-hex-map .game-place::before { display: none; }
 }
 
-.adventure-episode-panel > header { padding-block: .35rem; }
-.adventure-episode-panel > header h2 { font-size: 1rem; margin-block: 0; }
+.adventure-scene-panel > header { padding-block: .35rem; }
+.adventure-scene-panel > header h2 { font-size: 1rem; margin-block: 0; }
 .game-episode { max-width: 34rem; margin-inline: auto; color: #30271d; }
-.game-episode > h3 { font-size: clamp(1.6rem, 6vw, 2.35rem); line-height: 1.12; margin: 0 0 .55rem; }
-.game-episode-tools { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .5rem; }
-.game-episode-tools > button, .game-episode-map > summary {
+.game-scene-first > h3 { font-size: clamp(1.6rem, 6vw, 2.35rem); line-height: 1.12; margin: 0 0 .55rem; }
+.game-scene-tools { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .5rem; }
+.game-scene-tools > button, .game-scene-map > summary {
  box-sizing: border-box; min-width: 44px; background: #fff8e9; color: #45311f; border: 1px solid #846746; border-radius: .75rem;
 }
-.game-episode-map { margin: 0 !important; }
-.game-episode-map[open] { flex-basis: 100%; }
+.game-run .game-scene-map { margin: 0; }
+.game-scene-map[open] { flex-basis: 100%; }
 .game-episode-map ul { margin-block: .5rem 0; padding: 0; list-style: none; }
 .game-episode-map li { display: grid; gap: .35rem; padding: .65rem .8rem; background: #fffdf7; border-inline-start: 3px solid #947d58; }
 .game-episode-map li[aria-current] { border-color: #386a56; }
 .game-episode-map button { justify-self: start; }
-.game-episode .game-encounter { margin-block: .65rem .35rem; }
-.game-episode .game-encounter-backdrop { position: relative; aspect-ratio: 2.4; }
-.game-episode .game-encounter-backdrop > svg { width: 100%; height: 100%; object-fit: cover; scale: 1.37; }
+.game-scene-first .game-encounter { margin-block: .65rem .35rem; }
+.game-scene-first .game-encounter-backdrop { position: relative; aspect-ratio: 2.4; }
+.game-scene-first .game-encounter-backdrop > svg { width: 100%; height: 100%; object-fit: cover; scale: 1.37; }
 .game-encounter-stage { position: absolute; inset: 0; display: flex; justify-content: center; align-items: end; pointer-events: none; }
-.game-encounter-stage svg { width: auto; height: 87%; }
-.game-episode .game-block p { line-height: 1.45; margin: .2rem 0 .65rem; }
-.game-episode .game-block strong { font-size: .9rem; color: #624720; }
-.game-episode .game-actions legend {
- position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+.game-scene-first .game-encounter-stage > svg { width: auto; height: 87%; max-width: 48%; }
+.game-scene-first .game-block p { line-height: 1.45; margin: .2rem 0 .65rem; }
+.game-scene-first .game-block strong { font-size: .9rem; color: #624720; }
+.game-scene-first .game-actions legend, .game-visually-hidden {
+ position: absolute; inline-size: 1px; block-size: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
 }
-.game-episode .game-actions button, .game-episode-exit {
+.game-scene-first .game-actions button, .game-episode-exit {
  width: 100%; color: #fffdf7; background: #285745; border: 2px solid #285745; font-weight: 700;
 }
-.game-episode .game-actions button:hover:not(:disabled), .game-episode-exit:hover { background: #204638; }
+.game-scene-first button:hover { transform: none; }
+.game-scene-first .game-actions button:hover:not(:disabled), .game-episode-exit:hover { background: #204638; }
 .game-episode .game-run-status { min-block-size: 1.6em; margin-block: .25rem; }
 .game-episode .game-encounter-content h4 { margin-block: 0 .55rem; font-size: 1.25rem; }
 @media (forced-colors: active) {
- .game-episode .game-actions button, .game-episode-exit { color: ButtonText; background: ButtonFace; border-color: ButtonText; }
+ .game-scene-first .game-actions button, .game-episode-exit { color: ButtonText; background: ButtonFace; border-color: ButtonText; }
+}
+
+.game-expedition-location { margin-block: .85rem .35rem; scroll-margin-block-start: 4.5rem; }
+.game-expedition .game-encounter-backdrop { max-height: 10rem; }
+.game-expedition details.game-current-characters { padding: 0 .8rem; }
+.game-expedition details.game-current-characters[open] { padding-bottom: .8rem; }
+.game-expedition .game-run-status:not(.game-visually-hidden) {
+ position: sticky; inset-block-start: 3rem; z-index: 1; padding: .35rem .65rem;
+ border: 1px solid #bca67c; border-radius: .65rem; background: #fffdf7; color: #2e2413;
 }

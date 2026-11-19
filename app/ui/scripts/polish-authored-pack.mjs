@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {checkBoardRoute} from './game-honeycomb-board.mjs';
+import {checkBoardRoute,openExpeditionMap} from './game-honeycomb-board.mjs';
 import {assertCompanionUI,holdCompanionChoice,captureCompanionEvidence} from './game-companions.mjs';
 
 export async function checkPolishPack({page,context,base,requests}) {
@@ -26,6 +26,7 @@ export async function checkPolishPack({page,context,base,requests}) {
    await assertCompanionUI({page,game,run});
    assert.equal(member.trait,'Cierpliwa');assert.ok(member.need.length>0);assert.equal(member.assetId,'character.mela-bee');
    assert.equal(member.recruited,label==='Siadam na chwilę i słucham Meli');
+   if(member.recruited)await game.getByText('Mela joined the adventure.',{exact:true}).waitFor();
    await captureCompanionEvidence({page,game,run,label:member.recruited?'mela-joined':'mela-needs'});
    if(member.recruited){
     const command=requests.filter(r=>r.url.includes('/commands')).at(-1);
@@ -50,7 +51,26 @@ export async function checkPolishPack({page,context,base,requests}) {
   const before=requests.length;
   await page.getByRole('button',{name:locale==='en'?'Start adventure':'Rozpocznij przygodę',exact:true}).click();
   await game.waitFor();await saved();assert.equal(await game.getAttribute('lang'),'pl');
-  await game.getByText(locale==='en'?'Story language: Polish':'Język historii: polski',{exact:true}).waitFor();
+  const viewport=page.viewportSize();
+  try {
+   await page.setViewportSize({width:360,height:640});
+   const first=game.getByRole('button',{name:locale==='en'?'Continue':'Dalej',exact:true});
+   const action=await first.boundingBox();
+   assert.ok(action&&action.y>=0&&action.y+action.height<=640,'First story action is below the fold');
+   assert.ok(action.height>=44&&action.width>=44);
+   await game.getByRole('heading',{name:'Polana Nowego Ula',exact:true}).waitFor();
+   const map=game.locator('.game-scene-map');
+   assert.equal(await map.locator('summary').textContent(),locale==='en'?'Map':'Mapa');
+   assert.equal(await map.evaluate(node=>node.open),false);
+   assert.equal(await game.locator('.game-board').isVisible(),false);
+   assert.equal(await game.locator('.game-current-characters').evaluate(node=>node.open),false);
+   assert.equal(await game.locator('.game-party').count(),0);
+   assert.equal(await game.getByText(/^(Story language: Polish|Język historii: polski)$/).count(),0);
+   assert.equal(await game.getByText(/^(Your adventure is saved\.|Twoja przygoda jest zapisana\.)/).count(),0);
+   assert.equal(await game.locator('.game-run-status').evaluate(node=>node.getBoundingClientRect().height),1);
+  } finally {
+   await page.setViewportSize(viewport);
+  }
   const starts=requests.slice(before).filter(r=>r.url.endsWith('/api/game/runs'));assert.equal(starts.length,1);
   assert.equal(starts[0].body.packId,'capybee-new-hive');assert.equal(starts[0].body.locale,'pl');assert.equal(starts[0].body.generated,false);
   assert.deepEqual(starts[0].body.startInputs,{'story-tone':'cozy',interests:'',mood:''});
@@ -90,6 +110,7 @@ export async function checkPolishPack({page,context,base,requests}) {
  await checkBoardRoute({page,context,base,requests});
  await choose('Na dziś wybieram odpoczynek');await ending('rest-here');
  await start();await choose('Continue');
+ await openExpeditionMap(game);
  assert.equal(await game.locator('.game-board [data-place-id]').count(),7);
  assert.equal(await game.getByRole('button',{name:'Visit: Mostek Dwóch Świateł',exact:true}).isDisabled(),true);
  await choose('Visit: Latarnia Wspomnień');await choose('Visit: Polana Nowego Ula');

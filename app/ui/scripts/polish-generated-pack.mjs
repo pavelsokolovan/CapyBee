@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {assertCompanionUI,captureCompanionEvidence} from './game-companions.mjs';
+import {openExpeditionMap} from './game-honeycomb-board.mjs';
 
 export async function checkPolishGeneration({page,context,base,requests,logs}) {
  const idea='Fikcyjna baśń srebrnego liścia '+crypto.randomUUID().replace(/[0-9]/g,d=>String.fromCharCode(107+Number(d)));
@@ -34,6 +35,7 @@ export async function checkPolishGeneration({page,context,base,requests,logs}) {
  });assert.equal(stores.includes(idea),false);assert.equal(logs.some(line=>line.includes(idea)),false);
  const game=page.locator('.game-run');
  await game.getByRole('button',{name:'Continue',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.game-run [role=status]')?.textContent==='Saved');
+ await openExpeditionMap(game);
  for(const label of ['Visit: Cicha Łąka','Siadam na chwilę i słucham Meli']){
   await game.getByRole('button',{name:label,exact:true}).click();await page.waitForFunction(()=>document.querySelector('.game-run [role=status]')?.textContent==='Saved');
   const run=await (await context.request.get(`${base}/api/game/runs/current`)).json();await assertCompanionUI({page,game,run});

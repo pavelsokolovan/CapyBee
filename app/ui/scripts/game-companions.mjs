@@ -15,9 +15,10 @@ export async function assertCompanionUI({page, game, run}) {
  },{currentIds,partyIds});
  for(const meta of known.filter(c=>currentIds.includes(c.id))){
   const card=game.locator(`.game-current-characters [data-character-id=${JSON.stringify(meta.id)}]`);
-  assert.ok((await card.innerText()).includes(cast.get(meta.id).name));
-  if(meta.trait)assert.ok((await card.innerText()).includes(meta.trait));
-  if(meta.need)assert.ok((await card.innerText()).includes(meta.need));
+  const content=await card.textContent();
+  assert.ok(content.includes(cast.get(meta.id).name));
+  if(meta.trait)assert.ok(content.includes(meta.trait));
+  if(meta.need)assert.ok(content.includes(meta.need));
  }
  assert.ok(await game.locator('.game-current-characters svg,.game-party svg').evaluateAll(nodes=>nodes.every(n=>n.getAttribute('aria-hidden')==='true'&&n.getAttribute('focusable')==='false')));
  assert.equal(await game.locator('.game-party button,.game-current-characters button').count(),0,'portrait surfaces added a mutation control');
@@ -48,11 +49,24 @@ export async function captureCompanionEvidence({page,game,run,label,full=false})
  await mkdir(evidence,{recursive:true});await assertCompanionUI({page,game,run});
  // Center the surface in the scrolling adventure so sticky navigation does not cover it.
  const shot=async(selector,name)=>{
-  const surface=game.locator(selector);await surface.evaluate(n=>n.scrollIntoView({block:'center'}));
-  await surface.screenshot({path:`${evidence}${name}.png`});
+  const surface=game.locator(selector);
+  const wasClosed=await surface.evaluate(node=>node instanceof HTMLDetailsElement&&!node.open);
+  if (wasClosed) await surface.locator('summary').click();
+  try {
+   await surface.evaluate(n=>n.scrollIntoView({block:'center'}));
+   await surface.screenshot({path:`${evidence}${name}.png`});
+   if (selector==='.game-current-characters') {
+    assert.ok(await surface.locator('.game-character-portrait').evaluateAll(nodes=>nodes.every(node=>{
+     const width=node.getBoundingClientRect().width;
+     return width===0||width>=64;
+    })));
+   }
+  } finally {
+   if (wasClosed) await surface.locator('summary').click();
+  }
  };
  await shot('.game-current-characters',`${label}-characters`);
- await shot('.game-party',`${label}-party`);
+ if (run.view.presentation.party.length) await shot('.game-party',`${label}-party`);
  if(!full)return;
  const viewport=page.viewportSize(),zoom=await game.evaluate(n=>n.style.zoom);
  const reduced=await page.evaluate(()=>matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -81,7 +95,6 @@ export async function captureCompanionEvidence({page,game,run,label,full=false})
   await page.setViewportSize({width:1280,height:900});
   await shot('.game-current-characters',`characters-desktop`);
   await shot('.game-party',`party-desktop`);
-  assert.ok(await game.locator('.game-current-characters .game-character-portrait').evaluateAll(nodes=>nodes.every(n=>n.getBoundingClientRect().width>=64)));
   assert.ok(await game.locator('.game-party-portrait').evaluateAll(nodes=>nodes.every(n=>n.getBoundingClientRect().width>=40)));
   assert.ok(await game.locator('.game-party,.game-current-characters').evaluateAll(nodes=>nodes.every(n=>getComputedStyle(n).animationName==='none')));
   await writeFile(`${evidence}browser-verification.json`,JSON.stringify({schemaVersion:1,packVersion:run.packVersion,

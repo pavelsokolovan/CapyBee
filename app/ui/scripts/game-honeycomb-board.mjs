@@ -4,6 +4,10 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 const evidence=fileURLToPath(new URL('../../../docs/evidence/30.3/',import.meta.url));
 const current=async(context,base)=>(await context.request.get(base+'/api/game/runs/current')).json();
+export async function openExpeditionMap(game) {
+ const map=game.locator('.game-scene-map');
+ if (!await map.evaluate(node=>node.open)) await map.locator('summary').click();
+}
 async function accepted(page,context,base,placeId,revision){
  await page.waitForFunction(({placeId,revision})=>{
   const cell=document.querySelector('.game-board [aria-current=location]');
@@ -22,6 +26,15 @@ export async function checkBoardRoute({page,context,base,requests}){
  await page.emulateMedia({reducedMotion:'no-preference',forcedColors:'none'});
  const game=page.locator('.game-run'),board=game.locator('.game-board');
  const initial=await current(context,base);assert.equal(initial.packVersion,'1.4.0');
+ const beforeOpening=requests.length;
+ await openExpeditionMap(game);
+ await board.locator('.game-board-player').waitFor();
+ const mapControl=game.locator('.game-scene-map > summary');
+ await mapControl.focus();await page.keyboard.press('Enter');
+ assert.equal(await board.isVisible(),false);
+ assert.equal(await mapControl.evaluate(node=>node===document.activeElement),true);
+ await page.keyboard.press('Enter');await board.locator('.game-board-player').waitFor();
+ assert.equal(requests.length,beforeOpening,'toggling the map submitted a command');
  assert.equal(await board.count(),1);assert.equal(await game.locator('.game-places').count(),1);
  assert.equal(await board.locator('[data-place-id]').count(),7);assert.equal(await board.locator('.game-tile-marker').count(),0);
  assert.equal(await board.locator('.game-board-player').count(),1);assert.equal(await board.locator('.game-hex-map').evaluate(n=>getComputedStyle(n).display),'grid');
@@ -51,11 +64,11 @@ export async function checkBoardRoute({page,context,base,requests}){
   assert.ok(await board.locator('.game-board-player').evaluate(n=>n.style.transition.includes('200ms')&&getComputedStyle(n).transitionDuration.includes('0.2s')),'accepted adjacent marker did not animate on its stable layout');
   assert.ok(run.view.options.some(o=>o.id==='help-mela'));assert.equal(run.view.presentation.party.length,0);
   assert.ok(run.view.characters.some(c=>c.inCurrentScene&&c.name==='Mela'));
-  assert.equal(await game.getByRole('heading',{name:'Current moment',exact:true}).evaluate(n=>n===document.activeElement),true);
+  assert.equal(await game.getByRole('heading',{name:'Cicha Łąka',exact:true}).evaluate(n=>n===document.activeElement),true);
   const writes=requests.slice(before).filter(r=>r.url===url);assert.equal(writes.length,1);assert.deepEqual(writes[0].body.command,{type:'MOVE',placeId:'quiet-meadow'});
   const replay=await context.request.post(url,{data:writes[0].body});assert.equal(replay.status(),200);
   const same=await current(context,base);assert.equal(same.revision,run.revision);assert.deepEqual(same.view,run.view);
-  await shot(page,'.game-current-characters','accepted-encounter');
+  await shot(page,'.game-encounter','accepted-encounter');
   await checkExpedition({page,game,requests});
  }finally{release();await context.unroute(url,handler);}
  // An offline neighboring move retains the accepted character and marker. Lose its acknowledgement after acceptance, then reload.
@@ -76,6 +89,8 @@ export async function checkBoardRoute({page,context,base,requests}){
   await page.reload();releaseAck();await page.getByRole('button',{name:'Play',exact:true}).click();await page.getByRole('button',{name:/Adventures/}).click();
   await page.getByRole('button',{name:'Continue',exact:true}).click();
   const run=await accepted(page,context,base,'reed-bank',mela.revision+1);
+  assert.equal(await game.locator('.game-scene-map').evaluate(node=>node.open),false);
+  await openExpeditionMap(game);
   assert.ok(run.view.options.some(o=>o.id==='help-borys'));assert.equal(run.view.presentation.party.length,0);
   assert.equal(requests.slice(pendingStart).filter(r=>r.url===url).length,1,'reload reposted uncertain board move');
   const stable=await current(context,base);assert.deepEqual(stable.view,run.view);

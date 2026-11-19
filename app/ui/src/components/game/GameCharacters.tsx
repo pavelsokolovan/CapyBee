@@ -22,12 +22,17 @@ function CharacterCard({character: c, locale, history = false}: {character: Pres
   </article>;
 }
 
-export function GameCurrentCharacters({view, locale}: Props) {
+export function GameCurrentCharacters({view, locale, collapsible = false}: Props & {collapsible?: boolean}) {
   const data = gameCompanions(view), titleId = useId();
   if (!data?.current.length) return null;
-  return <section className="game-art game-current-characters" aria-labelledby={titleId}>
-    <h4 id={titleId} lang={locale}>{companionCopy[locale].current}</h4>
-    <ul className="game-character-list">{data.current.map(c => <li key={c.id}><CharacterCard character={c} locale={locale}/></li>)}</ul>
+  const title = companionCopy[locale].current;
+  const list = <ul className="game-character-list">{data.current.map(c =>
+    <li key={c.id}><CharacterCard character={c} locale={locale}/></li>)}</ul>;
+  const className = 'game-art game-current-characters';
+  return collapsible ? <details className={className}>
+    <summary lang={locale}>{title}</summary>{list}
+  </details> : <section className={className} aria-labelledby={titleId}>
+    <h4 id={titleId} lang={locale}>{title}</h4>{list}
   </section>;
 }
 
@@ -47,7 +52,9 @@ export function GameCharacterHistory({view, locale}: Props) {
 }
 
 /** The caller enables announcements only for eligible accepted updates, never initial hydration. */
-export function GameParty({view, locale, runId, revision, announce = false, ready = true}: Props & {runId: string; revision: number; announce?: boolean; ready?: boolean}) {
+export function GameParty({view, locale, runId, revision, announce = false, ready = true, hideEmpty = false}: Props & {
+  runId: string; revision: number; announce?: boolean; ready?: boolean; hideEmpty?: boolean;
+}) {
   const data = gameCompanions(view), party = data?.party ?? [], titleId = useId(), copy = companionCopy[locale];
   const previous = useRef<{runId: string; revision: number; ids: Set<string>; ready: boolean; available: boolean} | null>(null);
   const [addedNames, setAddedNames] = useState<string[]>([]);
@@ -62,12 +69,15 @@ export function GameParty({view, locale, runId, revision, announce = false, read
     previous.current = next;
   }, [runId, revision, identity, announce, ready, available]);
   if (!data) return null;
-  return <section className="game-art game-party" aria-labelledby={titleId}>
+  const announcement = <p className="game-party-announcement" role="status" aria-live="polite" aria-atomic="true" lang={locale}>
+    {addedNames.length ? copy.added(addedNames.join(', ')) : ''}
+  </p>;
+  return <>{!hideEmpty || party.length ? <section className="game-art game-party" aria-labelledby={titleId}>
     <h4 id={titleId} lang={locale}>{copy.party}</h4>
     {party.length ? <ul className="game-party-members">{party.map(c => <li key={c.id} data-character-id={c.id}>
       <span className="game-party-portrait"><GameCharacter assetId={c.assetId} variant="portrait" expression={c.expression} decorative/></span>
       <strong>{c.name}</strong>
     </li>)}</ul> : <p className="game-party-empty" lang={locale}>{copy.empty}</p>}
-    <p className="game-party-announcement" role="status" aria-live="polite" aria-atomic="true" lang={locale}>{addedNames.length ? copy.added(addedNames.join(', ')) : ''}</p>
-  </section>;
+    {!hideEmpty ? announcement : null}
+  </section> : null}{hideEmpty ? announcement : null}</>;
 }
