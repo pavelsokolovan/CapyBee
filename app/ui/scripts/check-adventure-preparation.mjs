@@ -1,3 +1,4 @@
+import {checkAnonymousNote} from './capybee-anonymous-note.mjs';
 import {checkPolishGeneration} from './polish-generated-pack.mjs';
 import {checkPolishPack} from './polish-authored-pack.mjs';
 import {checkCompletion} from './game-completion.mjs';
@@ -110,6 +111,7 @@ try {
  await checkCompletion({page,context,base,requests});
  await checkPolishPack({page,context,base,requests});
  await checkPolishGeneration({page,context,base,requests,logs});
+ await checkAnonymousNote({page,context,base,requests});
  await checkRecovery({page,context,base,requests,logs});
  // A new worker must notify an already-running renderer, without discarding drafts automatically.
  await page.evaluate(()=>navigator.serviceWorker.ready);

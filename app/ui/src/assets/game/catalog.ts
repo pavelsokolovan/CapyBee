@@ -29,6 +29,7 @@ export const catalog = {
   'backdrop.hive-clearing': backdrop(), 'backdrop.lantern-grove': backdrop(), 'backdrop.quiet-meadow': backdrop(),
   'backdrop.reed-bank': backdrop(), 'backdrop.willow-glen': backdrop(), 'backdrop.hive-workshop': backdrop(),
   'backdrop.small-crossing': backdrop(), 'backdrop.neutral': backdrop(),
+  'backdrop.note-clearing': backdrop(), 'backdrop.note-meadow': backdrop(),
   'motif.lantern': motif(), 'motif.reed': motif(), 'motif.rest-leaf': motif(),
 } as const;
 export type AssetId = keyof typeof catalog;

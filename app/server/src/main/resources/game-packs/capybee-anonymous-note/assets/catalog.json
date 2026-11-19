@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": 1,
+  "assets": [
+    {
+      "id": "character.capy",
+      "kind": "CHARACTER"
+    },
+    {
+      "id": "character.mela-bee",
+      "kind": "CHARACTER"
+    },
+    {
+      "id": "backdrop.note-clearing",
+      "kind": "BACKDROP"
+    },
+    {
+      "id": "backdrop.note-meadow",
+      "kind": "BACKDROP"
+    },
+    {
+      "id": "terrain.meadow",
+      "kind": "TERRAIN"
+    }
+  ]
+}

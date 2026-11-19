@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 2,
+  "startPlace": "hive-square",
+  "layout": {
+    "kind": "HEX"
+  },
+  "places": [
+    {
+      "id": "hive-square",
+      "labelKey": "place.hive-square",
+      "descriptionKey": "description.hive-square",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "entry": {
+        "sceneId": "find-note"
+      }
+    },
+    {
+      "id": "quiet-meadow",
+      "labelKey": "place.quiet-meadow",
+      "descriptionKey": "description.quiet-meadow",
+      "position": {
+        "x": 1,
+        "y": 0
+      },
+      "entry": {
+        "sceneId": "meet-mela"
+      }
+    }
+  ],
+  "links": [
+    {
+      "from": "hive-square",
+      "to": "quiet-meadow",
+      "bidirectional": false
+    }
+  ],
+  "navigation": {
+    "allowedSceneIds": [
+      "read-note"
+    ],
+    "unavailableHintKey": "navigation.finish-scene"
+  }
+}

@@ -16,8 +16,8 @@ describe('fixed catalog boundary', () => {
   it('publishes complete, serializable metadata with local sources and bounded artwork', () => {
     expect(catalogVersion).toBe(1);
     const entries = Object.entries(catalog);
-    expect(entries).toHaveLength(23);
-    expect(new Set(entries.map(([id]) => id)).size).toBe(23);
+    expect(entries).toHaveLength(25);
+    expect(new Set(entries.map(([id]) => id)).size).toBe(25);
     const counts: Record<AssetKind, number> = {character: 0, terrain: 0, backdrop: 0, motif: 0};
     for (const [id, entry] of entries) {
       counts[entry.kind]++;
@@ -30,7 +30,7 @@ describe('fixed catalog boundary', () => {
         expect(entry.expressions).toEqual(expressions);
       }
     }
-    expect(counts).toEqual({character: 5, terrain: 7, backdrop: 8, motif: 3});
+    expect(counts).toEqual({character: 5, terrain: 7, backdrop: 10, motif: 3});
     expect(JSON.parse(JSON.stringify(catalog))).toEqual(catalog);
     const bytes = readdirSync(artworkPath).reduce((sum, file) => sum + statSync(resolve(artworkPath, file)).size, 0);
     expect(bytes).toBeLessThan(500 * 1024);

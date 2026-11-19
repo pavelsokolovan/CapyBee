@@ -14,4 +14,4 @@ capybee:
   game:
     enabled: ${CAPYBEE_GAME_ENABLED:true}
     web-client-enabled: ${CAPYBEE_GAME_WEB_CLIENT_ENABLED:true}
-    pack-ids: ${CAPYBEE_GAME_PACK_IDS:capybee-new-hive}
+    pack-ids: ${CAPYBEE_GAME_PACK_IDS:capybee-anonymous-note,capybee-new-hive}

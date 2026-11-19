@@ -5,6 +5,7 @@ import {GameTransport} from '../../offline/syncEngine';
 import {AdventureStart} from '../../game/adventureStart';
 import {adventureCopy} from '../../game/adventureCopy';
 import {compatible,transientPack,effective,inputsOf,localesOf,titleOf,validation,codePoints,type Adventure} from '../../game/preparation';
+import {anonymousNotePackId,anonymousNoteTitle} from '../../game/anonymousNote';
 import {GameRun} from './GameRun';
 import {restoreGameSession} from '../../game/restoreGameSession';
 
@@ -21,7 +22,7 @@ export function AdventurePreparation({owner,locale,onClose,onRunReady,flow:provi
  useEffect(()=>{void flow.load();return()=>flow.dispose();},[flow]);
  useEffect(()=>{void flow.shellLocale(locale);},[flow,locale]);
  useEffect(()=>{setWish('');},[state.clearIdea]);
- useLayoutEffect(()=>{heading.current?.focus();},[state.phase,state.step]);
+ useLayoutEffect(()=>{if(state.phase!=='ready')heading.current?.focus();},[state.phase,state.step]);
  useEffect(()=>{
   const previous=document.activeElement as HTMLElement|null;
   const oldOverflow=document.body.style.overflow;document.body.style.overflow='hidden';
@@ -70,25 +71,31 @@ export function AdventurePreparation({owner,locale,onClose,onRunReady,flow:provi
    {invalid&&problems.includes(input.id)?<p role="alert">{input.kind==='FREE_TEXT'?copy.textTooLong:copy.required}</p>:null}
   </fieldset>;
  };
+ const episodeReady=state.phase==='ready'&&state.ready?.packId===anonymousNotePackId;
+ const panelCopy=episodeReady?adventureCopy.pl:copy;
+ const openingEpisode=selected?.kind==='PACK'&&selected.pack.id===anonymousNotePackId&&state.loading;
+ const currentStory=state.current?.view;
+ const savedTitle=state.current?.packId===anonymousNotePackId ? anonymousNoteTitle
+  : currentStory&&'story' in currentStory ? currentStory.story?.title??copy.saved : copy.saved;
  const activeCurrent=state.caps?.gameEnabled&&state.current&&['ACTIVE','PREPARING'].includes(state.current.status);
  return <div className="adventure-overlay" role="dialog" data-preparation-phase={state.phase} aria-modal="true" aria-labelledby="adventure-title" ref={panel}
   onKeyDown={event=>{
    if(event.key==='Escape'&&!composing){event.preventDefault();close();}
    if(event.key==='Tab'){
-    const nodes=Array.from(panel.current?.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select,textarea,summary,a[href]')??[]).filter(node=>!node.closest('dialog:not([open])')&&!node.closest('fieldset:disabled'));
+    const nodes=Array.from(panel.current?.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select,textarea,summary,a[href]')??[]).filter(node=>!node.closest('dialog:not([open])')&&!node.closest('fieldset:disabled')&&(!node.closest('details:not([open])')||node.matches('summary')));
     if(!nodes?.length)return;const first=nodes[0],last=nodes[nodes.length-1];
     if(event.shiftKey&&(document.activeElement===first||document.activeElement===heading.current)){event.preventDefault();last.focus();}
     else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
    }
   }}>
-  <div className="adventure-panel">
-   <header><h2 id="adventure-title" tabIndex={-1} ref={heading}>{copy.title}</h2><button type="button" onClick={close}>{copy.close}</button></header>
+  <div className={episodeReady?'adventure-panel adventure-episode-panel':'adventure-panel'}>
+   <header lang={episodeReady?'pl':locale}><h2 id="adventure-title" tabIndex={-1} ref={heading}>{panelCopy.title}</h2><button type="button" onClick={close}>{panelCopy.close}</button></header>
    {sessionStorage.getItem('game-reconfirm')?<p>{locale==='pl'?'Sprawdź zapisaną grę. Potwierdź ponownie przed rozpoczęciem.':'Check the saved game. Confirm again before starting.'}</p>:null}
    {state.message?<p role="status">{copy[state.message]}</p>:null}
    {state.loading?<p role="status">{copy.loading}</p>:null}
    {state.message==='signin'?<a href="/oauth2/authorization/google">{copy.signInAction}</a>:null}
    {state.phase==='catalog'||state.phase==='signin'?<>
-    {activeCurrent?<section><h3>{'story' in (state.current!.view??{})?(state.current!.view as {story?:{title:string}}).story?.title??copy.saved:copy.saved}</h3>
+    {activeCurrent?<section><h3>{savedTitle}</h3>
      <p>{new Intl.DisplayNames([locale],{type:'language'}).of(state.current!.locale)}</p><button className="primary-button" onClick={()=>void flow.resume()}>{copy.continue}</button></section>:null}
     <h3>{copy.newGame}</h3>
     {!state.loading&&!state.games.length&&!state.message?<p>{copy.empty}</p>:null}
@@ -110,7 +117,7 @@ export function AdventurePreparation({owner,locale,onClose,onRunReady,flow:provi
     <div className="adventure-actions"><button type="button" onClick={()=>{setInvalid(false);flow.back();}}>{copy.back}</button>
     <button type="button" className="primary-button" disabled={state.loading||composing} onClick={next}>{state.step+1<visibleSteps.length?copy.next:copy.review}</button></div>
    </>:null}
-   {state.phase==='review'&&selected?<>
+   {state.phase==='review'&&selected&&!openingEpisode?<>
     <h3>{copy.reviewTitle}</h3><h4>{titleOf(selected)}</h4>
     <p>{selected.kind==='DYNAMIC'?copy.dynamic:state.generated?copy.packGenerated:copy.authored}</p>
     <p>{copy.locale}: {new Intl.DisplayNames([locale],{type:'language'}).of(state.answers['game-locale']?.[0]??locale)}</p>
@@ -132,7 +139,7 @@ export function AdventurePreparation({owner,locale,onClose,onRunReady,flow:provi
     {activeCurrent?<button type="button" onClick={()=>void flow.resume()}>{copy.continue}</button>:null}
     <button type="button" onClick={()=>{setWish('');flow.catalog();void flow.load(false);}}>{copy.newGame}</button>
    </>:null}
-   {state.phase==='ready'&&state.ready?<GameRun key={owner+state.ready.runId} run={state.ready} owner={owner} locale={locale} onAnother={()=>{flow.catalog();void flow.load(false);}}/>:null}
+   {state.phase==='ready'&&state.ready?<GameRun key={owner+state.ready.runId} run={state.ready} owner={owner} locale={locale} onClose={close} onAnother={()=>{flow.catalog();void flow.load(false);}}/>:null}
   </div>
  </div>;
 }

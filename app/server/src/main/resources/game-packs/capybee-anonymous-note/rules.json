@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 2,
+  "counters": [],
+  "flags": [],
+  "sets": [],
+  "objectives": [],
+  "outcomes": [
+    {
+      "id": "trail-found",
+      "resultClass": "SUCCESS",
+      "labelKey": "result.trail"
+    }
+  ]
+}

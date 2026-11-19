@@ -1,0 +1,12 @@
+{
+  "place.hive-square": "Polana Nowego Ula",
+  "description.hive-square": "Tu CapyBee znalazł kopertę.",
+  "place.quiet-meadow": "Cicha Łąka",
+  "description.quiet-meadow": "Mela czeka pośród kwiatów.",
+  "character.capy.name": "CapyBee",
+  "character.capy.description": "Znalazł wiadomość pod ulem.",
+  "character.mela.name": "Mela",
+  "character.mela.description": "Zna wszystkie ścieżki na łące.",
+  "navigation.finish-scene": "Najpierw sprawdź, co dzieje się w tej scenie.",
+  "result.trail": "Zagadka rozwiązana"
+}

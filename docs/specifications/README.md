@@ -102,6 +102,10 @@ list. The current implementation boundary is:
 Spec 30.7 remains the visual release acceptance follow-up. Specs 30.3 and 30.4 share
 the implemented 30.2 contracts for the board, encounters and recruited party.
 
+## Mobile-first authored episode
+
+- [31](31-capybee-anonymous-note-episode-instruction.md) — The Anonymous Note, a short Polish mystery with two playable routes.
+
 ### Roadmap reconciliation
 
 The web host and server-side SDK wiring move from the earlier "spec 29" plan

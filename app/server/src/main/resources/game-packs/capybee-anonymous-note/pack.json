@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "capybee-anonymous-note",
+  "version": "1.0.0",
+  "name": "Tajemnicza wiadomość",
+  "description": "Ktoś zostawił pod ulem zagadkę. Odkryj, dokąd prowadzi.",
+  "locales": [
+    "pl"
+  ],
+  "defaultLocale": "pl",
+  "features": [
+    "PLACES",
+    "ASSETS"
+  ],
+  "startInputs": [],
+  "contentPolicy": {
+    "freeTextAllowed": false
+  },
+  "files": [
+    "strings/pl.json",
+    "scenes/pl/story.json",
+    "rules.json",
+    "places.json",
+    "assets/catalog.json",
+    "presentation.json"
+  ]
+}

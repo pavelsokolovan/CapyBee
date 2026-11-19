@@ -1,3 +1,4 @@
+import {anonymousNotePackId} from './anonymousNote';
 import type { GameCapabilities, GamePackInfoDto, GameRunSummaryDto, GeneratorProfile } from './gameApi';
 import { decodeCapabilities, decodePack, decodeProfile, decodeSummary, object } from './gameDecoders';
 import { type GameReply, type OperationMarker } from '../offline/syncEngine';
@@ -89,7 +90,9 @@ export class AdventureStart {
   if(this.sending || this.value.phase==='waiting' || !compatible(game))return;
   if(this.value.current?.status==='PREPARING'){this.update({message:'waitHint'});return;}
   if(game.kind==='PACK' && !transientPack(game) && this.value.current && ['ACTIVE','PREPARING'].includes(this.value.current.status)){this.update({message:'packConflict'});return;}
-  this.generation++;this.pollAbort?.abort();this.forget();this.update({selected:game,answers:initialAnswers(game,this.locale),generated:false,replacement:false,step:0,phase:'setup',message:undefined,clearIdea:this.value.clearIdea+1});
+  const direct = game.kind==='PACK' && game.pack.id===anonymousNotePackId;
+  this.generation++;this.pollAbort?.abort();this.forget();this.update({selected:game,answers:initialAnswers(game,this.locale),generated:false,replacement:false,step:0,phase:direct?'review':'setup',message:undefined,clearIdea:this.value.clearIdea+1});
+  if(direct)void this.confirm('');
  }
  answer(id:string,values:string[]) {if(this.sending)return;this.update({answers:{...this.value.answers,[id]:values},phase:'setup'});}
  generated(value:boolean) {if(!this.sending)this.update({generated:value,phase:'setup'});}

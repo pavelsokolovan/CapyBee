@@ -27,3 +27,37 @@
  .game-hex-map .game-place-current { border: 4px double #51401e; }
  .game-hex-map .game-place::before { display: none; }
 }
+
+.adventure-episode-panel > header { padding-block: .35rem; }
+.adventure-episode-panel > header h2 { font-size: 1rem; margin-block: 0; }
+.game-episode { max-width: 34rem; margin-inline: auto; color: #30271d; }
+.game-episode > h3 { font-size: clamp(1.6rem, 6vw, 2.35rem); line-height: 1.12; margin: 0 0 .55rem; }
+.game-episode-tools { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .5rem; }
+.game-episode-tools > button, .game-episode-map > summary {
+ box-sizing: border-box; min-width: 44px; background: #fff8e9; color: #45311f; border: 1px solid #846746; border-radius: .75rem;
+}
+.game-episode-map { margin: 0 !important; }
+.game-episode-map[open] { flex-basis: 100%; }
+.game-episode-map ul { margin-block: .5rem 0; padding: 0; list-style: none; }
+.game-episode-map li { display: grid; gap: .35rem; padding: .65rem .8rem; background: #fffdf7; border-inline-start: 3px solid #947d58; }
+.game-episode-map li[aria-current] { border-color: #386a56; }
+.game-episode-map button { justify-self: start; }
+.game-episode .game-encounter { margin-block: .65rem .35rem; }
+.game-episode .game-encounter-backdrop { position: relative; aspect-ratio: 2.4; }
+.game-episode .game-encounter-backdrop > svg { width: 100%; height: 100%; object-fit: cover; scale: 1.37; }
+.game-encounter-stage { position: absolute; inset: 0; display: flex; justify-content: center; align-items: end; pointer-events: none; }
+.game-encounter-stage svg { width: auto; height: 87%; }
+.game-episode .game-block p { line-height: 1.45; margin: .2rem 0 .65rem; }
+.game-episode .game-block strong { font-size: .9rem; color: #624720; }
+.game-episode .game-actions legend {
+ position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+.game-episode .game-actions button, .game-episode-exit {
+ width: 100%; color: #fffdf7; background: #285745; border: 2px solid #285745; font-weight: 700;
+}
+.game-episode .game-actions button:hover:not(:disabled), .game-episode-exit:hover { background: #204638; }
+.game-episode .game-run-status { min-block-size: 1.6em; margin-block: .25rem; }
+.game-episode .game-encounter-content h4 { margin-block: 0 .55rem; font-size: 1.25rem; }
+@media (forced-colors: active) {
+ .game-episode .game-actions button, .game-episode-exit { color: ButtonText; background: ButtonFace; border-color: ButtonText; }
+}

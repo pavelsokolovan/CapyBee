@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "playerAssetId": "character.capy",
+  "characters": [
+    {
+      "id": "actor:hive-guide",
+      "assetId": "character.capy",
+      "sceneIds": [
+        "find-note",
+        "read-note"
+      ],
+      "nameKey": "character.capy.name",
+      "descriptionKey": "character.capy.description"
+    },
+    {
+      "id": "actor:mela-bee",
+      "assetId": "character.mela-bee",
+      "sceneIds": [
+        "meet-mela",
+        "handwriting",
+        "tracks",
+        "ending-note",
+        "ending-tracks"
+      ],
+      "nameKey": "character.mela.name",
+      "descriptionKey": "character.mela.description"
+    }
+  ],
+  "scenes": [
+    {
+      "sceneId": "find-note",
+      "backdropAssetId": "backdrop.note-clearing"
+    },
+    {
+      "sceneId": "read-note",
+      "backdropAssetId": "backdrop.note-clearing"
+    },
+    {
+      "sceneId": "meet-mela",
+      "backdropAssetId": "backdrop.note-meadow"
+    },
+    {
+      "sceneId": "handwriting",
+      "backdropAssetId": "backdrop.note-meadow"
+    },
+    {
+      "sceneId": "tracks",
+      "backdropAssetId": "backdrop.note-meadow"
+    },
+    {
+      "sceneId": "ending-note",
+      "backdropAssetId": "backdrop.note-meadow"
+    },
+    {
+      "sceneId": "ending-tracks",
+      "backdropAssetId": "backdrop.note-meadow"
+    }
+  ],
+  "places": [
+    {
+      "placeId": "hive-square",
+      "terrainAssetId": "terrain.meadow"
+    },
+    {
+      "placeId": "quiet-meadow",
+      "terrainAssetId": "terrain.meadow"
+    }
+  ]
+}

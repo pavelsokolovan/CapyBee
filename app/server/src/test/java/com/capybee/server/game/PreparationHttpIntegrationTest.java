@@ -121,6 +121,8 @@ class PreparationHttpIntegrationTest {
                 new ClasspathPackSource(PreparationHttpIntegrationTest.class.getClassLoader(),"game-packs/capybee-new-hive")));
         packs.add(new PackLoader(Engine.sectionValidators()).load(new PackId("capybee-new-hive"),
                 new ClasspathPackSource(PreparationHttpIntegrationTest.class.getClassLoader(),"game-packs/capybee-new-hive/retained/1.0.0")));
+        packs.add(new PackLoader(Engine.sectionValidators()).load(new PackId("capybee-anonymous-note"),
+                new ClasspathPackSource(PreparationHttpIntegrationTest.class.getClassLoader(),"game-packs/capybee-anonymous-note")));
         // Test-only HEX presentation over the same engine mechanics as the dungeon.
         var base=new DirectoryPackSource(Path.of("../engine/fixtures/game-packs/fixture-text-dungeon"));
         var overrides=new DirectoryPackSource(Path.of("src/test/resources/game-packs/fixture-hex"));

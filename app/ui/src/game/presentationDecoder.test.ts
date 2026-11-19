@@ -72,10 +72,22 @@ describe('public presentation decoding', () => {
   });
 });
 
-it('keeps the packaged allowlist exactly aligned with the canonical SVG catalog metadata', () => {
-  const shipped = JSON.parse(readFileSync(resolve(process.cwd(), '../engine/reference-game-pack-versions/capybee-new-hive/1.2.0/assets/catalog.json'), 'utf8'));
-  expect(shipped.catalogVersion).toBe(catalogVersion);
-  expect(shipped.assets).toEqual(Object.entries(catalog).filter(([,entry]) => entry.kind !== 'motif').map(([id, entry]) => ({id, kind: entry.kind.toUpperCase()})));
+it('keeps shipped presentation assets aligned with the canonical SVG catalog', () => {
+  const paths = [
+    '../engine/reference-game-pack-versions/capybee-new-hive/1.2.0/assets/catalog.json',
+    '../server/src/main/resources/game-packs/capybee-anonymous-note/assets/catalog.json',
+  ];
+  const shippedAssets = new Map<string, string>();
+  for (const path of paths) {
+    const shipped = JSON.parse(readFileSync(resolve(process.cwd(), path), 'utf8'));
+    expect(shipped.catalogVersion).toBe(catalogVersion);
+    for (const {id, kind} of shipped.assets) {
+      expect(catalog[id as keyof typeof catalog]?.kind.toUpperCase()).toBe(kind);
+      shippedAssets.set(id, kind);
+    }
+  }
+  expect(shippedAssets).toEqual(new Map(Object.entries(catalog)
+    .filter(([,entry]) => entry.kind !== 'motif').map(([id,entry]) => [id,entry.kind.toUpperCase()])));
 });
 
 it('reads the same public JSON golden that the Java session wire round-trips', () => {

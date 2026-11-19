@@ -1,0 +1,139 @@
+{
+  "schemaVersion": 1,
+  "scenes": [
+    {
+      "id": "find-note",
+      "start": true,
+      "blocks": [
+        {
+          "kind": "SPEECH",
+          "speaker": "actor:hive-guide",
+          "text": "Pod ulem leży koperta bez podpisu. Na wierzchu ktoś dopisał: „Dla osoby, która jeszcze nie zna drogi”."
+        }
+      ],
+      "options": [
+        {
+          "id": "open-envelope",
+          "label": "Przeczytaj wiadomość",
+          "next": "read-note"
+        }
+      ]
+    },
+    {
+      "id": "read-note",
+      "blocks": [
+        {
+          "kind": "NARRATION",
+          "text": "W środku jest rysunek strzałki z trzema kropkami i dopisek: „Cicha Łąka. Mela wie, gdzie szukać”."
+        }
+      ],
+      "options": [
+        {
+          "id": "visit-mela",
+          "label": "Odwiedź Melę",
+          "next": "meet-mela",
+          "effects": [
+            {
+              "type": "GO_TO",
+              "place": "quiet-meadow"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "meet-mela",
+      "blocks": [
+        {
+          "kind": "SPEECH",
+          "speaker": "actor:mela-bee",
+          "text": "Też dostałam taką kopertę. Myślałam, że to zaproszenie na zebranie pszczół. Znowu."
+        },
+        {
+          "kind": "NARRATION",
+          "text": "Mela zauważa ślady przy kwiatach. Możesz też pokazać jej rysunek."
+        }
+      ],
+      "options": [
+        {
+          "id": "show-note",
+          "label": "Pokaż Meli wiadomość",
+          "next": "handwriting"
+        },
+        {
+          "id": "follow-tracks",
+          "label": "Sprawdź ślady przy kwiatach",
+          "next": "tracks"
+        }
+      ]
+    },
+    {
+      "id": "handwriting",
+      "blocks": [
+        {
+          "kind": "SPEECH",
+          "speaker": "actor:mela-bee",
+          "text": "Znam te trzy kropki! Borys tak podpisuje drewniane drogowskazy. Chodź, jeden jest za kwiatami."
+        }
+      ],
+      "options": [
+        {
+          "id": "inspect-sign",
+          "label": "Sprawdź drogowskaz",
+          "next": "ending-note"
+        }
+      ]
+    },
+    {
+      "id": "tracks",
+      "blocks": [
+        {
+          "kind": "NARRATION",
+          "text": "Ślady prowadzą za kwiaty. Na drewnianej tabliczce widzisz tę samą strzałkę z trzema kropkami."
+        },
+        {
+          "kind": "SPEECH",
+          "speaker": "actor:mela-bee",
+          "text": "O, to znak Borysa. Zawsze stawia trzy kropki, nawet kiedy nie ma już miejsca."
+        }
+      ],
+      "options": [
+        {
+          "id": "inspect-sign",
+          "label": "Sprawdź drogowskaz",
+          "next": "ending-tracks"
+        }
+      ]
+    },
+    {
+      "id": "ending-note",
+      "blocks": [
+        {
+          "kind": "NARRATION",
+          "text": "Za drogowskazem wisi tabliczka: „Ścieżka dla nowych, od Borysa”. Obok leży pusta deseczka i ołówek. Ktoś, kto dopiero poznaje okolicę, może zostawić własny znak."
+        },
+        {
+          "kind": "NARRATION",
+          "text": "Twój rysunek pomógł Meli rozpoznać podpis Borysa."
+        }
+      ],
+      "end": true,
+      "outcome": "trail-found"
+    },
+    {
+      "id": "ending-tracks",
+      "blocks": [
+        {
+          "kind": "NARRATION",
+          "text": "Za drogowskazem wisi tabliczka: „Ścieżka dla nowych, od Borysa”. Obok leży pusta deseczka i ołówek. Ktoś, kto dopiero poznaje okolicę, może zostawić własny znak."
+        },
+        {
+          "kind": "NARRATION",
+          "text": "To twoje odkrycie przy kwiatach połączyło kopertę z drogowskazem."
+        }
+      ],
+      "end": true,
+      "outcome": "trail-found"
+    }
+  ]
+}
