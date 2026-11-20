@@ -81,19 +81,9 @@ it('shows a title-less illustrated pack as an expedition and preserves text and 
  expect(map.open).toBe(false);
  expect(game.querySelector<HTMLDetailsElement>('details.game-current-characters')?.open).toBe(false);
  expect(game.querySelector('.game-party')).toBeNull();
- const encounter=game.querySelector('.game-encounter-content')!;
- const text=encounter.textContent;
- const choices=()=>[...game.querySelectorAll('.game-actions button')].map(button=>button.textContent);
- expect(choices()).toEqual(['Hold the reed']);
+ expect(game.querySelector('.game-actions button')?.textContent).toBe('Hold the reed');
  const menu=game.querySelector<HTMLDetailsElement>('.game-scene-menu')!;
- menu.open=true;
- const toggle=[...game.querySelectorAll('button')].find(button=>button.textContent==='Text mode')!;
- await act(async()=>toggle.click());
- expect(toggle.getAttribute('aria-pressed')).toBe('true');
- expect(menu.open).toBe(false);
- expect(document.activeElement).toBe(menu.querySelector('summary'));
- expect(encounter.textContent).toBe(text);
- expect(choices()).toEqual(['Hold the reed']);
+ expect([...menu.querySelectorAll('button')].map(button=>button.textContent)).toEqual(['End adventure']);
  expect(submit).not.toHaveBeenCalled();
  await act(async()=>game.querySelector<HTMLButtonElement>('.game-map-button')!.click());
  expect(map.open).toBe(true);
@@ -155,7 +145,7 @@ it.each(['close','cancel','backdrop'])('dismisses the sheet by %s and restores M
 it('dismisses only the open menu on Escape and returns focus there after cancelling abandon',async()=>{
  const {submit}=await renderRun(illustratedRun());
  const menu=host.querySelector<HTMLDetailsElement>('.game-scene-menu')!;
- const summary=menu.querySelector('summary')!,end=menu.querySelectorAll('button')[1];
+ const summary=menu.querySelector('summary')!,end=menu.querySelector('button')!;
  const escaped=vi.fn();document.body.addEventListener('keydown',escaped,{once:true});
  menu.open=true;end.focus();
  await act(async()=>end.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true})));

@@ -68,6 +68,6 @@ export async function checkPolishGeneration({page,context,base,requests,logs}) {
   labels:['Zabieram światło','Wracam na polanę','Odpoczywam na dziś']});
  await game.getByRole('button',{name:'Odpoczywam na dziś',exact:true}).click();
  await game.getByRole('button',{name:'Start another adventure',exact:true}).waitFor();
- console.log('PASS: Polish generated and fallback lantern beats fit 360 × 640 with three actions and Text mode parity');
+ console.log('PASS: Polish generated and fallback lantern beats fit 360 × 640 with three actions');
  console.log('PASS: Polish generated Pack explicit consent, Unicode limit, offline wish, masked review, lost response, one operation, exact reload and private storage exclusions');
 }

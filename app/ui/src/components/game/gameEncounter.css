@@ -73,17 +73,17 @@
  display: none;
 }
 @media (forced-colors: none) {
- .game-expedition[data-text-mode="false"] .game-progressive-text .game-block {
+ .game-expedition .game-progressive-text .game-block {
   margin-block-start: 0;
  }
- .game-expedition[data-text-mode="false"] .game-progressive-text [data-inactive] {
+ .game-expedition .game-progressive-text [data-inactive] {
   position: absolute;
   inline-size: 1px;
   block-size: 1px;
   overflow: hidden;
   clip-path: inset(50%);
  }
- .game-expedition[data-text-mode="false"] .game-read-more {
+ .game-expedition .game-read-more {
   display: inline-flex;
   align-items: center;
   min-block-size: 44px;

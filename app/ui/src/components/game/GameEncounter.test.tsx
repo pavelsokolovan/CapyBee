@@ -30,7 +30,7 @@ it('omits the stage that anchors the bubble tail when no characters are present'
  expect(host.querySelector('.game-encounter-backdrop > svg')).not.toBeNull();
  expect(host.querySelector('.game-encounter-stage')).toBeNull();
 });
-it.each(['en','pl'] as const)('composes accepted art and preserves draft, focus and commands on %s text-mode switches',async locale=>{
+it.each(['en','pl'] as const)('composes accepted art and preserves the draft when dismissing the %s scene menu',async locale=>{
  const view=companionView();view.presentation!.backdropAssetId='backdrop.reed-bank';view.input={mode:'CHOICE_OR_TEXT',maxChars:200};
  const run:GameRunSummaryDto={runId:'one',source:{kind:'PACK',packId:'fixture',packVersion:'1.0.0'},packId:'fixture',packVersion:'1.0.0',locale:'pl',status:'ACTIVE',revision:0,updatedAt:'2026-11-16T00:00:00Z',viewSchema:2,view};
  let state:RunState={run,pending:false,message:'saved'};const listeners=new Set<()=>void>();
@@ -40,19 +40,16 @@ it.each(['en','pl'] as const)('composes accepted art and preserves draft, focus 
  const area=host.querySelector('textarea')!;const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value')!.set!;
  await act(async()=>{setter.call(area,'A quiet fictional wish');area.dispatchEvent(new Event('input',{bubbles:true}));});
  const menu=host.querySelector<HTMLDetailsElement>('.game-scene-menu')!;
- menu.open=true;
- const stores=()=>[localStorage,sessionStorage].map(store=>Object.entries(store));
- const before=stores();
- const toggle=[...host.querySelectorAll('button')].find(b=>b.textContent===(locale==='en'?'Text mode':'Tryb tekstowy'))!;toggle.focus();
- await act(async()=>{menu.open=true;toggle.click();});expect(host.querySelector('.game-run')?.getAttribute('data-text-mode')).toBe('true');expect(document.activeElement).toBe(menu.querySelector('summary'));expect(host.querySelector('textarea')).toBe(area);expect(area.value).toBe('A quiet fictional wish');expect(controller.submit).not.toHaveBeenCalled();
- await act(async()=>{menu.open=true;toggle.click();});expect(host.querySelector('textarea')).toBe(area);expect(area.value).toBe('A quiet fictional wish');
- expect(stores()).toEqual(before);
+ const end=menu.querySelector('button')!;
+ expect(menu.querySelectorAll('button')).toHaveLength(1);
+ menu.open=true;end.focus();
+ await act(async()=>end.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true})));
+ expect(menu.open).toBe(false);expect(document.activeElement).toBe(menu.querySelector('summary'));
+ expect(host.querySelector('textarea')).toBe(area);expect(area.value).toBe('A quiet fictional wish');expect(controller.submit).not.toHaveBeenCalled();
  await act(async()=>{state={...state,pending:true,message:'waiting'};listeners.forEach(fn=>fn());});
  expect(host.querySelector('.game-block')?.textContent).toContain('We can take our time.');expect(host.querySelector('fieldset')?.disabled).toBe(true);
  expect(host.querySelector('.game-encounter-backdrop svg')?.getAttribute('aria-hidden')).toBe('true');
- await act(async()=>{menu.open=true;toggle.click();});
- await act(async()=>{state={run:{...run,runId:'two'},pending:false,message:'saved'};listeners.forEach(fn=>fn());});
- expect(host.querySelector('.game-run')?.getAttribute('data-text-mode')).toBe('false');
+
 });
 it('retains the legacy text renderer without a presentation promise',async()=>{
  const {GameEncounter}=await import('./GameEncounter');const view=companionView();delete view.presentation;

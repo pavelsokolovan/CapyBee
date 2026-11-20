@@ -101,10 +101,8 @@ body:has(.adventure-overlay .game-expedition) { min-width: 0; }
  border: 1px solid #846746; border-radius: .75rem; background: #fffdf7;
 }
 .game-scene-menu-items button { border: 0; background: transparent; color: #2e2413; text-align: start; }
-.game-scene-menu-items button[aria-pressed=true] { background: #dceadd; }
 @media (forced-colors: active) {
  .game-scene-menu-items { border-color: CanvasText; background: Canvas; }
- .game-scene-menu-items button[aria-pressed=true] { border: 2px solid Highlight; }
 }
 .game-scene-footer {
  box-sizing: border-box; flex: 0 0 auto; max-height: 45dvh; overflow-y: auto; overscroll-behavior: contain;

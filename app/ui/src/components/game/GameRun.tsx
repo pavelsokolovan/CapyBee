@@ -130,8 +130,8 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
  const cancel=()=>{dialog.current?.close();(expedition?menuSummary:abandon).current?.focus();};
  const title=adventureTitle(state.run);
  const endingLabel=view?.endReason==='ABANDONED' ? c.abandoned : 'Zagadka rozwiązana';
- const textToggle=presentation?<button type="button" lang={controlsLocale} aria-pressed={textMode}
-  onClick={()=>{setTextPreference({runId:state.run.runId,enabled:!textMode});if(expedition)closeMenu();}}>{encounterCopy[controlsLocale].text}</button>:null;
+ const textToggle=!expedition&&presentation?<button type="button" lang={controlsLocale} aria-pressed={textMode}
+  onClick={()=>setTextPreference({runId:state.run.runId,enabled:!textMode})}>{encounterCopy[controlsLocale].text}</button>:null;
  const quietSave=expedition&&initialized&&state.message==='saved'&&!state.pending;
  const status=<p className={quietSave?'game-run-status game-visually-hidden':'game-run-status'} role="status" aria-live="polite" lang={controlsLocale}>{initialized
   ? (!episode||state.message!=='saved'||saveVisible ? c[state.message] : '') : c.checking}</p>;
@@ -164,29 +164,28 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
   const caption=<h4 className={currentLocation?'game-expedition-location':'game-visually-hidden'} tabIndex={-1} ref={heading}
    lang={currentLocation?state.run.locale:locale}>{currentLocation??boardCopy[locale].moment}</h4>;
   const canAbandon=state.run.status==='ACTIVE';
-  return <section ref={section} className={runClass} data-text-mode={textMode} lang={state.run.locale}>
-   {mapAvailable||textToggle||canAbandon?<div className="game-scene-tools" lang={locale}>
+  return <section ref={section} className={runClass} lang={state.run.locale}>
+   {mapAvailable||canAbandon?<div className="game-scene-tools" lang={locale}>
     {mapAvailable?<button className="game-map-button" type="button" aria-haspopup="dialog" ref={mapButton} onClick={openMap}>
      <span aria-hidden="true">🗺</span> {boardCopy[locale].map}
     </button>:null}
-    {textToggle||canAbandon?<details className="game-scene-menu" ref={menu}
+    {canAbandon?<details className="game-scene-menu" ref={menu}
      onKeyDown={event=>{if(event.key==='Escape'&&event.currentTarget.open){event.preventDefault();event.stopPropagation();closeMenu();}}}>
      <summary ref={menuSummary}><span aria-hidden="true">⋯</span> {boardCopy[locale].menu}</summary>
      <div className="game-scene-menu-items">
-      {textToggle}
-      {canAbandon?<button type="button" disabled={locked} onClick={()=>{closeMenu();dialog.current?.showModal();}}>{c.abandon}</button>:null}
+      <button type="button" disabled={locked} onClick={()=>{closeMenu();dialog.current?.showModal();}}>{c.abandon}</button>
      </div>
     </details>:null}
    </div>:null}
    {mapAvailable&&mapOpen?null:status}
    {mapAvailable&&places?<ExpeditionMap places={places} presentation={presentation} locale={locale} dialog={mapDialog}
-    selectedId={selectedPlace} onSelect={setSelectedPlace} onClose={closeMap} textMode={textMode}
+    selectedId={selectedPlace} onSelect={setSelectedPlace} onClose={closeMap}
     pending={state.pending} locked={locked} status={mapOpen?status:null} submit={submit}
     completedPlaces={completedHivePlaces(state.run)} animatedFills={animatedFills}/>:null}
    <div className="game-scene-body" ref={sceneBody}>
     {titleHeading}{notices}
     {view?<>
-    <GameEncounter view={view} stage caption={caption} textMode={textMode} encounterRef={encounter} capyExpression={capyExpression}>
+    <GameEncounter view={view} stage caption={caption} encounterRef={encounter} capyExpression={capyExpression}>
      <SceneBlocks key={JSON.stringify([state.run.runId,view.blocks])} view={view} locale={controlsLocale}
       progressive={!!presentation}/>
     </GameEncounter>

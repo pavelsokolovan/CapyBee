@@ -156,8 +156,6 @@ export async function checkProgressiveText({page,game,requests,locale}) {
   const count=await blocks.count();
   assert.ok(count>=3);
   const action=panel.getByRole('button',{name:locale==='pl'?'Czytaj dalej':'Read more',exact:true});
-  const menu=game.locator('.game-scene-menu > summary');
-  const toggle=game.locator('.game-scene-menu button[aria-pressed]');
   const visible=()=>blocks.evaluateAll(nodes=>nodes.map((node,i)=>getComputedStyle(node).clipPath==='none'?i:null).filter(i=>i!==null));
   const writes=requests.length;
   assert.deepEqual(await visible(),[0]);
@@ -166,11 +164,6 @@ export async function checkProgressiveText({page,game,requests,locale}) {
   for(const block of await blocks.locator('p').allTextContents())assert.ok(accessible.includes(block));
   await action.focus();
   await page.keyboard.press('Space');
-  assert.deepEqual(await visible(),[1]);
-  await menu.click();await toggle.click();
-  assert.equal(await action.isVisible(),false);
-  assert.deepEqual(await visible(),Array.from({length:count},(_,i)=>i));
-  await menu.click();await toggle.click();
   assert.deepEqual(await visible(),[1]);
   try{
    await page.emulateMedia({forcedColors:'active'});
@@ -186,7 +179,7 @@ export async function checkProgressiveText({page,game,requests,locale}) {
   assert.equal(await blocks.last().evaluate(node=>node===document.activeElement),true);
   assert.equal(requests.length,writes);
  });
- console.log('PASS: 360 × 640 progressive story blocks, accessible full text, keyboard focus, reading modes and no game writes');
+ console.log('PASS: 360 × 640 progressive story blocks, accessible full text, keyboard focus, forced colors and no game writes');
 }
 
 export async function checkShortPolishBeat({page,game,text,labels}) {
@@ -203,13 +196,7 @@ export async function checkShortPolishBeat({page,game,text,labels}) {
    assert.ok(bounds.y>=scroller.y&&bounds.y+bounds.height<=frame.y+1, 'the full scene must fit above its actions');
   }
   assert.equal(await game.locator(body).evaluate(node=>node.scrollTop),0);
-  const menu=game.locator('.game-scene-menu > summary');
-  const toggle=game.locator('.game-scene-menu button[aria-pressed]');
-  await menu.click();await toggle.click();
-  assert.equal(await game.locator(art).count(),0);
-  assert.equal(await bubbleNode.innerText(),text);
-  assert.deepEqual(await buttons.allTextContents(),labels);
-  await menu.click();await toggle.click();
+
  });
 }
 
@@ -221,8 +208,6 @@ export async function checkExpedition({page,game,requests}){
  assert.ok(text.length>0);
  const choices=()=>game.locator('.game-actions fieldset button').allTextContents();
  const labels=await choices(),before=requests.length;
- const toggle=game.locator('.game-scene-menu button[aria-pressed]');
- const menu=game.locator('.game-scene-menu > summary');
  const viewport=page.viewportSize();
  const tail=()=>encounter.locator(bubble).evaluate(node=>getComputedStyle(node,'::before').content);
  try{
@@ -237,18 +222,6 @@ export async function checkExpedition({page,game,requests}){
   }), 'a scene character is clipped by the artwork frame');
   assert.notEqual(await tail(),'none');
   await atMobile(page,game,async()=>{
-   await menu.click();await toggle.focus();await page.keyboard.press('Enter');
-   assert.equal(await toggle.getAttribute('aria-pressed'),'true');
-   assert.equal(await menu.evaluate(node=>node===document.activeElement&&!node.parentElement.open),true);
-   assert.equal(await encounter.locator(art).count(),0);
-   assert.equal(await tail(),'none');
-   assert.equal(await heading.isVisible(),true);
-   assert.deepEqual(await narration(),text);
-   assert.deepEqual(await choices(),labels);
-   await checkFooter(page,game,labels.length);
-   await screenshot(page,'text-mode-mobile');
-
-   await menu.click();await toggle.click();
    await page.emulateMedia({forcedColors:'active',reducedMotion:'reduce'});
    assert.equal(await encounter.locator(art+' > svg').isVisible(),false);
    assert.equal(await heading.isVisible(),true);
@@ -264,5 +237,5 @@ export async function checkExpedition({page,game,requests}){
   await page.emulateMedia({forcedColors:'none',reducedMotion:'no-preference'});
   await page.setViewportSize(viewport);
  }
- console.log('PASS: one-screen expedition, pinned and inline actions, zoom, keyboard Text mode and forced colors');
+ console.log('PASS: one-screen expedition, pinned and inline actions, zoom and forced colors');
 }

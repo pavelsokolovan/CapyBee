@@ -16,7 +16,6 @@ type Props = {
   onSelect: (id: string) => void;
   locked: boolean;
   pending: boolean;
-  textMode: boolean;
   completedPlaces: readonly string[];
   animatedFills: readonly string[];
   status: ReactNode;
@@ -24,7 +23,7 @@ type Props = {
 };
 
 export function ExpeditionMap({places, presentation, locale, dialog, onClose, selectedId, onSelect,
-  locked, pending, textMode, status, submit, completedPlaces, animatedFills}: Props) {
+  locked, pending, status, submit, completedPlaces, animatedFills}: Props) {
   const titleId = useId(), copy = runCopy[locale], board = boardCopy[locale];
   const scroll = useRef<HTMLDivElement>(null);
   const layout = hexLayout(places), columns = layout?.columns;
@@ -45,7 +44,7 @@ export function ExpeditionMap({places, presentation, locale, dialog, onClose, se
     colors.addEventListener('change', measure);
     return () => {observer?.disconnect();colors.removeEventListener('change', measure);};
   }, [columns]);
-  const graphical = graphicalSpace && !!presentation?.places.length && !!layout && !textMode;
+  const graphical = graphicalSpace && !!presentation?.places.length && !!layout;
   const selected = places.places.find(place => place.id === selectedId)
     ?? places.places.find(place => place.id === places.currentPlaceId) ?? places.places[0];
   if (!selected) return null;

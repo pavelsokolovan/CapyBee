@@ -120,15 +120,8 @@ export async function checkBoardRoute({page,context,base,requests}){
  await sheet.locator('.game-map-list').waitFor();
  assert.equal(await sheet.getByText("You're here",{exact:true}).isVisible(),true);
  assert.equal(await card.getByText(bridge.moveHint,{exact:true}).isVisible(),true);
- await page.emulateMedia({forcedColors:'none'});await close.click();
- await menu.click();await game.getByRole('button',{name:'Text mode',exact:true}).click();
- await openExpeditionMap(game);
- await sheet.locator('.game-map-list').waitFor();
- assert.equal(await sheet.locator('svg').count(),0);
- assert.equal(await sheet.getByText("You're here",{exact:true}).count(),2);
- assert.ok(await tiles.evaluateAll(nodes=>nodes.every(node=>node.innerText.trim().length>0)));
  await mapScreenshot(page,'map-sheet-list');
- await close.click();await menu.click();await game.getByRole('button',{name:'Text mode',exact:true}).click();
+ await page.emulateMedia({forcedColors:'none'});await close.click();
  assert.equal(requests.length,beforeOpen);
 
  // Hold the one keyboard-confirmed MOVE so the accepted scene and selection can be inspected.

@@ -167,6 +167,8 @@ export async function checkPolishPack({page,context,base,requests}) {
  await polishSheet.getByRole('button',{name:'Idź: Cicha Łąka',exact:true}).waitFor();
  await polishSheet.getByRole('button',{name:'Zamknij',exact:true}).click();
  await choose('Odpoczywam na dziś');await ending('rest-here');
+ assert.equal(await game.locator('.game-scene-menu').count(),0);
+ assert.equal(await game.locator('.game-map-button').count(),1);
  await checkProgressiveText({page,game,requests,locale:'pl'});
  await page.emulateMedia({reducedMotion:'reduce'});await game.evaluate(n=>n.style.zoom='2');
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth));
@@ -213,18 +215,17 @@ async function checkLanternFeedback({page,game,choose}) {
   assert.equal(await fill.evaluate(node=>getComputedStyle(node).animationName),'none');
   assert.equal(await fill.evaluate(node=>getComputedStyle(node).fillOpacity),'0.58');
   await close(sheet);
-  const menu=game.locator('.game-scene-menu > summary'),toggle=game.locator('.game-scene-menu button[aria-pressed]');
-  await menu.click();await toggle.click();
+  await page.emulateMedia({forcedColors:'active'});
   sheet=await openExpeditionMap(game);
   await sheet.locator('.game-map-list').waitFor();
   await tile(sheet).getByText(/Completed/).waitFor();
   await close(sheet);
-  await menu.click();await toggle.click();
+  await page.emulateMedia({forcedColors:'none'});
  }finally{
-  await page.emulateMedia({reducedMotion:'no-preference'});
+  await page.emulateMedia({reducedMotion:'no-preference',forcedColors:'none'});
   await page.setViewportSize(viewport);
  }
- console.log('PASS: accepted Hive completion fills one map tile, with scene motion, reduced motion and Text mode');
+ console.log('PASS: accepted Hive completion fills one map tile, with scene motion, reduced motion and forced colors');
 }
 
 
@@ -252,12 +253,11 @@ async function checkCapyExpression({page,game,expression,inspect=false}) {
    assert.ok(bounds.width>0&&bounds.height>0);
   }
   await sheet.getByRole('button',{name:'Close',exact:true}).click();
-  const menu=game.locator('.game-scene-menu > summary'),toggle=game.locator('.game-scene-menu button[aria-pressed]');
-  await menu.click();await toggle.click();
-  assert.equal(await stage.count(),0);
+  await page.emulateMedia({forcedColors:'active'});
+  assert.equal(await stage.isVisible(),false);
   assert.equal(await capy.isVisible(),false);
-  await menu.click();await toggle.click();
+  await page.emulateMedia({forcedColors:'none'});
   assert.equal(await stage.getAttribute('data-capy-expression'),expression);
   await summary.click();
- }finally{await page.setViewportSize(viewport);}
+ }finally{await page.emulateMedia({forcedColors:'none'});await page.setViewportSize(viewport);}
 }
