@@ -1,0 +1,20 @@
+{
+  "title": "Mały przystanek",
+  "narration": "W Warsztacie Plastra czeka poręcz z trzciny. Możesz związać ją z CapyBee, także bez innych towarzyszy.",
+  "dialogue": [],
+  "choices": [
+    {
+      "id": "tie-rail",
+      "label": "Wiążę poręcz"
+    },
+    {
+      "id": "back-to-board",
+      "label": "Wracam na polanę"
+    },
+    {
+      "id": "rest-now",
+      "label": "Odpoczywam na dziś"
+    }
+  ],
+  "continuityFacts": []
+}

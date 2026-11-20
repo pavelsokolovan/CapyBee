@@ -1,1 +1,11 @@
-{"schemaVersion":1,"policyVersion":"dynamic-release-pl-v1","maxNarrativeCodePoints":24000,"forbiddenPhrases":[]}
+{
+  "schemaVersion": 1,
+  "policyVersion": "dynamic-release-pl-v2",
+  "maxNarrativeCodePoints": 24000,
+  "forbiddenPhrases": [],
+  "sceneWordLimits": {
+    "maxBlockWords": 20,
+    "minChoiceWords": 2,
+    "maxChoiceWords": 5
+  }
+}

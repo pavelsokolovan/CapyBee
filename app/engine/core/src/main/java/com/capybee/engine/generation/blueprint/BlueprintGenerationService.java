@@ -1,9 +1,11 @@
 package com.capybee.engine.generation.blueprint;
 
 import com.capybee.engine.api.Issue;
+import com.capybee.engine.generation.SceneWordLimits;
 import com.capybee.engine.generation.blueprint.BlueprintGenerationResult.*;
 import com.capybee.engine.generation.blueprint.json.BlueprintOutputParser;
 import com.capybee.engine.generation.blueprint.json.BlueprintSchemas;
+import com.capybee.engine.generation.json.SceneWordLimitsParser;
 import com.capybee.engine.generation.profile.*;
 import com.capybee.engine.input.PreparedStartInputs;
 import com.capybee.engine.input.SafeTextInput;
@@ -71,6 +73,9 @@ public final class BlueprintGenerationService implements BlueprintGenerator {
     private BlueprintGenerationResult execute(BlueprintGenerationRequest request) {
         if (!GenerationProfileTrust.validForGeneration(request.profile(),request.preferences(),request.constraints()))
             return failure(request,"BLUEPRINT_CONFIGURATION_INVALID");
+        final SceneWordLimits wordLimits;
+        try { wordLimits = sceneWordLimits(request); }
+        catch (RuntimeException invalidPolicy) { return failure(request, "BLUEPRINT_CONFIGURATION_INVALID"); }
         TextGenerator.Capabilities capabilities=generator.capabilities();
         int tokens=request.constraints().blueprintMaxOutputTokens();
         if(!capabilities.gameBlueprintStructuredOutput()||tokens>capabilities.maxBlueprintOutputTokens())
@@ -92,7 +97,7 @@ public final class BlueprintGenerationService implements BlueprintGenerator {
         for(int attempt=1;attempt<=maximumAttempts;attempt++){
             if(cancelled(request))return new Cancelled("BLUEPRINT_CANCELLED");
             StructuredGenerationRequest providerRequest;
-            try{providerRequest=providerRequest(request,suggestion,attempt,feedback,tokens,capabilities.maxInputCharacters());}
+            try{providerRequest=providerRequest(request,suggestion,attempt,feedback,tokens,capabilities.maxInputCharacters(),wordLimits);}
             catch(RequestTooLarge ignored){return failure(request,"BLUEPRINT_REQUEST_TOO_LARGE");}
             TextGenerationResult generated;
             try{generated=generator.generate(providerRequest);}
@@ -150,8 +155,9 @@ public final class BlueprintGenerationService implements BlueprintGenerator {
     }
 
     private StructuredGenerationRequest providerRequest(BlueprintGenerationRequest request,SafeTextInput suggestion,
-            int attempt,List<BlueprintIssue> feedback,int tokens,int adapterInputLimit){
+            int attempt,List<BlueprintIssue> feedback,int tokens,int adapterInputLimit,SceneWordLimits wordLimits){
         String instructions=fixedInstructions()+"\n"+request.profile().profile().blueprintPrompts().get(request.preferences().gameLocale());
+        if (wordLimits != null) instructions += "\n" + wordLimits.blueprintInstructions();
         String data=data(request,suggestion,attempt,feedback);
         String schema=schemas.specializedSchema(request.profile(),request.preferences(),request.constraints());
         long size=(long)instructions.length()+data.length()+schema.length();
@@ -218,7 +224,24 @@ public final class BlueprintGenerationService implements BlueprintGenerator {
     private BlueprintGenerationResult pending(BlueprintGenerationRequest r,ParsedGameBlueprint b,int attempt,String reviewer,String validatorVersion,String code){return new ReviewPending(b,new Evidence(r.profile().identity(),r.preparationId(),attempt,reviewer,validatorVersion),code);}
     private static String inputCode(List<Issue> issues){return issues.stream().filter(i->i.severity()==Issue.Severity.ERROR).map(Issue::code).findFirst().orElse("BLUEPRINT_INPUT_ACTION_REQUIRED");}
     private static NeedsInputAction input(String code){return new NeedsInputAction(code,List.of(Recovery.EDIT_AND_RECONFIRM,Recovery.SKIP_SUGGESTION_AND_RECONFIRM,Recovery.CANCEL));}
-    private GenerationFailed failure(BlueprintGenerationRequest request,String code){FallbackOffer offer=fallbacks.matchingReviewedFallback(request.preferences()).orElse(null);List<Recovery> recovery=new ArrayList<>(List.of(Recovery.EDIT_AND_RECONFIRM,Recovery.RETRY_AND_RECONFIRM,Recovery.CANCEL));if(offer!=null)recovery.add(Recovery.SELECT_FALLBACK);return new GenerationFailed(code,recovery,offer);}
+    private static SceneWordLimits sceneWordLimits(BlueprintGenerationRequest request) {
+        String policy = request.profile().profile().qualityResources().get(request.preferences().gameLocale());
+        return SceneWordLimitsParser.parse(JSON.readTree(policy));
+    }
+
+    private GenerationFailed failure(BlueprintGenerationRequest request, String code) {
+        List<Recovery> recovery = new ArrayList<>(List.of(Recovery.EDIT_AND_RECONFIRM, Recovery.RETRY_AND_RECONFIRM, Recovery.CANCEL));
+        FallbackOffer offer = null;
+        if (GenerationProfileTrust.validForGeneration(request.profile(), request.preferences(), request.constraints())) {
+            try {
+                offer = fallbacks.matchingReviewedFallback(request.preferences(), sceneWordLimits(request)).orElse(null);
+            } catch (RuntimeException unavailableFallback) {
+                // A fallback offer requires valid policy and a verified binding.
+            }
+        }
+        if (offer != null) recovery.add(Recovery.SELECT_FALLBACK);
+        return new GenerationFailed(code, recovery, offer);
+    }
     private static String providerCode(TextGenerationException.Code code){return switch(code){
         case CONFIGURATION_ERROR->"BLUEPRINT_PROVIDER_CONFIGURATION_ERROR";
         case UNAVAILABLE->"BLUEPRINT_PROVIDER_UNAVAILABLE";

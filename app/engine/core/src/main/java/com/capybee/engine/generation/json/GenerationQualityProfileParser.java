@@ -29,7 +29,7 @@ public final class GenerationQualityProfileParser {
     public static GenerationQualityProfile parse(LocaleTag locale, String json) {
         JsonNode root;
         try { root = MAPPER.readTree(json); } catch (RuntimeException e) { throw new IllegalArgumentException("PACK_QUALITY_PROFILE_INVALID", e); }
-        exact(root, Set.of("schemaVersion","profileId","locale","readability","repetition","phraseSets","toneProfiles","truthPhrases"));
+        exact(root, Set.of("schemaVersion","profileId","locale","readability","repetition","phraseSets","toneProfiles","truthPhrases",SceneWordLimitsParser.FIELD));
         if (integer(root,"schemaVersion") != 1) fail("PACK_QUALITY_SCHEMA_UNSUPPORTED");
         String id=text(root,"profileId"), localeText=text(root,"locale");
         if (id == null || !id.matches("[a-z0-9][a-z0-9._-]{0,79}")) fail("PACK_QUALITY_PROFILE_INVALID");
@@ -50,8 +50,10 @@ public final class GenerationQualityProfileParser {
         canonicalProfile.put("schemaVersion",1);canonicalProfile.put("profileId",id);canonicalProfile.put("locale",localeText);
         canonicalProfile.put("readability",readability);canonicalProfile.put("repetition",repetition);
         canonicalProfile.put("phraseSets",phraseSets);canonicalProfile.put("toneProfiles",tones);canonicalProfile.put("truthPhrases",truths);
+        var sceneWordLimits = SceneWordLimitsParser.parse(root);
+        if (sceneWordLimits != null) canonicalProfile.put(SceneWordLimitsParser.FIELD, sceneWordLimits);
         String canonical=GenerationJson.encode(canonicalProfile);
-        return new GenerationQualityProfile(1,id,locale,readability,repetition,phraseSets,tones,truths,sha256(canonical));
+        return new GenerationQualityProfile(1,id,locale,readability,repetition,phraseSets,tones,truths,sha256(canonical),sceneWordLimits);
     }
     private static List<String> phrases(JsonNode n){List<String> values=strings(n,64);Set<String> seen=new java.util.HashSet<>();for(String v:values){int cp=v.codePointCount(0,v.length());String normalized=GenerationQualityEvaluator.normalize(v);if(cp<1||cp>120||normalized.isBlank()||!seen.add(normalized)||v.matches("(?is).*<\\s*(script|iframe).*"))fail("PACK_QUALITY_PHRASE_INVALID");}return values;}
     private static List<String> strings(JsonNode n,int max){if(n==null||!n.isArray()||n.size()>max)fail("PACK_QUALITY_PROFILE_INVALID");List<String> out=new ArrayList<>();for(JsonNode x:n){if(!x.isString())fail("PACK_QUALITY_PROFILE_INVALID");out.add(x.asString());}return List.copyOf(out);}

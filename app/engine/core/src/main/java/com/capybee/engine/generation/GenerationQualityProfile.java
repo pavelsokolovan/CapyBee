@@ -9,7 +9,7 @@ public record GenerationQualityProfile(
         int schemaVersion, String profileId, LocaleTag locale,
         ReadabilityRules readability, RepetitionRules repetition,
         Map<String, List<String>> phraseSets, Map<String, ToneProfile> toneProfiles,
-        List<TruthPhraseFamily> truthPhrases, String fingerprint) {
+        List<TruthPhraseFamily> truthPhrases, String fingerprint, SceneWordLimits sceneWordLimits) {
     public GenerationQualityProfile {
         Map<String, List<String>> sortedPhrases = new java.util.LinkedHashMap<>();
         phraseSets.entrySet().stream().sorted(Map.Entry.comparingByKey())
@@ -20,6 +20,14 @@ public record GenerationQualityProfile(
                 .forEach(entry -> sortedTones.put(entry.getKey(), entry.getValue()));
         toneProfiles = java.util.Collections.unmodifiableMap(sortedTones);
         truthPhrases = List.copyOf(truthPhrases);
+    }
+
+    public GenerationQualityProfile(int schemaVersion, String profileId, LocaleTag locale,
+            ReadabilityRules readability, RepetitionRules repetition,
+            Map<String, List<String>> phraseSets, Map<String, ToneProfile> toneProfiles,
+            List<TruthPhraseFamily> truthPhrases, String fingerprint) {
+        this(schemaVersion, profileId, locale, readability, repetition, phraseSets, toneProfiles,
+                truthPhrases, fingerprint, null);
     }
 
     public record ReadabilityRules(int maxSentenceCodePoints, int maxParagraphCodePoints,

@@ -31,6 +31,16 @@ public final class GenerationQualityEvaluator {
             if (MECHANIC.matcher(value).find()) block(findings, "Q_CONTROL_MECHANIC_CLAIM", field.scope(), Map.of());
             readability(field, profile, findings);
         }
+        var wordLimits = profile.sceneWordLimits();
+        if (wordLimits != null && stage == GenerationCatalog.Stage.SCENE) {
+            if (payload instanceof GenerationArtifact.PlannedScenePayload scene) {
+                findings.addAll(wordLimits.evaluate(scene.narration(),
+                        scene.dialogue().stream().map(line -> line.text()).toList(), scene.choices()));
+            } else if (payload instanceof GenerationArtifact.ScenePayload scene) {
+                findings.addAll(wordLimits.evaluate(scene.narration(),
+                        scene.dialogue().stream().map(line -> line.text()).toList(), scene.choices()));
+            }
+        }
         duplicateRules(payload, fields, context, profile, findings);
         phraseRules(stage, fields, context, profile, findings);
         findings.sort(java.util.Comparator.comparing(QualityFinding::severity).reversed()

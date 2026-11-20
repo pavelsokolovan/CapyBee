@@ -1,0 +1,20 @@
+{
+  "title": "Mały przystanek",
+  "narration": "Mela nasłuchuje szelestu kwiatów. Przyda jej się chwila ciszy, żeby wybrać kierunek lotu.",
+  "dialogue": [],
+  "choices": [
+    {
+      "id": "help-mela",
+      "label": "Słucham z Melą"
+    },
+    {
+      "id": "wave-mela",
+      "label": "Macham Meli"
+    },
+    {
+      "id": "rest-now",
+      "label": "Odpoczywam na dziś"
+    }
+  ],
+  "continuityFacts": []
+}

@@ -108,6 +108,10 @@ public final class PackLoader {
                 for (String locale : catalog.supportedLocales()) {
                     try {
                         GenerationPipeline.validatePack(pack, new LocaleTag(locale));
+                    } catch (GenerationPipeline.FallbackQualityException invalid) {
+                        context.error("GENERATION_FALLBACK_INVALID", invalid.resource(), invalid.scope(),
+                                "A generation fallback failed " + invalid.getMessage());
+                        break;
                     } catch (RuntimeException exception) {
                         boolean invalidReference = "GENERATION_REFERENCE_INVALID".equals(exception.getMessage());
                         context.error(invalidReference ? "GENERATION_REFERENCE_INVALID" : "GENERATION_FALLBACK_INVALID",

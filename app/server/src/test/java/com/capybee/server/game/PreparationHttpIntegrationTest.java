@@ -65,6 +65,7 @@ class PreparationHttpIntegrationTest {
     static long persistedRevision;
     static String publishedPackRun,publishedPackView,publishedPackOperation;
     static final AtomicInteger PACK_CALLS=new AtomicInteger();
+    static final AtomicInteger LANTERN_CALLS=new AtomicInteger();
     static volatile boolean PAUSE_PACK;
     static volatile CountDownLatch packEntered=new CountDownLatch(1),packRelease=new CountDownLatch(1);
     static int callsBeforeRestart;
@@ -107,6 +108,18 @@ class PreparationHttpIntegrationTest {
                 }
             }
             if(RESTARTED)throw new AssertionError("PROVIDER_CALLED_AFTER_RESTART");
+            if ("lantern-slot".equals(request.slotKey())) {
+                String narration = "Pod oknem wisi mały lampion. W ciepłym blasku migoczą drobne pyłki, a przez uchylone drzwi wpada zapach mokrych, zielonych liści.";
+                if (LANTERN_CALLS.getAndIncrement() > 0) narration += " Iskra.";
+                var lantern = Map.of("title", "Ciepłe okno", "narration", narration,
+                        "dialogue", List.of(), "continuityFacts", List.of(), "choices", List.of(
+                                Map.of("id", "carry-light", "label", "Zabieram mały lampion ze sobą"),
+                                Map.of("id", "back-to-board", "label", "Wracam na polanę ula"),
+                                Map.of("id", "rest-now", "label", "Dziś wybieram chwilę odpoczynku")));
+                return new TextGenerationResult(SessionJson.encode(lantern),
+                        new TextGenerationResult.TokenUsage(1,1,0,0),"preparation-fixture",
+                        TextGenerationResult.FinishReason.COMPLETE);
+            }
             if(request.purpose()==StructuredGenerationRequest.Purpose.GAME_BLUEPRINT){
                 BLUEPRINT_CALLS.incrementAndGet();entered.countDown();
                 try{if(!release.await(10,TimeUnit.SECONDS))throw new IllegalStateException("FIXTURE_TIMEOUT");}

@@ -12,7 +12,7 @@ public class GameCompletionPolicy {
     public record Suggestion(String key, int version) {}
     public Optional<Suggestion> suggest(String packId, String version, String outcome, String scene) {
         if ("capybee-new-hive".equals(packId)) {
-            if (!java.util.Set.of("1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0").contains(version == null ? "" : version)) return Optional.empty();
+            if (!java.util.Set.of("1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0").contains(version == null ? "" : version)) return Optional.empty();
             String key = switch (outcome == null ? "" : outcome) {
                 case "new-path" -> "ending-new".equals(scene) ? "say_thank_you_helper" : null;
                 case "two-lights" -> "ending-two".equals(scene) ? "listen_song_reminds_home" : null;

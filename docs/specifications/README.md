@@ -110,6 +110,10 @@ the implemented 30.2 contracts for the board, encounters and recruited party.
 - [34](34-capybee-resume-from-play-instruction.md) — Resume an active story from the Play screen.
 - [35](35-capybee-episode-endings-and-continuation-instruction.md) — A clear ending and a playtest response for the Anonymous Note.
 
+## Generated scene copy
+
+- [41](41-capybee-generated-text-limits-instruction.md) — Polish word limits, repair and playable fallback for generated scenes.
+
 ### Roadmap reconciliation
 
 The web host and server-side SDK wiring move from the earlier "spec 29" plan

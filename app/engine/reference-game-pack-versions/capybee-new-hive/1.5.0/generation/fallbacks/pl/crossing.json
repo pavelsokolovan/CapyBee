@@ -1,0 +1,24 @@
+{
+  "title": "Mały przystanek",
+  "narration": "Na mostku jest miejsce na nowe światło i lampion wspomnienia. Możesz zapalić światło, zostawić oba albo wrócić.",
+  "dialogue": [],
+  "choices": [
+    {
+      "id": "light-new-path",
+      "label": "Zapalam nowe światło"
+    },
+    {
+      "id": "keep-two-lights",
+      "label": "Zostawiam miejsce na oba światła"
+    },
+    {
+      "id": "back-to-board",
+      "label": "Wracam na polanę"
+    },
+    {
+      "id": "rest-now",
+      "label": "Odpoczywam na dziś"
+    }
+  ],
+  "continuityFacts": []
+}

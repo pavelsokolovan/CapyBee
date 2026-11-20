@@ -1,1 +1,16 @@
-{"schemaVersion":1,"policyVersion":"classic-detective-pl-v1","maxNarrativeCodePoints":24000,"forbiddenPhrases":["Sherlock Holmes","John Watson","221B Baker Street","Profesor Moriarty"]}
+{
+  "schemaVersion": 1,
+  "policyVersion": "classic-detective-pl-v2",
+  "maxNarrativeCodePoints": 24000,
+  "forbiddenPhrases": [
+    "Sherlock Holmes",
+    "John Watson",
+    "221B Baker Street",
+    "Profesor Moriarty"
+  ],
+  "sceneWordLimits": {
+    "maxBlockWords": 20,
+    "minChoiceWords": 2,
+    "maxChoiceWords": 5
+  }
+}

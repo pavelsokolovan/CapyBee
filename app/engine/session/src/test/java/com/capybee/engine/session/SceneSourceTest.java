@@ -34,6 +34,16 @@ class SceneSourceTest {
         assertThat(source(GenerationArtifact.Outcome.GENERATED, false)).isEqualTo(SceneSource.INLINE_GENERATED);
     }
 
+    @Test
+    void classifiesFullGamePlannedScenes() {
+        GenerationArtifact scene = new GenerationArtifact(2, new PackId("test-pack"), new PackVersion(1, 0, 0),
+                new LocaleTag("en"), GenerationCatalog.Stage.SCENE, "shared-template", "artifact-next",
+                GenerationArtifact.Outcome.GENERATED,
+                new GenerationArtifact.PlannedScenePayload("next", "Title", "Narration", List.of(), List.of(), List.of()));
+        assertThat(RunSessionService.sceneSource("start", snapshot("next", List.of(scene)),
+                List.of(new PrefetchedArtifact("next", 0, scene)), false)).isEqualTo(SceneSource.PREFETCHED);
+    }
+
     private static SceneSource source(GenerationArtifact.Outcome outcome, boolean joined) {
         return RunSessionService.sceneSource("start", snapshot("next", List.of(scene("next", outcome))),
                 List.of(), joined);

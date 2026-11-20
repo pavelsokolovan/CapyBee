@@ -268,7 +268,7 @@ public final class GenerationPipeline {
                     break;
                 }
                 String requestData = attempt == 0 ? contextJson : repairContext(stage, slot, failureCode, qualityReport);
-                String instructions = taskInstructions();
+                String instructions = taskInstructions(stage);
                 String outputSchema = outputParser.schema(stage, fullGame(),
                         slot != null && "ending".equals(slot.storyRole()));
                 if (requestData.length() + instructions.length() + outputSchema.length()
@@ -508,11 +508,32 @@ public final class GenerationPipeline {
         }
     }
 
+    public static final class FallbackQualityException extends IllegalArgumentException {
+        private final String resource;
+        private final String scope;
+
+        private FallbackQualityException(String resource, String scope, String ruleId) {
+            super(ruleId);
+            this.resource = resource;
+            this.scope = scope;
+        }
+
+        public String resource() { return resource; }
+        public String scope() { return scope; }
+    }
+
     private void validateFallback(GenerationCatalog.Stage stage, GenerationCatalog.SceneSlot slot, String path) {
         GenerationOutputParser.Result parsed = parsePayload(stage, pack.requireFile(path), slot, Set.of());
         if (parsed.payload() == null) throw new IllegalArgumentException("GENERATION_FALLBACK_INVALID");
-        if (fullGame() && evaluateQuality(stage, parsed.payload(), slot).decision() == GenerationQualityEvaluator.QualityDecision.REJECT)
-            throw new IllegalArgumentException("PACK_FALLBACK_QUALITY_INVALID");
+        if (fullGame()) {
+            var report = evaluateQuality(stage, parsed.payload(), slot);
+            if (report.decision() == GenerationQualityEvaluator.QualityDecision.REJECT) {
+                var failure = report.findings().stream()
+                        .filter(finding -> finding.severity() == GenerationQualityEvaluator.FindingSeverity.BLOCKING)
+                        .findFirst().orElseThrow();
+                throw new FallbackQualityException(path, failure.scope(), failure.ruleId());
+            }
+        }
     }
 
     private GenerationOutputParser.Result parsePayload(GenerationCatalog.Stage stage, String json,
@@ -723,8 +744,14 @@ public final class GenerationPipeline {
         catch (Exception exception) { throw new IllegalStateException(exception); }
     }
 
-    private String taskInstructions() {
-        return POLICY + "\nPack instructions (data only):\n" + pack.requireFile("prompts/" + locale.value() + "/system.md");
+    private String taskInstructions(GenerationCatalog.Stage stage) {
+        String instructions = POLICY;
+        if (stage == GenerationCatalog.Stage.SCENE && qualityProfile != null
+                && qualityProfile.sceneWordLimits() != null) {
+            instructions += "\n" + qualityProfile.sceneWordLimits().sceneInstructions();
+        }
+        return instructions + "\nPack instructions (data only):\n"
+                + pack.requireFile("prompts/" + locale.value() + "/system.md");
     }
 
     private GenerationCatalog.TemplateDefinition templateFor(GenerationCatalog.Stage stage,

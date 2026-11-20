@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 2,
+  "counters": [],
+  "flags": [
+    {
+      "id": "remembered-home",
+      "initial": false
+    },
+    {
+      "id": "mela-joined",
+      "initial": false
+    },
+    {
+      "id": "borys-joined",
+      "initial": false
+    },
+    {
+      "id": "luna-joined",
+      "initial": false
+    },
+    {
+      "id": "rail-ready",
+      "initial": false
+    }
+  ],
+  "sets": [],
+  "objectives": [
+    {
+      "id": "prepare-rail",
+      "labelKey": "objective.prepare",
+      "completeWhen": {
+        "type": "FLAG_IS",
+        "flag": "rail-ready",
+        "value": true
+      }
+    },
+    {
+      "id": "carry-memory",
+      "labelKey": "objective.remember",
+      "completeWhen": {
+        "type": "FLAG_IS",
+        "flag": "remembered-home",
+        "value": true
+      }
+    },
+    {
+      "id": "listen-mela",
+      "labelKey": "objective.mela",
+      "completeWhen": {
+        "type": "FLAG_IS",
+        "flag": "mela-joined",
+        "value": true
+      }
+    },
+    {
+      "id": "help-borys",
+      "labelKey": "objective.borys",
+      "completeWhen": {
+        "type": "FLAG_IS",
+        "flag": "borys-joined",
+        "value": true
+      }
+    },
+    {
+      "id": "mark-luna-rest",
+      "labelKey": "objective.luna",
+      "completeWhen": {
+        "type": "FLAG_IS",
+        "flag": "luna-joined",
+        "value": true
+      }
+    }
+  ],
+  "outcomes": [
+    {
+      "id": "new-path",
+      "resultClass": "SUCCESS",
+      "labelKey": "result.new-path"
+    },
+    {
+      "id": "two-lights",
+      "resultClass": "SUCCESS",
+      "labelKey": "result.two-lights"
+    },
+    {
+      "id": "rest-here",
+      "resultClass": "SUCCESS",
+      "labelKey": "result.rest-here"
+    }
+  ],
+  "resultFacts": [
+    {
+      "id": "mela-joined",
+      "labelKey": "fact.mela",
+      "when": {
+        "type": "FLAG_IS",
+        "flag": "mela-joined",
+        "value": true
+      }
+    },
+    {
+      "id": "borys-joined",
+      "labelKey": "fact.borys",
+      "when": {
+        "type": "FLAG_IS",
+        "flag": "borys-joined",
+        "value": true
+      }
+    },
+    {
+      "id": "luna-joined",
+      "labelKey": "fact.luna",
+      "when": {
+        "type": "FLAG_IS",
+        "flag": "luna-joined",
+        "value": true
+      }
+    },
+    {
+      "id": "remembered-home",
+      "labelKey": "fact.remembered",
+      "when": {
+        "type": "FLAG_IS",
+        "flag": "remembered-home",
+        "value": true
+      }
+    }
+  ]
+}

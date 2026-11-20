@@ -36,7 +36,6 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.LinkedHashMap;
@@ -667,7 +666,7 @@ public final class RunSessionService {
 
     private RunSnapshot mergePrefetched(RunSnapshot snapshot, List<PrefetchedArtifact> artifacts) {
         if (snapshot == null || snapshot.dynamicGame() || artifacts.isEmpty()) return snapshot;
-        Map<String, GenerationArtifact> bySlot = new HashMap<>();
+        Map<String, GenerationArtifact> bySlot = new LinkedHashMap<>();
         snapshot.state().generationArtifacts().forEach(item -> bySlot.put(slot(item), item));
         artifacts.forEach(item -> bySlot.putIfAbsent(slot(item.artifact()), item.artifact()));
         RunState old = snapshot.state();
@@ -685,9 +684,7 @@ public final class RunSessionService {
                 || next.state().sceneId().equals(previousScene)) return SceneSource.NONE;
             String entered = next.state().sceneId();
             GenerationArtifact artifact = next.state().generationArtifacts().stream()
-                .filter(item -> item.stage() == GenerationCatalog.Stage.SCENE)
-                .filter(item -> item.payload() instanceof GenerationArtifact.ScenePayload payload
-                    && payload.sceneId().equals(entered))
+                .filter(item -> entered.equals(generatedSceneId(item)))
                 .findFirst().orElse(null);
             if (artifact == null) return SceneSource.NONE;
             if (rowsBeforeApply.stream().anyMatch(row -> row.sceneId().equals(entered))) return SceneSource.PREFETCHED;
@@ -708,8 +705,8 @@ public final class RunSessionService {
 
     private List<String> visitedGeneratedScenes(RunSnapshot snapshot) {
         return snapshot.state().generationArtifacts().stream()
-                .filter(artifact -> artifact.payload() instanceof GenerationArtifact.ScenePayload)
-                .map(artifact -> ((GenerationArtifact.ScenePayload) artifact.payload()).sceneId())
+                .map(RunSessionService::generatedSceneId)
+                .filter(java.util.Objects::nonNull)
                 .toList();
     }
 
@@ -731,7 +728,17 @@ public final class RunSessionService {
     }
 
     private static String slot(GenerationArtifact artifact) {
-        return artifact.stage() + ":" + artifact.templateId();
+        String sceneId = generatedSceneId(artifact);
+        return artifact.stage() + ":" + (sceneId == null ? artifact.templateId() : sceneId);
+    }
+
+    private static String generatedSceneId(GenerationArtifact artifact) {
+        if (artifact.stage() != GenerationCatalog.Stage.SCENE) return null;
+        return switch (artifact.payload()) {
+            case GenerationArtifact.ScenePayload scene -> scene.sceneId();
+            case GenerationArtifact.PlannedScenePayload scene -> scene.sceneId();
+            default -> null;
+        };
     }
 
     private static String nullToEmpty(String value) {

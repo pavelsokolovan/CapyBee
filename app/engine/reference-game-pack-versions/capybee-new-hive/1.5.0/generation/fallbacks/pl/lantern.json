@@ -1,0 +1,20 @@
+{
+  "title": "Mały przystanek",
+  "narration": "W Latarni Wspomnień pali się ciepłe światło. Nie musisz nikomu opowiadać. Możesz tu po prostu postać.",
+  "dialogue": [],
+  "choices": [
+    {
+      "id": "carry-light",
+      "label": "Zabieram światło"
+    },
+    {
+      "id": "back-to-board",
+      "label": "Wracam na polanę"
+    },
+    {
+      "id": "rest-now",
+      "label": "Odpoczywam na dziś"
+    }
+  ],
+  "continuityFacts": []
+}

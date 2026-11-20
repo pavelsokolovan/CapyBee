@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "questions": [
+    {
+      "inputId": "story-tone",
+      "helpKey": "help.story-tone",
+      "stages": [
+        "THEME",
+        "SCENARIO"
+      ],
+      "defaultValues": [
+        "cozy"
+      ],
+      "options": [
+        {
+          "value": "cozy",
+          "labelKey": "option.story-tone.cozy"
+        },
+        {
+          "value": "curious",
+          "labelKey": "option.story-tone.curious"
+        }
+      ]
+    },
+    {
+      "inputId": "interests",
+      "helpKey": "help.interests",
+      "stages": [
+        "THEME",
+        "SCENARIO"
+      ],
+      "defaultValues": [],
+      "options": [
+        {
+          "value": "nature",
+          "labelKey": "option.interests.nature"
+        },
+        {
+          "value": "making",
+          "labelKey": "option.interests.making"
+        },
+        {
+          "value": "animals",
+          "labelKey": "option.interests.animals"
+        }
+      ]
+    },
+    {
+      "inputId": "mood",
+      "helpKey": "help.mood",
+      "stages": [
+        "THEME",
+        "SCENARIO"
+      ],
+      "defaultValues": [],
+      "options": [
+        {
+          "value": "heavy",
+          "labelKey": "option.mood.heavy"
+        },
+        {
+          "value": "okay",
+          "labelKey": "option.mood.okay"
+        },
+        {
+          "value": "good",
+          "labelKey": "option.mood.good"
+        }
+      ]
+    },
+    {
+      "inputId": "story-wish",
+      "helpKey": "help.story-wish",
+      "stages": [
+        "THEME"
+      ],
+      "defaultValues": [],
+      "options": [],
+      "freeTextNoticeKey": "wish.notice"
+    }
+  ]
+}

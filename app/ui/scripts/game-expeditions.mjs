@@ -142,6 +142,30 @@ export async function captureExpeditionLantern({page,game}){
  });
 }
 
+export async function checkShortPolishBeat({page,game,text,labels}) {
+ await atMobile(page,game,async()=>{
+  const bubbleNode=game.locator(bubble);
+  const buttons=game.locator(footer+' fieldset button');
+  assert.equal(await bubbleNode.innerText(),text);
+  assert.deepEqual(await buttons.allTextContents(),labels);
+  const frame=await checkFooter(page,game,3);
+  await checkBackdrop(game);
+  const scroller=await game.locator(body).boundingBox();
+  for(const region of [art,bubble]){
+   const bounds=await game.locator(region).boundingBox();
+   assert.ok(bounds.y>=scroller.y&&bounds.y+bounds.height<=frame.y+1, 'the full scene must fit above its actions');
+  }
+  assert.equal(await game.locator(body).evaluate(node=>node.scrollTop),0);
+  const menu=game.locator('.game-scene-menu > summary');
+  const toggle=game.locator('.game-scene-menu button[aria-pressed]');
+  await menu.click();await toggle.click();
+  assert.equal(await game.locator(art).count(),0);
+  assert.equal(await bubbleNode.innerText(),text);
+  assert.deepEqual(await buttons.allTextContents(),labels);
+  await menu.click();await toggle.click();
+ });
+}
+
 export async function checkExpedition({page,game,requests}){
  const encounter=game.locator('.game-encounter');
  const heading=encounter.getByRole('heading',{level:4});

@@ -1,5 +1,7 @@
 package com.capybee.engine.generation.blueprint;
 
+import com.capybee.engine.generation.SceneWordLimits;
+import com.capybee.engine.generation.json.SceneWordLimitsParser;
 import com.capybee.engine.generation.profile.ResolvedGamePreferences;
 import com.capybee.engine.input.PiiScrubber;
 import tools.jackson.databind.JsonNode;
@@ -21,8 +23,10 @@ public final class DefaultBlueprintOutputReviewer implements BlueprintOutputRevi
     public Review review(ParsedGameBlueprint blueprint, ResolvedGamePreferences preferences, String qualityPolicyJson) {
         if (blueprint == null || preferences == null || qualityPolicyJson == null) return Review.unavailable("unknown");
         final JsonNode policy;
+        final SceneWordLimits wordLimits;
         try {
             policy = JSON.readTree(qualityPolicyJson);
+            wordLimits = SceneWordLimitsParser.parse(policy);
         } catch (RuntimeException invalid) {
             return Review.unavailable("unknown");
         }
@@ -42,8 +46,17 @@ public final class DefaultBlueprintOutputReviewer implements BlueprintOutputRevi
         for (int i=0;i<blueprint.phases().size();i++) { var v=blueprint.phases().get(i); walker.text("/phases/"+i+"/goal",v.goal()); walker.text("/phases/"+i+"/development",v.development()); walker.text("/phases/"+i+"/transition",v.transition()); }
         for (int i=0;i<blueprint.scenes().size();i++) {
             var v=blueprint.scenes().get(i);
-            if(v instanceof ParsedGameBlueprint.DecisionScene s){walker.text("/scenes/"+i+"/title",s.title());walker.text("/scenes/"+i+"/intent",s.intent());for(int j=0;j<s.choices().size();j++)walker.text("/scenes/"+i+"/choices/"+j+"/intent",s.choices().get(j).intent());}
-            else if(v instanceof ParsedGameBlueprint.EndingScene s){walker.text("/scenes/"+i+"/title",s.title());walker.text("/scenes/"+i+"/intent",s.intent());}
+            String path = "/scenes/" + i;
+            if (v instanceof ParsedGameBlueprint.DecisionScene scene) {
+                walker.text(path + "/title", scene.title());
+                walker.sceneIntent(path + "/intent", scene.intent(), wordLimits);
+                for (int j = 0; j < scene.choices().size(); j++) {
+                    walker.choiceIntent(path + "/choices/" + j + "/intent", scene.choices().get(j).intent(), wordLimits);
+                }
+            } else if (v instanceof ParsedGameBlueprint.EndingScene scene) {
+                walker.text(path + "/title", scene.title());
+                walker.sceneIntent(path + "/intent", scene.intent(), wordLimits);
+            }
         }
         for(int i=0;i<blueprint.outcomes().size();i++){var v=blueprint.outcomes().get(i);walker.text("/outcomes/"+i+"/title",v.title());walker.text("/outcomes/"+i+"/description",v.description());}
         return issues.isEmpty() ? Review.pass(version) : new Review(Status.REJECT, version, issues);
@@ -52,6 +65,24 @@ public final class DefaultBlueprintOutputReviewer implements BlueprintOutputRevi
     private static final class Walker {
         private final List<BlueprintIssue> issues; private final List<String> forbidden; private final int maximum; private final PiiScrubber pii = new PiiScrubber();
         private Walker(List<BlueprintIssue> issues,List<String> forbidden,int maximum){this.issues=issues;this.forbidden=forbidden;this.maximum=maximum;}
+        void sceneIntent(String pointer, String value, SceneWordLimits limits) {
+            text(pointer, value);
+            if (limits != null && value != null && !limits.allowsBlock(SceneWordLimits.wordCount(value))) {
+                addWordFinding(SceneWordLimits.BLOCK_RULE, pointer);
+            }
+        }
+
+        void choiceIntent(String pointer, String value, SceneWordLimits limits) {
+            text(pointer, value);
+            if (limits != null && value != null && !limits.allowsChoice(SceneWordLimits.wordCount(value))) {
+                addWordFinding(SceneWordLimits.CHOICE_RULE, pointer);
+            }
+        }
+
+        private void addWordFinding(String code, String pointer) {
+            if (issues.size() < MAX_FINDINGS) issues.add(new BlueprintIssue(code, "blueprint", pointer, ""));
+        }
+
         void text(String pointer,String value){
             if(issues.size()>=MAX_FINDINGS||value==null)return;
             String code=null;

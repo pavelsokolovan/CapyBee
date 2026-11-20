@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {assertCompanionUI,captureCompanionEvidence} from './game-companions.mjs';
 import {travelTo} from './game-honeycomb-board.mjs';
+import {checkShortPolishBeat} from './game-expeditions.mjs';
 
 export async function checkPolishGeneration({page,context,base,requests,logs}) {
  const idea='Fikcyjna baśń srebrnego liścia '+crypto.randomUUID().replace(/[0-9]/g,d=>String.fromCharCode(107+Number(d)));
@@ -19,7 +20,7 @@ export async function checkPolishGeneration({page,context,base,requests,logs}) {
  await page.unroute('**/api/game/pack-starts');
  assert.equal(requests.filter(r=>r.url.endsWith('/api/game/pack-starts')).length,before+1);
  const body=requests.filter(r=>r.url.endsWith('/api/game/pack-starts')).at(-1).body;
- assert.equal(body.suggestion,idea);assert.equal(body.confirmed,true);assert.equal(body.packVersion,'1.4.0');assert.equal(body.disclosureRevision,1);assert.equal(body.selections['story-tone'][0],'cozy');
+ assert.equal(body.suggestion,idea);assert.equal(body.confirmed,true);assert.equal(body.packVersion,'1.5.0');assert.equal(body.disclosureRevision,1);assert.equal(body.selections['story-tone'][0],'cozy');
  const current=await (await context.request.get(`${base}/api/game/runs/current`)).json();assert.equal(current.source.kind,'PACK');assert.ok(current.view.story);
  await page.reload();await page.getByRole('button',{name:'Play',exact:true}).click();await page.getByRole('button',{name:/Adventures/}).click();
  await page.getByRole('button',{name:'Continue',exact:true}).click();await page.locator('.game-run').waitFor();
@@ -35,9 +36,14 @@ export async function checkPolishGeneration({page,context,base,requests,logs}) {
  });assert.equal(stores.includes(idea),false);assert.equal(logs.some(line=>line.includes(idea)),false);
  const game=page.locator('.game-run');
  await game.getByRole('button',{name:'Continue',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.game-run [role=status]')?.textContent==='Saved');
+ await travelTo(game,'old-lantern');
+ await checkShortPolishBeat({page,game,
+  text:'Ciepłe okno\nPod oknem wisi mały lampion. W ciepłym blasku migoczą drobne pyłki, a przez uchylone drzwi wpada zapach mokrych, zielonych liści.',
+  labels:['Zabieram mały lampion ze sobą','Wracam na polanę ula','Dziś wybieram chwilę odpoczynku']});
+ await travelTo(game,'hive-square');
  await travelTo(game,'quiet-meadow');
  await assertCompanionUI({page,game,run:await (await context.request.get(`${base}/api/game/runs/current`)).json()});
- await game.getByRole('button',{name:'Siadam na chwilę i słucham Meli',exact:true}).click();
+ await game.getByRole('button',{name:'Słucham z Melą',exact:true}).click();
  await page.waitForFunction(()=>document.querySelector('.game-run [role=status]')?.textContent==='Saved');
  const joined=await (await context.request.get(`${base}/api/game/runs/current`)).json();assert.equal(joined.view.presentation.party.length,1);
  await assertCompanionUI({page,game,run:joined});
@@ -46,6 +52,20 @@ export async function checkPolishGeneration({page,context,base,requests,logs}) {
  await page.getByRole('button',{name:'Continue',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.game-run [role=status]')?.textContent==='Saved');
  const joinedResume=await (await context.request.get(`${base}/api/game/runs/current`)).json();assert.deepEqual(joinedResume.view,joined.view);await assertCompanionUI({page,game,run:joinedResume});
  await game.getByRole('button',{name:'Continue',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.game-run [role=status]')?.textContent==='Saved');
- await game.getByRole('button',{name:'Na dziś wybieram odpoczynek',exact:true}).click();await game.getByRole('button',{name:'Start another adventure',exact:true}).waitFor();
+ await game.getByRole('button',{name:'Odpoczywam na dziś',exact:true}).click();await game.getByRole('button',{name:'Start another adventure',exact:true}).waitFor();
+ await game.getByRole('button',{name:'Start another adventure',exact:true}).click();
+ await page.getByRole('button',{name:/CapyBee — Nowy ul, dwa światła/}).click();
+ await page.getByRole('checkbox',{name:'Use AI narration',exact:true}).check();
+ await page.getByRole('button',{name:'Review',exact:true}).click();
+ await page.getByRole('button',{name:'Start adventure',exact:true}).click();
+ await game.getByRole('button',{name:'Continue',exact:true}).click();
+ await page.waitForFunction(()=>document.querySelector('.game-run [role=status]')?.textContent==='Saved');
+ await travelTo(game,'old-lantern');
+ await checkShortPolishBeat({page,game,
+  text:'Mały przystanek\nW Latarni Wspomnień pali się ciepłe światło. Nie musisz nikomu opowiadać. Możesz tu po prostu postać.',
+  labels:['Zabieram światło','Wracam na polanę','Odpoczywam na dziś']});
+ await game.getByRole('button',{name:'Odpoczywam na dziś',exact:true}).click();
+ await game.getByRole('button',{name:'Start another adventure',exact:true}).waitFor();
+ console.log('PASS: Polish generated and fallback lantern beats fit 360 × 640 with three actions and Text mode parity');
  console.log('PASS: Polish generated Pack explicit consent, Unicode limit, offline wish, masked review, lost response, one operation, exact reload and private storage exclusions');
 }

@@ -1,0 +1,34 @@
+{
+  "title": "Dwa światła",
+  "narration": "Lampion wspomnienia i nowe światełko stoją obok siebie. Dla obu domów jest miejsce.",
+  "dialogue": [],
+  "choices": [],
+  "continuityFacts": [],
+  "ending": {
+    "headline": "Dwa światła mieszczą się obok siebie",
+    "summary": "Ta baśniowa wyprawa ma na dziś swoje zakończenie. Dawny i nowy dom mogą pozostać ważne.",
+    "objectiveNotes": [
+      {
+        "objectiveId": "prepare-rail",
+        "text": "Poręcz jest jednym z możliwych kroków tej wyprawy."
+      },
+      {
+        "objectiveId": "carry-memory",
+        "text": "Wspomnienie ma miejsce, jeśli chcesz je zabrać."
+      },
+      {
+        "objectiveId": "listen-mela",
+        "text": "Spotkanie z Melą pozostaje twoim wyborem."
+      },
+      {
+        "objectiveId": "help-borys",
+        "text": "Borys poradzi sobie również podczas twojej przerwy."
+      },
+      {
+        "objectiveId": "mark-luna-rest",
+        "text": "Zakątek Luny może poczekać na inną wizytę."
+      }
+    ],
+    "reflection": "Jeśli chcesz, posłuchaj po grze piosenki z dawnego domu. Możesz też odpocząć w ciszy. Ta propozycja niczego nie zapisuje ani nie zalicza."
+  }
+}
