@@ -46,6 +46,7 @@ export function AdventurePreparation({owner,locale,onClose,resumeRunId,onRunRead
  const currentStep=visibleSteps[state.step];
  const currentInputs=currentStep?allInputs.filter(i=>currentStep.inputIds.includes(i.id) && (i.kind!=='FREE_TEXT'||canWish)):[];
  const generated=selected?.kind==='DYNAMIC'||state.generated;
+ const disclosure=selected?.kind==='DYNAMIC'?copy.dynamicDisclosure:copy.disclosure;
  const problems=selected?validation(selected,state.answers,wish):[];
  const next=()=>{
   setInvalid(true);if(currentInputs.some(i=>problems.includes(i.id))||composing)return;
@@ -57,7 +58,7 @@ export function AdventurePreparation({owner,locale,onClose,resumeRunId,onRunRead
   return <fieldset key={input.id} className="adventure-field" aria-describedby={helpId}>
    <legend>{input.label}{input.required?' *':''}</legend><p id={helpId}>{input.help}</p>
    {input.kind==='FREE_TEXT'?<>
-    <p>{copy.disclosure}</p><p>{input.notice}</p><p>{copy.privacy}</p>
+    <p>{disclosure}</p><p>{input.notice}</p><p>{copy.privacy}</p>
     <textarea disabled={!online} aria-label={input.label} value={wish} onChange={e=>setWish(e.target.value)}
       onCompositionStart={()=>setComposing(true)} onCompositionEnd={()=>setComposing(false)} autoComplete="off" spellCheck={false}/>
     <small>{codePoints(wish)} / {input.maxCodePoints}</small>
@@ -108,8 +109,9 @@ export function AdventurePreparation({owner,locale,onClose,resumeRunId,onRunRead
     {!state.loading&&!state.games.length&&!state.message?<p>{copy.empty}</p>:null}
     {state.games.map(game=>{
      const supported=compatible(game),pack=game.kind==='PACK'?game.pack:null;
-     const description=!supported?copy.unsupported:!pack?copy.dynamic
-      :pack.id===anonymousNotePackId?copy.mysteryDescription:pack.id===hiveExpeditionPackId?copy.hiveDescription:copy.authored;
+     const description=!supported?copy.unsupported:game.kind==='DYNAMIC'
+      ?game.profile.id==='classic-detective'?game.profile.description:copy.dynamic
+      :pack?.id===anonymousNotePackId?copy.mysteryDescription:pack?.id===hiveExpeditionPackId?copy.hiveDescription:copy.authored;
      return <button type="button" className="play-game-row adventure-catalog-row"
       key={game.kind==='PACK'?`PACK:${game.pack.id}`:`DYNAMIC:${game.profile.id}`}
       disabled={state.loading||!supported||!state.caps?.viewFeatures.includes('canAdvance')} onClick={()=>select(game)}>
@@ -150,7 +152,7 @@ export function AdventurePreparation({owner,locale,onClose,resumeRunId,onRunRead
     <dl>{allInputs.filter(i=>i.kind!=='FREE_TEXT').map(i=><div key={i.id}><dt>{i.label}</dt><dd>{effective(i,state.answers).map(id=>i.options.find(o=>o.id===id)?.label).join(', ')||copy.notSelected}</dd></div>)}</dl>
     <p>{wish.trim()?copy.ideaAdded:copy.ideaNone}</p>
     {wish?<button type="button" onClick={()=>{setWish('');flow.back();}}>{copy.remove}</button>:null}
-    {generated?<p>{copy.disclosure}</p>:null}
+    {generated?<p>{disclosure}</p>:null}
     {canReplace&&activeCurrent?<><p>{copy.replacementNotice}</p><label className="adventure-option"><input type="checkbox" disabled={state.loading} checked={state.replacement} onChange={e=>flow.replacement(e.target.checked)}/>{copy.replace}</label></>:null}
     {!online?<p>{copy.offline}</p>:null}
     <div className="adventure-actions"><button type="button" onClick={()=>flow.back()} disabled={state.loading}>{copy.edit}</button>

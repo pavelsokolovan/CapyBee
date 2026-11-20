@@ -15,3 +15,5 @@ capybee:
     enabled: ${CAPYBEE_GAME_ENABLED:true}
     web-client-enabled: ${CAPYBEE_GAME_WEB_CLIENT_ENABLED:true}
     pack-ids: ${CAPYBEE_GAME_PACK_IDS:capybee-anonymous-note,capybee-new-hive}
+    dynamic:
+      profile-ids: ${CAPYBEE_GAME_DYNAMIC_PROFILE_IDS:generic-adventure,classic-detective}

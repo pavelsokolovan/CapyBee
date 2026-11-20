@@ -65,7 +65,7 @@ public final class GeneratorProfileCatalog {
     }
 
     private static Map<String, byte[]> classpathProfile(String id) throws IOException {
-        if (!"generic-adventure".equals(id)) throw new IllegalStateException("DYNAMIC_PROFILE_INVALID");
+        if (!List.of("generic-adventure", "classic-detective").contains(id)) throw new IllegalStateException("DYNAMIC_PROFILE_INVALID");
         var files = new LinkedHashMap<String, byte[]>(); long total = 0;
         for (String relative : List.of("profile.json", "setup.json", "prompts/en/blueprint.md",
                 "prompts/pl/blueprint.md", "quality/en.json", "quality/pl.json",

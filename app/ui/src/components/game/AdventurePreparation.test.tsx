@@ -117,9 +117,32 @@ it('reviews random AI presets before sending a start request',async()=>{
  await act(async()=>{while(h.flow.getSnapshot().phase==='setup')h.flow.back();});
  await click(copy.quickStart);
  expect(host.textContent).toContain(copy.ideaNone);
- expect(host.textContent).toContain(copy.disclosure);
+ expect(host.textContent).toContain(copy.dynamicDisclosure);
  expect(h.transport.transient).not.toHaveBeenCalled();
  await click(copy.start);
  expect(h.transport.transient).toHaveBeenCalledTimes(1);
  expect(vi.mocked(h.transport.transient).mock.calls[0][2]).not.toHaveProperty('suggestion');
+});
+
+it('shows the localized detective card and confirms Quick Start as a dynamic case',async()=>{
+ const h=harness(),copy=adventureCopy.pl;
+ const detective={...contracts.profile,id:'classic-detective',title:'Klasyczna zagadka detektywistyczna',
+  description:'Zbierz dowody i sprawdź alibi.',metadataLocale:'pl'};
+ const read=vi.mocked(h.transport.read),fallback=read.getMockImplementation()!;
+ read.mockImplementation(path=>{
+  if(path.endsWith('/generator-profiles'))return Promise.resolve({status:200,body:[detective]});
+  if(path.endsWith('/generator-profiles/classic-detective'))return Promise.resolve({status:200,body:detective});
+  return fallback(path);
+ });
+ await act(async()=>root.render(<AdventurePreparation owner="owner" locale="pl" onClose={h.close} flow={h.flow}/>));
+ expect(host.querySelector('.adventure-catalog-row span')?.textContent).toBe(detective.description);
+ await click(detective.title);
+ await click(copy.quickStart);
+ expect(host.textContent).toContain(copy.dynamicDisclosure);
+ expect(h.transport.transient).not.toHaveBeenCalled();
+ await click(copy.start);
+ expect(h.transport.transient).toHaveBeenCalledExactlyOnceWith(
+  expect.objectContaining({path:'/api/game/dynamic-starts'}),'POST',
+  expect.objectContaining({profileId:detective.id,locale:'pl',confirmed:true}),
+ );
 });

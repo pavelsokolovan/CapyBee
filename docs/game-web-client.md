@@ -58,7 +58,7 @@ Fly enables the game and web client by default. AI generation defaults to `true`
 | `CAPYBEE_GAME_GENERATION_ENABLED` | Enable AI generation across games, including prepared pack narration and new dynamic adventures |
 | `CAPYBEE_GAME_PACK_PROVIDER_APPROVED` | Record the operator’s provider approval for live pack narration |
 | `CAPYBEE_GAME_DYNAMIC_PROFILE_ROOT` | Reviewed profile directory |
-| `CAPYBEE_GAME_DYNAMIC_PROFILE_IDS` | Reviewed allowlist (default `generic-adventure`) |
+| `CAPYBEE_GAME_DYNAMIC_PROFILE_IDS` | Reviewed allowlist (Fly defaults to `generic-adventure,classic-detective`; the base configuration defaults to `generic-adventure`) |
 
 To stop new paid starts while preserving saved runs, keep the API and client
 available and set `CAPYBEE_GAME_GENERATION_ENABLED=false`. Do not disable the entire
@@ -66,12 +66,15 @@ game API to pause paid creation. Existing authored starts can remain available.
 Keep the command HMAC key stable across server restarts. Do not log keys or
 private bodies. Deployment does not automatically enable generation.
 
+A custom profile root must contain every profile in the configured allowlist.
+
 The server checks profile allowlisting, active family profile and the entire
 birth-year age interval. Generic adventure is reviewed for ages 10–14;
-`classic-detective` targets 15–17 and is not made available to a child around
-12 by this client. Capabilities advertise disclosure revision **1**. A changed
-profile identity/fingerprint or disclosure revision invalidates review before
-a new paid request. No reviewed dynamic fallback Pack binding is currently
+`classic-detective` targets 15–17. Eligible players can choose Classic Detective
+Mystery from Play → Adventures when dynamic starts are available. Capabilities
+advertise disclosure revision **1**. A changed profile identity/fingerprint
+or disclosure revision invalidates review before a new paid request.
+No reviewed dynamic fallback Pack binding is currently
 advertised: a fallback offer is not an implicit start.
 
 ## Online and offline boundaries

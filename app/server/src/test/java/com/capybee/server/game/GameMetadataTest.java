@@ -33,14 +33,15 @@ class GameMetadataTest {
     }
 
     @Test void discoveryIsLocalizedAudienceBoundAndIndependentOfSavedRunAccess() throws Exception {
-        var catalog = new GeneratorProfileCatalog(true, Path.of("../engine/generator-profiles"), List.of("generic-adventure","classic-detective"));
+        var catalog = new GeneratorProfileCatalog(true, null, List.of("generic-adventure", "classic-detective"));
         var users = mock(UserService.class); var profiles = mock(FamilyProfileRepository.class);
         var auth = mock(OAuth2AuthenticationToken.class); var user = new UserAccount();user.setId(UUID.randomUUID());
         when(users.getCurrentUser(auth)).thenReturn(user);
         var child = new FamilyProfile();child.setBirthYear(2014);
         when(profiles.findByParentUser_Id(user.getId())).thenReturn(Optional.of(child));
         @SuppressWarnings("unchecked") ObjectProvider<DynamicStartOperationService> operations=mock(ObjectProvider.class);
-        when(operations.getIfAvailable()).thenReturn(mock(DynamicStartOperationService.class));
+        var service = mock(DynamicStartOperationService.class);
+        when(operations.getIfAvailable()).thenReturn(service);
         var controller = new DynamicGameController(catalog,operations,users,profiles,mock(DynamicStartRateLimiter.class),false,0,
                 "https://example.invalid",Clock.fixed(Instant.parse("2026-11-14T00:00:00Z"),ZoneOffset.UTC),false,true,true,new org.springframework.beans.factory.ObjectProvider<com.capybee.engine.port.TextGenerator>() { @Override public com.capybee.engine.port.TextGenerator getIfAvailable() { return mock(com.capybee.engine.port.TextGenerator.class); } });
         var http = org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(controller).build();
@@ -57,6 +58,29 @@ class GameMetadataTest {
         assertThat(controller.capabilities(auth).getBody()).containsEntry("viewFeatures",List.of("canAdvance","presentation-v1","place-entry-v1"))
                 .containsEntry("supportedViewSchemas",List.of(1,2));
         assertThatThrownBy(()->controller.profile(auth,"classic-detective",Locale.ENGLISH)).isInstanceOf(com.capybee.engine.session.SessionException.class);
+        var detectiveProfile = catalog.find("classic-detective").orElseThrow().identity();
+        var request = new DynamicGameController.DynamicStartBody(UUID.randomUUID(), "classic-detective",
+                detectiveProfile.version().toString(), detectiveProfile.fingerprint(), "pl", "medium", "expert",
+                Map.of(), null, 1, true, null, null);
+        assertThatThrownBy(() -> controller.start(auth, "https://example.invalid", request))
+                .isInstanceOf(com.capybee.engine.session.SessionException.class);
+        verifyNoInteractions(service);
+
+        child.setBirthYear(2010);
+        assertThat(controller.profiles(auth, Locale.ENGLISH).getBody())
+                .extracting(DynamicGameController.ProfileDto::id).containsExactly("classic-detective");
+        assertThat(controller.capabilities(auth).getBody()).containsEntry("dynamicStartEnabled", true);
+        var detective = controller.profile(auth, "classic-detective", Locale.forLanguageTag("pl-PL")).getBody();
+        assertThat(detective.metadataLocale()).isEqualTo("pl");
+        assertThat(detective.title()).isEqualTo("Klasyczna zagadka detektywistyczna");
+        assertThat(detective.supportedLocales()).containsExactlyInAnyOrder("en", "pl");
+        assertThat(detective.inputs()).extracting(DynamicGameController.InputDto::id)
+                .containsExactly("genre", "setting", "tone", "interests", "length", "challenge", "game-locale", "story-wish");
+
+        when(service.submit(any(), eq(request.requestId()), any(), isNull(), isNull(), any()))
+                .thenReturn(new DynamicStartOperationService.Processing(100));
+        assertThat(controller.start(auth, "https://example.invalid", request).getStatusCode().value()).isEqualTo(202);
+
         child.setBirthYear(null);
         assertThat(controller.profiles(auth,Locale.ENGLISH).getBody()).isEmpty();
         assertThat(controller.capabilities(auth).getBody()).containsEntry("dynamicStartEnabled",false).containsEntry("gameEnabled",true).containsEntry("packGenerationEnabled",false);
