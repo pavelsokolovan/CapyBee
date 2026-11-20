@@ -6,12 +6,18 @@ import './gameEncounter.css';
 
 export const encounterCopy={en:{text:'Text mode'},pl:{text:'Tryb tekstowy'}} as const;
 /** Artwork comes only from the accepted public view; children retain their identity across modes. */
-export function GameEncounter({view,children,stage=false}:{view:GameView;children:ReactNode;stage?:boolean}) {
- const presentation='presentation' in view?view.presentation:null;
+export function GameEncounter({view,children,stage=false,caption,textMode=false}:{
+ view:GameView;children:ReactNode;stage?:boolean;caption?:ReactNode;textMode?:boolean;
+}) {
+ const presentation=view.presentation;
+ const backdrop=presentation&&!textMode;
+ const cast=stage&&backdrop?gameCompanions(view)?.current:undefined;
  return <div className={presentation?'game-art game-encounter':'game-encounter'}>
-  {presentation?<div className="game-encounter-backdrop" aria-hidden="true"><GameBackdrop assetId={presentation.backdropAssetId} decorative/>
-   {stage ? <div className="game-encounter-stage">{gameCompanions(view)?.current.map(character=>
+  {backdrop||caption?<div className={backdrop?'game-encounter-backdrop':undefined} aria-hidden={caption?undefined:true}>
+   {backdrop?<GameBackdrop assetId={presentation.backdropAssetId} cover={!!caption} decorative/>:null}
+   {cast?.length ? <div className="game-encounter-stage" aria-hidden="true">{cast.map(character=>
     <GameCharacter key={character.id} assetId={character.assetId} expression={character.expression} decorative/>)}</div> : null}
+   {caption}
   </div>:null}
   <div className="game-encounter-content">{children}</div>
  </div>;

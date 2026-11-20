@@ -3,7 +3,7 @@ import type {GameRunSummaryDto,GameCommand} from '../../game/gameApi';
 import {GameTransport} from '../../game/gameTransport';
 import {RunController} from '../../game/runController';
 import {restoreGameSession} from '../../game/restoreGameSession';
-import {SceneBlocks,SceneActions,ScenePanels,SceneResult} from './GameScene';
+import {SceneBlocks,SceneActions,ScenePanels,SceneResult,hasTextInput} from './GameScene';
 import {adventureCopy} from '../../game/adventureCopy';
 import {adventureLocation,adventureTitle} from '../../game/savedAdventure';
 import {sceneFirstKind} from '../../game/sceneFirst';
@@ -82,39 +82,70 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
  const party=view?<GameParty view={view} locale={locale} runId={state.run.runId} revision={state.run.revision}
   ready={initialized} announce={initialized&&!locked&&state.message==='saved'} hideEmpty={expedition}/>:null;
  const runClass=episode?'game-run game-scene-first game-episode':expedition?'game-run game-scene-first game-expedition':'game-run';
- return <section className={runClass} data-text-mode={textMode} lang={state.run.locale}>
- <h3 tabIndex={-1} ref={hasSceneHeading?runHeading:heading}
+ const titleHeading=<h3 tabIndex={-1} ref={hasSceneHeading?runHeading:heading}
   className={expedition&&title===null?'game-visually-hidden':undefined}
-  lang={expedition&&title===null?controlsLocale:undefined}>{title??c.scene}</h3>
- {!episode?<>{!expedition?<><p>{adventureCopy[locale].locale}: {new Intl.DisplayNames([locale],{type:'language'}).of(state.run.locale)}</p>
- {initialized&&state.message==='saved'?<p>{adventureCopy[locale].ready}</p>:null}</>:null}{status}</>:null}
- {unsupported?<p>{c.unsupported}</p>:null}{state.run.status!=='ACTIVE'&&!ended?<p>{c.unavailable}</p>:null}
- {view?episode?<><div className="game-scene-tools">
- {view.places?.places.length&&!ended?<EpisodeMap places={view.places} locked={locked} submit={submit} details={episodeMap}/>:null}
- {textToggle}</div>
- <GameEncounter view={view} stage>
- {ended?<h4 className="game-episode-ending-title" tabIndex={-1} ref={endingHeading}>{endingLabel}</h4>:null}
- <SceneBlocks view={view} locale={controlsLocale}/>{actions}
- {episodeCompleted?<EpisodeInterest key={state.run.runId}/>:null}
- {ended?<button type="button" className={episodeCompleted?'game-episode-return':'game-episode-exit'} onClick={onClose??onAnother}>{c.back}</button>:null}
- </GameEncounter>{status}</>:<>
- {expedition?<div className="game-scene-tools">
-  {board?<details className="game-scene-map"><summary lang={locale}>{boardCopy[locale].map}</summary>{board}</details>:null}
-  {textToggle}
- </div>:<>{textToggle}{board}{party}</>}
- {hasSceneHeading?<h4 className={expedition?(currentLocation?'game-expedition-location':'game-visually-hidden'):undefined} tabIndex={-1} ref={heading}
-  lang={expedition&&currentLocation?state.run.locale:locale}>{expedition&&currentLocation?currentLocation:boardCopy[locale].moment}</h4>:null}
- <GameEncounter view={view} stage={expedition}>
- {!expedition?<GameCurrentCharacters view={view} locale={locale}/>:null}
- <SceneBlocks view={view} locale={locale}/>{actions}
- </GameEncounter>
- {expedition?<><GameCurrentCharacters view={view} locale={locale} collapsible/>{party}</>:null}
- <ScenePanels hidePlaces={expedition} view={view} locale={locale} locked={locked} submit={submit}/>{ended?<SceneResult view={view} locale={locale}/>:null}</>:episode?status:null}
- {state.retryable?<button type="button" onClick={()=>void controller.retryUnsent()}>{c.retry}</button>:null}
- {state.cancellable?<button type="button" onClick={()=>void controller.removeUnsent()}>{c.remove}</button>:null}
- {state.pending?<button type="button" onClick={()=>void controller.check()}>{c.check}</button>:null}
- {!episode&&ended&&view?.endReason==='COMPLETED'?<GameCompletion owner={owner} runId={state.run.runId} revision={state.run.revision} locale={locale}/>:null}
- {!episode&&ended?<button type="button" onClick={onAnother}>{c.newGame}</button>:null}
- {state.run.status==='ACTIVE'?<button type="button" ref={abandon} disabled={locked} onClick={()=>dialog.current?.showModal()}>{c.abandon}</button>:null}
- <dialog onKeyDown={e=>e.stopPropagation()} ref={dialog} aria-labelledby="game-abandon-title" onCancel={e=>{e.preventDefault();cancel();}}><h4 id="game-abandon-title">{c.confirm}</h4><button type="button" onClick={cancel}>{c.cancel}</button><button type="button" disabled={locked} onClick={()=>{cancel();void submit({type:'ABANDON'});}}>{c.abandon}</button></dialog></section>;
+  lang={expedition&&title===null?controlsLocale:undefined}>{title??c.scene}</h3>;
+ const notices=<>{unsupported?<p>{c.unsupported}</p>:null}
+  {state.run.status!=='ACTIVE'&&!ended?<p>{c.unavailable}</p>:null}</>;
+ const recovery=state.retryable||state.cancellable||state.pending?<>
+  {state.retryable?<button type="button" onClick={()=>void controller.retryUnsent()}>{c.retry}</button>:null}
+  {state.cancellable?<button type="button" onClick={()=>void controller.removeUnsent()}>{c.remove}</button>:null}
+  {state.pending?<button type="button" onClick={()=>void controller.check()}>{c.check}</button>:null}
+ </>:null;
+ const completion=!episode&&ended?<>{view?.endReason==='COMPLETED'?<GameCompletion owner={owner} runId={state.run.runId} revision={state.run.revision} locale={locale}/>:null}
+  <button type="button" onClick={onAnother}>{c.newGame}</button></>:null;
+ const exit=<>
+  {state.run.status==='ACTIVE'?<button type="button" ref={abandon} disabled={locked} onClick={()=>dialog.current?.showModal()}>{c.abandon}</button>:null}
+  <dialog onKeyDown={e=>e.stopPropagation()} ref={dialog} aria-labelledby="game-abandon-title" onCancel={e=>{e.preventDefault();cancel();}}><h4 id="game-abandon-title">{c.confirm}</h4><button type="button" onClick={cancel}>{c.cancel}</button><button type="button" disabled={locked} onClick={()=>{cancel();void submit({type:'ABANDON'});}}>{c.abandon}</button></dialog>
+ </>;
+
+ if(expedition) {
+  const actionCount=view?view.options.length+Number(view.canAdvance===true):0;
+  const pinned=actions&&view&&!ended&&!hasTextInput(view)&&actionCount>=1&&actionCount<=3;
+  const caption=<h4 className={currentLocation?'game-expedition-location':'game-visually-hidden'} tabIndex={-1} ref={heading}
+   lang={currentLocation?state.run.locale:locale}>{currentLocation??boardCopy[locale].moment}</h4>;
+  return <section className={runClass} data-text-mode={textMode} lang={state.run.locale}>
+   {status}
+   <div className="game-scene-body">
+    {titleHeading}{notices}
+    {view?<><div className="game-scene-tools">
+     {board?<details className="game-scene-map"><summary lang={locale}>{boardCopy[locale].map}</summary>{board}</details>:null}
+     {textToggle}
+    </div>
+    <GameEncounter view={view} stage caption={caption} textMode={textMode}>
+     <SceneBlocks view={view} locale={controlsLocale}/>
+    </GameEncounter>
+    {pinned?null:actions}
+    <GameCurrentCharacters view={view} locale={locale} collapsible/>{party}
+    <ScenePanels hidePlaces view={view} locale={locale} locked={locked} submit={submit}/>
+    {ended?<SceneResult view={view} locale={locale}/>:null}</>:null}
+    {completion}{exit}
+   </div>
+   {pinned||recovery?<footer className="game-scene-footer">{recovery}{pinned?actions:null}</footer>:null}
+  </section>;
+ }
+
+ return <section className={runClass} data-text-mode={textMode} lang={state.run.locale}>
+  {titleHeading}
+  {!episode?<><p>{adventureCopy[locale].locale}: {new Intl.DisplayNames([locale],{type:'language'}).of(state.run.locale)}</p>
+   {initialized&&state.message==='saved'?<p>{adventureCopy[locale].ready}</p>:null}{status}</>:null}
+  {notices}
+  {view?episode?<><div className="game-scene-tools">
+   {view.places?.places.length&&!ended?<EpisodeMap places={view.places} locked={locked} submit={submit} details={episodeMap}/>:null}
+   {textToggle}</div>
+   <GameEncounter view={view} stage>
+    {ended?<h4 className="game-episode-ending-title" tabIndex={-1} ref={endingHeading}>{endingLabel}</h4>:null}
+    <SceneBlocks view={view} locale={controlsLocale}/>{actions}
+    {episodeCompleted?<EpisodeInterest key={state.run.runId}/>:null}
+    {ended?<button type="button" className={episodeCompleted?'game-episode-return':'game-episode-exit'} onClick={onClose??onAnother}>{c.back}</button>:null}
+   </GameEncounter>{status}</>:<>
+   {party}
+   <GameEncounter view={view}>
+    <GameCurrentCharacters view={view} locale={locale}/>
+    <SceneBlocks view={view} locale={locale}/>{actions}
+   </GameEncounter>
+   <ScenePanels view={view} locale={locale} locked={locked} submit={submit}/>{ended?<SceneResult view={view} locale={locale}/>:null}
+  </>:episode?status:null}
+  {recovery}{completion}{exit}
+ </section>;
 }

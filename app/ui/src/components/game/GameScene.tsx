@@ -4,6 +4,9 @@ import {runCopy} from './runCopy';
 import {GamePlaces} from './GamePlaces';
 import {GameCharacterHistory} from './GameCharacters';
 type Props={hidePlaces?:boolean;view:GameView;locale:'en'|'pl';locked:boolean;selection?:string;submit:(command:GameCommand)=>void};
+export function hasTextInput(view:GameView) {
+ return view.input?.mode==='TEXT'||view.input?.mode==='CHOICE_OR_TEXT';
+}
 export function SceneBlocks({view,locale}:{view:GameView;locale:'en'|'pl'}) {
  const cast='characters' in view?view.characters:[];
  return <div>{view.blocks.map((block,i)=>{
@@ -16,7 +19,7 @@ export function SceneActions({view,locale,locked,selection,submit}:Props){
  const [online,setOnline]=useState(navigator.onLine);
  useEffect(()=>{const update=()=>setOnline(navigator.onLine);window.addEventListener('online',update);window.addEventListener('offline',update);return()=>{window.removeEventListener('online',update);window.removeEventListener('offline',update);};},[]);
  const copy=runCopy[locale], [draft,setDraft]=useState(''),[error,setError]=useState(false);
- const textAllowed=view.input&&['TEXT','CHOICE_OR_TEXT'].includes(view.input.mode);
+ const textAllowed=hasTextInput(view);
  const bound=Math.min(view.input?.maxChars??0,1000);
  return <div className="game-actions"><fieldset disabled={locked}><legend>{copy.scene}</legend>
  {view.options.map(o=><div key={o.id}><button type="button" disabled={!o.enabled} aria-describedby={o.hint?`hint-${o.id}`:undefined} onClick={()=>submit({type:'CHOOSE',optionId:o.id})}>{o.label}{selection===o.id?` — ${copy.checking}`:''}</button>{o.hint?<p id={`hint-${o.id}`}>{o.hint}</p>:null}</div>)}

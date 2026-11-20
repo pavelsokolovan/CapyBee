@@ -8,9 +8,9 @@ import './gameArt.css';
 
 /** Unique meaning requires a localized name; decorative artwork never enters the accessibility tree. */
 type ArtAccessibility = {decorative: true; label?: never} | {decorative?: false; label: string};
-function ArtFrame({viewBox, children, ...a11y}: ArtAccessibility & {viewBox: string; children: ReactNode}) {
+function ArtFrame({viewBox, children, cover=false, ...a11y}: ArtAccessibility & {viewBox: string; children: ReactNode; cover?: boolean}) {
   const titleId = useId();
-  return <svg viewBox={viewBox} preserveAspectRatio="xMidYMid meet" focusable="false"
+  return <svg viewBox={viewBox} preserveAspectRatio={cover?"xMidYMid slice":"xMidYMid meet"} focusable="false"
     aria-hidden={a11y.decorative ? true : undefined} role={a11y.decorative ? undefined : 'img'}
     aria-labelledby={a11y.decorative ? undefined : titleId}>
     {!a11y.decorative && <title id={titleId}>{a11y.label}</title>}{children}
@@ -32,8 +32,8 @@ export function GameCharacter({assetId, variant = 'figure', expression = 'neutra
 export function GameTerrain({assetId, ...a11y}: ArtAccessibility & {assetId?: TerrainId | null}) {
   return <ArtFrame viewBox="0 0 120 140" {...a11y}><TerrainArtwork id={resolveAsset('terrain', assetId)!}/></ArtFrame>;
 }
-export function GameBackdrop({assetId, ...a11y}: ArtAccessibility & {assetId?: BackdropId | null}) {
-  return <ArtFrame viewBox="0 0 640 360" {...a11y}><BackdropArtwork id={resolveAsset('backdrop', assetId)!}/></ArtFrame>;
+export function GameBackdrop({assetId, cover, ...a11y}: ArtAccessibility & {assetId?: BackdropId | null; cover?: boolean}) {
+  return <ArtFrame viewBox="0 0 640 360" cover={cover} {...a11y}><BackdropArtwork id={resolveAsset('backdrop', assetId)!}/></ArtFrame>;
 }
 export function GameMotif({assetId, ...a11y}: ArtAccessibility & {assetId?: MotifId | null}) {
   const id = resolveAsset('motif', assetId);

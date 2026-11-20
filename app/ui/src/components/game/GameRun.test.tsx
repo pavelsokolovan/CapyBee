@@ -25,14 +25,15 @@ async function renderRun(run:GameRunSummaryDto) {
  },initialize:vi.fn(async()=>{}),detach:vi.fn(),submit:vi.fn()};
  await act(async()=>root.render(<GameRun run={run} owner="owner" locale="en" onAnother={vi.fn()}
   controller={controller as unknown as RunController}/>));
- return {submit:controller.submit,accept:async(run:GameRunSummaryDto)=>act(async()=>{
-  state={...state,run};listeners.forEach(listener=>listener());
- })};
+ const update=async(patch:Partial<RunState>)=>act(async()=>{
+  state={...state,...patch};listeners.forEach(listener=>listener());
+ });
+ return {submit:controller.submit,update,accept:(run:GameRunSummaryDto)=>update({run})};
 }
 it('shows a title-less illustrated pack as an expedition and preserves text and focus on travel',async()=>{
  const run=illustratedRun(),{submit,accept}=await renderRun(run);
  const game=host.querySelector('.game-scene-first.game-expedition')!;
- const title=game.querySelector(':scope > h3')!;
+ const title=game.querySelector('.game-scene-body > h3')!;
  expect(title.textContent).toBe('Adventure');
  expect(title.classList.contains('game-visually-hidden')).toBe(true);
  expect(title.getAttribute('lang')).toBe('en');
@@ -48,9 +49,9 @@ it('shows a title-less illustrated pack as an expedition and preserves text and 
  expect(travel.map(button=>button.getAttribute('aria-label'))).toEqual(['Visit: Rzeka']);
  expect(game.querySelector<HTMLDetailsElement>('details.game-current-characters')?.open).toBe(false);
  expect(game.querySelector('.game-party')).toBeNull();
- const encounter=game.querySelector('.game-encounter')!;
+ const encounter=game.querySelector('.game-encounter-content')!;
  const text=encounter.textContent;
- const choices=()=>[...encounter.querySelectorAll('.game-actions button')].map(button=>button.textContent);
+ const choices=()=>[...game.querySelectorAll('.game-actions button')].map(button=>button.textContent);
  expect(choices()).toEqual(['Hold the reed']);
  const toggle=[...game.querySelectorAll('button')].find(button=>button.textContent==='Text mode')!;
  await act(async()=>toggle.click());
@@ -72,9 +73,48 @@ it('shows a title-less illustrated pack as an expedition and preserves text and 
 it('keeps the fallback moment heading accessible when an illustrated run has no location',async()=>{
  const run=illustratedRun();delete run.view.places;
  await renderRun(run);
- const heading=host.querySelector('.game-run > h4.game-visually-hidden');
+ const heading=host.querySelector('.game-encounter h4.game-visually-hidden');
  expect(heading?.textContent).toBe('Current moment');
  expect(heading?.getAttribute('lang')).toBe('en');
+});
+it('pins up to three actions, counting disabled choices and Continue',async()=>{
+ const run=illustratedRun();
+ run.view.options.push({id:'disabled',label:'Wait here',enabled:false,hint:'The path is closed.'});
+ run.view.canAdvance=true;
+ await renderRun(run);
+ const footer=host.querySelector('.game-scene-footer')!;
+ expect([...footer.querySelectorAll('fieldset button')].map(button=>button.textContent)).toEqual(['Hold the reed','Wait here','Continue']);
+ expect(footer.querySelector<HTMLButtonElement>('button[aria-describedby="hint-disabled"]')?.disabled).toBe(true);
+ expect(footer.querySelector('#hint-disabled')?.textContent).toBe('The path is closed.');
+ expect(host.querySelector('.game-scene-body fieldset')).toBeNull();
+});
+it.each([[6,'CHOICE'],[1,'CHOICE_OR_TEXT']] as const)('keeps %i choices with %s input below the bubble',async(count,mode)=>{
+ const run=illustratedRun();
+ run.view.options=Array.from({length:count},(_,index)=>({id:String(index),label:`Option ${index}`,enabled:true}));
+ run.view.input={mode,maxChars:35};
+ await renderRun(run);
+ expect(host.querySelector('.game-scene-footer')).toBeNull();
+ const actions=host.querySelector('.game-scene-body .game-encounter + .game-actions')!;
+ expect(actions.querySelectorAll('button[type=button]')).toHaveLength(count);
+ expect(Boolean(actions.querySelector('textarea'))).toBe(mode==='CHOICE_OR_TEXT');
+});
+it('keeps recovery controls in the footer while an inline action is locked',async()=>{
+ const run=illustratedRun();
+ run.view.input={mode:'CHOICE_OR_TEXT',maxChars:35};
+ const {update}=await renderRun(run);
+ await update({pending:true,retryable:true,cancellable:true,message:'checking'});
+ expect(host.querySelector('.game-expedition > [role=status]')?.textContent).toBe('Saving / checking');
+ expect(host.querySelector<HTMLFieldSetElement>('.game-scene-body fieldset')?.disabled).toBe(true);
+ expect([...host.querySelectorAll('.game-scene-footer button')].map(button=>button.textContent))
+  .toEqual(['Retry original action','Remove unsent action','Check saved game']);
+});
+it('renders ending prose and the result in the body without a footer',async()=>{
+ const run=illustratedRun();
+ run.status='ENDED';run.view.ended=true;run.view.endReason='ABANDONED';run.view.options=[];
+ await renderRun(run);
+ expect(host.querySelector('.game-scene-body .game-encounter-content')?.textContent).toContain('We can take our time.');
+ expect(host.querySelector('.game-scene-body')?.textContent).toContain('Abandoned');
+ expect(host.querySelector('.game-scene-footer')).toBeNull();
 });
 it('keeps the legacy text layout, status, actions and focus for a run without presentation',async()=>{
  const run=illustratedRun();delete run.view.presentation;

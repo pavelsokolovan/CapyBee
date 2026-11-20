@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {checkExpedition} from './game-expeditions.mjs';
+import {captureExpeditionHub,checkExpedition} from './game-expeditions.mjs';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 const evidence=fileURLToPath(new URL('../../../docs/evidence/30.3/',import.meta.url));
@@ -26,6 +26,7 @@ export async function checkBoardRoute({page,context,base,requests}){
  await page.emulateMedia({reducedMotion:'no-preference',forcedColors:'none'});
  const game=page.locator('.game-run'),board=game.locator('.game-board');
  const initial=await current(context,base);assert.equal(initial.packVersion,'1.4.0');
+ await captureExpeditionHub({page,game});
  const beforeOpening=requests.length;
  await openExpeditionMap(game);
  await board.locator('.game-board-player').waitFor();
@@ -80,7 +81,6 @@ export async function checkBoardRoute({page,context,base,requests}){
   const writes=requests.slice(before).filter(r=>r.url===url);assert.equal(writes.length,1);assert.deepEqual(writes[0].body.command,{type:'MOVE',placeId:'quiet-meadow'});
   const replay=await context.request.post(url,{data:writes[0].body});assert.equal(replay.status(),200);
   const same=await current(context,base);assert.equal(same.revision,run.revision);assert.deepEqual(same.view,run.view);
-  await shot(page,'.game-encounter','accepted-encounter');
   await checkExpedition({page,game,requests});
  }finally{release();await context.unroute(url,handler);}
  // An offline neighboring move retains the accepted character and marker. Lose its acknowledgement after acceptance, then reload.

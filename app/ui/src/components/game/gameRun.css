@@ -63,12 +63,33 @@
  .game-scene-first .game-actions button, .game-episode-exit { color: ButtonText; background: ButtonFace; border-color: ButtonText; }
 }
 
-.game-expedition-location { margin-block: .85rem .35rem; scroll-margin-block-start: 4.5rem; }
-.game-expedition .game-encounter-backdrop { max-height: 10rem; }
+body:has(.adventure-overlay .game-expedition) { min-width: 0; }
+.adventure-overlay:has(.game-expedition) {
+ box-sizing: border-box; block-size: 100dvh; overflow: hidden;
+ padding-block: max(.5rem, env(safe-area-inset-top, 0px)) 0;
+}
+.adventure-panel:has(> .game-expedition) {
+ display: flex; flex-direction: column; block-size: 100%; min-height: 0; padding-bottom: 0;
+}
+.adventure-panel:has(> .game-expedition) > header { position: static; flex-shrink: 0; }
+.game-run.game-expedition { display: flex; flex-direction: column; flex: 1; min-height: 0; padding-block: 0; }
+.game-scene-body {
+ flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain;
+ padding: .25rem .25rem .5rem; margin-inline: -.25rem;
+}
+.game-scene-body > h3 { font-size: clamp(1.4rem, 6vw, 2rem); line-height: 1.12; margin: 0 0 .45rem; }
+.game-scene-body > .game-actions button { margin-block: 4px; }
+.game-expedition .game-scene-tools { gap: .4rem; }
+.game-scene-footer {
+ box-sizing: border-box; flex: 0 0 auto; max-height: 45dvh; overflow-y: auto;
+ display: grid; gap: .4rem; padding: .4rem .25rem max(.5rem, env(safe-area-inset-bottom, 0px)); margin-inline: -.25rem;
+}
+.game-scene-footer fieldset { display: grid; gap: .4rem; margin: 0; }
+.game-expedition .game-scene-footer button { width: 100%; min-height: 48px; }
 .game-expedition details.game-current-characters { padding: 0 .8rem; }
 .game-expedition details.game-current-characters[open] { padding-bottom: .8rem; }
 .game-expedition .game-run-status:not(.game-visually-hidden) {
- position: sticky; inset-block-start: 3rem; z-index: 1; padding: .35rem .65rem;
+ flex-shrink: 0; margin: .15rem 0 .3rem; padding: .35rem .65rem;
  border: 1px solid #bca67c; border-radius: .65rem; background: #fffdf7; color: #2e2413;
 }
 

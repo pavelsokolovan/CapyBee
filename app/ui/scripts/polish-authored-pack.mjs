@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {checkBoardRoute,openExpeditionMap} from './game-honeycomb-board.mjs';
+import {checkExpeditionOpening,captureExpeditionLantern} from './game-expeditions.mjs';
 import {assertCompanionUI,holdCompanionChoice,captureCompanionEvidence} from './game-companions.mjs';
 
 export async function checkPolishPack({page,context,base,requests}) {
@@ -106,7 +107,7 @@ export async function checkPolishPack({page,context,base,requests}) {
   }
 
  };
- await start();await choose('Continue');
+ await start();await checkExpeditionOpening({page,game,capture:true});await choose('Continue');
  await checkBoardRoute({page,context,base,requests});
  await choose('Na dziś wybieram odpoczynek');await ending('rest-here');
  await start();await choose('Continue');
@@ -127,8 +128,9 @@ export async function checkPolishPack({page,context,base,requests}) {
  assert.equal(resumed.revision,current.revision);assert.deepEqual(resumed.view,current.view);assert.equal(requests.length,posts,'reload created another start/action');
  for(const label of ['Idę do Warsztatu Plastra','Wiążę poręcz i ruszam do mostku','Zapalam światło przy nowej ścieżce'])await choose(label);
  await ending('new-path');
- await start();
- for(const label of ['Continue','Zaglądam do Latarni Wspomnień','Zabieram światło wspomnienia na drogę','Continue',
+ await start();await choose('Continue');await choose('Zaglądam do Latarni Wspomnień');
+ await captureExpeditionLantern({page,game});
+ for(const label of ['Zabieram światło wspomnienia na drogę','Continue',
   'Odwiedzam Melę na Cichej Łące','Siadam na chwilę i słucham Meli','Continue',
   'Odwiedzam Borysa nad trzciną','Przytrzymuję trzcinę dla Borysa','Continue',
   'Odwiedzam Lunę pod wierzbą','Układam z Luną znak z liści','Continue',
@@ -137,7 +139,7 @@ export async function checkPolishPack({page,context,base,requests}) {
  await page.getByRole('button',{name:'Back to Play',exact:true}).click();
  await Promise.all([page.waitForResponse(r=>r.url().endsWith('/api/child-profile')&&r.request().method()==='PATCH'&&r.status()===200),page.locator('.locale-control select').first().selectOption('pl')]);
  await page.getByRole('button',{name:'Graj',exact:true}).click();await page.getByRole('button',{name:/Przygody/}).click();
- await start('pl');await choose('Dalej');await openExpeditionMap(game);
+ await start('pl');await checkExpeditionOpening({page,game});await choose('Dalej');await openExpeditionMap(game);
  await game.locator('[aria-current="location"]').getByText('Tu jesteś',{exact:true}).waitFor();
  await game.getByRole('button',{name:'Idź: Cicha Łąka',exact:true}).waitFor();
  await game.locator('.game-scene-map > summary').click();

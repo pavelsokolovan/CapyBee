@@ -14,3 +14,43 @@
  .game-art.game-encounter { border-color: CanvasText; }
  .game-art.game-encounter .game-encounter-content { background: Canvas; color: CanvasText; }
 }
+
+.game-expedition .game-art.game-encounter { border: 0; background: transparent; }
+.game-expedition .game-encounter .game-encounter-backdrop {
+ box-sizing: border-box; height: clamp(6rem, 20dvh, 10rem); aspect-ratio: auto;
+ border: 1px solid #bca67c; border-radius: 16px; background: var(--game-cream);
+}
+.game-expedition .game-encounter .game-encounter-backdrop > svg { scale: none; }
+.game-expedition .game-expedition-location { margin: 0 0 .4rem; }
+.game-expedition .game-encounter-backdrop .game-expedition-location {
+ position: absolute; inset-inline-start: .5rem; inset-block-end: .5rem;
+ max-inline-size: calc(100% - 1rem); box-sizing: border-box;
+ margin: 0; padding: .2rem .55rem; border: 1px solid #bca67c; border-radius: .625rem;
+ background: var(--game-paper); color: #2e2413; font-size: .875rem; line-height: 1.25;
+}
+.game-expedition .game-encounter > .game-encounter-content {
+ position: relative; border: 2px solid #846746; border-radius: 16px;
+ padding: .55rem .75rem; background: var(--game-paper, #fffdf7); color: #2e2413;
+}
+.game-expedition .game-encounter-backdrop + .game-encounter-content { margin-top: .55rem; }
+.game-expedition .game-encounter-content .game-block p { margin: 0; }
+.game-expedition .game-encounter-content .game-block + .game-block { margin-top: .45em; }
+@media (forced-colors: none) {
+ .game-expedition .game-encounter-backdrop:has(.game-encounter-stage) + .game-encounter-content::before {
+  content: ''; position: absolute; inset-block-start: -.41rem; inset-inline-start: 50%;
+  inline-size: .625rem; block-size: .625rem; background: var(--game-paper);
+  border-block-start: 2px solid #846746; border-inline-start: 2px solid #846746;
+  transform: translateX(-50%) rotate(45deg);
+ }
+}
+@media (forced-colors: active) {
+ .game-expedition .game-encounter .game-encounter-backdrop { display: contents; }
+ .game-expedition .game-encounter-backdrop > :is(svg, .game-encounter-stage) { display: none; }
+ .game-expedition .game-encounter-backdrop .game-expedition-location {
+  position: static; max-inline-size: none; margin: 0 0 .4rem; padding: 0; border: 0;
+  background: Canvas; color: CanvasText; font-size: revert; line-height: inherit;
+ }
+ .game-expedition .game-encounter > .game-encounter-content {
+  margin-top: 0; border-color: CanvasText; background: Canvas; color: CanvasText;
+ }
+}

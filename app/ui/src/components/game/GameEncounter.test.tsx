@@ -2,6 +2,7 @@ import {act} from 'react';
 import {createRoot,type Root} from 'react-dom/client';
 import {beforeEach,afterEach,it,expect,vi} from 'vitest';
 import {GameRun} from './GameRun';
+import {GameEncounter} from './GameEncounter';
 import {companionView} from '../../game/fixtures/companionViews';
 import type {GameRunSummaryDto} from '../../game/gameApi';
 import type {RunController,RunState} from '../../game/runController';
@@ -9,6 +10,26 @@ import type {RunController,RunState} from '../../game/runController';
 let host:HTMLDivElement,root:Root;
 beforeEach(()=>{host=document.createElement('div');document.body.append(host);root=createRoot(host);});
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();});
+it('keeps the same accessible caption when the backdrop is removed in Text mode',async()=>{
+ const view=companionView(),caption=<h4 lang="pl" tabIndex={-1}>Cicha Łąka</h4>;
+ const render=(textMode:boolean)=>act(async()=>root.render(<GameEncounter view={view} stage caption={caption} textMode={textMode}>Story</GameEncounter>));
+ await render(false);
+ const heading=host.querySelector('.game-encounter-backdrop > h4')!;
+ expect(heading.closest('[aria-hidden=true]')).toBeNull();
+ expect(host.querySelector('.game-encounter-stage')).not.toBeNull();
+ await render(true);
+ expect(host.querySelector('h4')).toBe(heading);
+ expect(host.querySelector('.game-encounter-backdrop,.game-encounter-stage')).toBeNull();
+ await render(false);
+ expect(host.querySelector('.game-encounter-backdrop > h4')).toBe(heading);
+});
+it('omits the stage that anchors the bubble tail when no characters are present',async()=>{
+ const view=companionView();
+ view.characters.forEach(character=>{character.inCurrentScene=false;});
+ await act(async()=>root.render(<GameEncounter view={view} stage caption={<h4>Quiet Meadow</h4>}>Story</GameEncounter>));
+ expect(host.querySelector('.game-encounter-backdrop > svg')).not.toBeNull();
+ expect(host.querySelector('.game-encounter-stage')).toBeNull();
+});
 it.each(['en','pl'] as const)('composes accepted art and preserves draft, focus and commands on %s text-mode switches',async locale=>{
  const view=companionView();view.presentation!.backdropAssetId='backdrop.reed-bank';view.input={mode:'CHOICE_OR_TEXT',maxChars:200};
  const run:GameRunSummaryDto={runId:'one',source:{kind:'PACK',packId:'fixture',packVersion:'1.0.0'},packId:'fixture',packVersion:'1.0.0',locale:'pl',status:'ACTIVE',revision:0,updatedAt:'2026-11-16T00:00:00Z',viewSchema:2,view};
