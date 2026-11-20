@@ -562,7 +562,16 @@ public final class GenerationPipeline {
             if (blocks.get(index).kind() == BlockKind.NARRATION) { narrationIndex = index; break; }
         }
         if (narrationIndex < 0) blocks.add(0, new Block(BlockKind.NARRATION, null, narration, List.of()));
-        else blocks.set(narrationIndex, new Block(BlockKind.NARRATION, null, narration, blocks.get(narrationIndex).refs()));
+        else {
+            List<String> references = blocks.get(narrationIndex).refs();
+            if (!trusted.end() && qualityProfile != null && qualityProfile.sceneWordLimits() != null) {
+                // The generated narration or its reviewed fallback replaces the whole authored beat.
+                references = blocks.stream().filter(block -> block.kind() == BlockKind.NARRATION)
+                        .flatMap(block -> block.refs().stream()).distinct().toList();
+                blocks.subList(narrationIndex + 1, blocks.size()).removeIf(block -> block.kind() == BlockKind.NARRATION);
+            }
+            blocks.set(narrationIndex, new Block(BlockKind.NARRATION, null, narration, references));
+        }
         int insertion = narrationIndex < 0 ? 1 : narrationIndex + 1;
         if (raw instanceof ScenePayload payload) for (Dialogue line : payload.dialogue()) {
             blocks.add(insertion++, new Block(BlockKind.SPEECH, line.actorId(), line.text(), List.of()));

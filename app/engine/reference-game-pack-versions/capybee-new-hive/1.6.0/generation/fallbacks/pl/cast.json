@@ -1,0 +1,24 @@
+{
+  "characters": [
+    {
+      "slotId": "hive-guide",
+      "name": "CapyBee",
+      "description": "Cierpliwy baśniowy przewodnik, który zostawia miejsce na odpoczynek."
+    },
+    {
+      "slotId": "mela-bee",
+      "name": "Mela",
+      "description": "Cierpliwa pszczoła. Potrzebuje ciszy, żeby wybrać kierunek lotu."
+    },
+    {
+      "slotId": "borys-beaver",
+      "name": "Borys",
+      "description": "Pomysłowy bóbr. Potrzebuje pomocy w przytrzymaniu trzciny."
+    },
+    {
+      "slotId": "luna-moth",
+      "name": "Luna",
+      "description": "Uważna ćma. Potrzebuje znaku wskazującego miejsce odpoczynku."
+    }
+  ]
+}

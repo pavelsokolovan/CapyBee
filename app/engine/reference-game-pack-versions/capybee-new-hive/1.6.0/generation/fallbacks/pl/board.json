@@ -1,0 +1,32 @@
+{
+  "title": "Polana Nowego Ula",
+  "narration": "Wybierz miejsce na mapie. Każde spotkanie jest dobrowolne. Możesz też odpocząć.",
+  "dialogue": [],
+  "choices": [
+    {
+      "id": "visit-lantern",
+      "label": "Odwiedzam Latarnię Wspomnień"
+    },
+    {
+      "id": "meet-mela",
+      "label": "Odwiedzam Melę"
+    },
+    {
+      "id": "meet-borys",
+      "label": "Odwiedzam Borysa"
+    },
+    {
+      "id": "meet-luna",
+      "label": "Odwiedzam Lunę"
+    },
+    {
+      "id": "visit-workshop",
+      "label": "Idę do Warsztatu"
+    },
+    {
+      "id": "rest-now",
+      "label": "Odpoczywam na dziś"
+    }
+  ],
+  "continuityFacts": []
+}

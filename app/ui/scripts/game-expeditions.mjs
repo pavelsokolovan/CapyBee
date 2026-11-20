@@ -209,7 +209,9 @@ export async function checkShortPolishBeat({page,game,text,labels}) {
 export async function checkExpedition({page,game,requests}){
  const encounter=game.locator('.game-encounter');
  const heading=encounter.getByRole('heading',{level:4});
- const text=await encounter.locator(bubble).innerText();
+ const narration=()=>encounter.locator(bubble+" .game-block p").allTextContents();
+ const text=await narration();
+ assert.ok(text.length>0);
  const choices=()=>game.locator('.game-actions fieldset button').allTextContents();
  const labels=await choices(),before=requests.length;
  const toggle=game.locator('.game-scene-menu button[aria-pressed]');
@@ -234,7 +236,7 @@ export async function checkExpedition({page,game,requests}){
    assert.equal(await encounter.locator(art).count(),0);
    assert.equal(await tail(),'none');
    assert.equal(await heading.isVisible(),true);
-   assert.equal(await encounter.locator(bubble).innerText(),text);
+   assert.deepEqual(await narration(),text);
    assert.deepEqual(await choices(),labels);
    await checkFooter(page,game,labels.length);
    await screenshot(page,'text-mode-mobile');
@@ -245,7 +247,7 @@ export async function checkExpedition({page,game,requests}){
    assert.equal(await heading.isVisible(),true);
    assert.equal(await heading.evaluate(node=>getComputedStyle(node).position),'static');
    assert.equal(await tail(),'none');
-   assert.equal(await encounter.locator(bubble).innerText(),text);
+   assert.deepEqual(await narration(),text);
    assert.deepEqual(await choices(),labels);
    await checkFooter(page,game,labels.length);
    await screenshot(page,'forced-colors-mobile');

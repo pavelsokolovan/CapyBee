@@ -27,13 +27,14 @@ foreach($old in @($archive,"$archive.sha256",(Join-Path $distributionRoot 'candi
 foreach($directory in @('bin','packs','profiles','certification','docs')){New-Item -ItemType Directory -Force (Join-Path $distribution $directory)|Out-Null}
 Copy-Item -LiteralPath $cliJar -Destination (Join-Path $distribution 'bin\engine-cli.jar')
 Copy-Item -LiteralPath (Join-Path $engine 'reference-game-packs\lanterns-of-willow-marsh') -Destination (Join-Path $distribution 'packs') -Recurse
-Copy-Item -LiteralPath (Join-Path $engine 'reference-game-pack-versions\capybee-new-hive\1.5.0') -Destination (Join-Path $distribution 'packs\capybee-new-hive') -Recurse
+Copy-Item -LiteralPath (Join-Path $engine 'reference-game-pack-versions\capybee-new-hive\1.6.0') -Destination (Join-Path $distribution 'packs\capybee-new-hive') -Recurse
 New-Item -ItemType Directory -Path (Join-Path $distribution 'packs\capybee-new-hive\retained') -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $engine 'reference-game-packs\capybee-new-hive') -Destination (Join-Path $distribution 'packs\capybee-new-hive\retained\1.0.0') -Recurse
 Copy-Item -LiteralPath (Join-Path $engine 'reference-game-pack-versions\capybee-new-hive\1.1.0') -Destination (Join-Path $distribution 'packs\capybee-new-hive\retained\1.1.0') -Recurse
 Copy-Item -LiteralPath (Join-Path $engine 'reference-game-pack-versions\capybee-new-hive\1.2.0') -Destination (Join-Path $distribution 'packs\capybee-new-hive\retained\1.2.0') -Recurse
 Copy-Item -LiteralPath (Join-Path $engine 'reference-game-pack-versions\capybee-new-hive\1.3.0') -Destination (Join-Path $distribution 'packs\capybee-new-hive\retained\1.3.0') -Recurse
 Copy-Item -LiteralPath (Join-Path $engine 'reference-game-pack-versions\capybee-new-hive\1.4.0') -Destination (Join-Path $distribution 'packs\capybee-new-hive\retained\1.4.0') -Recurse
+Copy-Item -LiteralPath (Join-Path $engine 'reference-game-pack-versions\capybee-new-hive\1.5.0') -Destination (Join-Path $distribution 'packs\capybee-new-hive\retained\1.5.0') -Recurse
 Copy-Item -LiteralPath (Join-Path $engine 'generator-profiles\generic-adventure') -Destination (Join-Path $distribution 'profiles') -Recurse
 foreach($suite in @('willow-marsh-v1','dynamic-v1','dynamic-live-v1','authored-reference-v1','honeycomb-board-v1')){Copy-Item -LiteralPath (Join-Path $engine "certification\$suite") -Destination (Join-Path $distribution 'certification') -Recurse}
 Copy-Item -LiteralPath (Join-Path $engine 'CERTIFICATION.md') -Destination (Join-Path $distribution 'docs\CERTIFICATION.md')
@@ -45,7 +46,7 @@ $buildInfo=[ordered]@{schemaVersion=1;product='capybee-engine';version=$Version;
 Write-Utf8 (Join-Path $distribution 'build-info.json') ($buildInfo|ConvertTo-Json -Depth 8)
 $contentFiles=Get-ChildItem -LiteralPath $distribution -File -Recurse|Sort-Object {Get-Relative $distribution $_.FullName}
 $entries=foreach($file in $contentFiles){$relative=Get-Relative $distribution $file.FullName;$kind=if($relative.StartsWith('bin/')){'executable-input'}elseif($relative.StartsWith('docs/') -or $relative -match '^(LICENSE|NOTICE)'){'documentation'}else{'release-input'};[ordered]@{path=$relative;bytes=$file.Length;sha256=Get-Sha256 $file.FullName;kind=$kind}}
-$manifest=[ordered]@{schemaVersion=1;maxFiles=256;maxExpandedBytes=67108864;maxFileBytes=33554432;allowedRoots=@('bin','packs','profiles','certification','docs');entries=@($entries)}
+$manifest=[ordered]@{schemaVersion=1;maxFiles=288;maxExpandedBytes=67108864;maxFileBytes=33554432;allowedRoots=@('bin','packs','profiles','certification','docs');entries=@($entries)}
 Write-Utf8 (Join-Path $distribution 'distribution-manifest.json') ($manifest|ConvertTo-Json -Depth 8)
 $checksumFiles=Get-ChildItem -LiteralPath $distribution -File -Recurse|Sort-Object {Get-Relative $distribution $_.FullName}
 $checksumLines=foreach($file in $checksumFiles){"$(Get-Sha256 $file.FullName)  $(Get-Relative $distribution $file.FullName)"}

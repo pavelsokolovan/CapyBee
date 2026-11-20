@@ -1,0 +1,20 @@
+{
+  "title": "Mały przystanek",
+  "narration": "Mela szuka ciszy przed lotem. Możesz posiedzieć obok albo iść dalej. Obie drogi są w porządku.",
+  "dialogue": [],
+  "choices": [
+    {
+      "id": "help-mela",
+      "label": "Słucham z Melą"
+    },
+    {
+      "id": "wave-mela",
+      "label": "Macham Meli"
+    },
+    {
+      "id": "rest-now",
+      "label": "Odpoczywam na dziś"
+    }
+  ],
+  "continuityFacts": []
+}

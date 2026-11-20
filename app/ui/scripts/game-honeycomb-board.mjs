@@ -48,7 +48,7 @@ export async function checkBoardRoute({page,context,base,requests}){
  const sheet=game.locator('.game-map-sheet'),card=sheet.locator('.game-map-card');
  const tiles=sheet.locator('.game-map-tile'),close=sheet.getByRole('button',{name:'Close',exact:true});
  const menu=game.locator('.game-scene-menu > summary');
- const initial=await current(context,base);assert.equal(initial.packVersion,'1.5.0');
+ const initial=await current(context,base);assert.equal(initial.packVersion,'1.6.0');
  await captureExpeditionHub({page,game});
  const viewport=page.viewportSize(),beforeOpen=requests.length;
  await page.setViewportSize({width:360,height:640});

@@ -137,6 +137,10 @@
           </execution>
           <execution><id>embed-current-polish-pack</id><phase>process-resources</phase><goals><goal>copy-resources</goal></goals>
             <configuration><outputDirectory>${project.build.outputDirectory}/game-packs/capybee-new-hive</outputDirectory>
+              <resources><resource><directory>${project.basedir}/../engine/reference-game-pack-versions/capybee-new-hive/1.6.0</directory><filtering>false</filtering></resource></resources>
+            </configuration></execution>
+          <execution><id>embed-retained-short-polish-pack</id><phase>process-resources</phase><goals><goal>copy-resources</goal></goals>
+            <configuration><outputDirectory>${project.build.outputDirectory}/game-packs/capybee-new-hive/retained/1.5.0</outputDirectory>
               <resources><resource><directory>${project.basedir}/../engine/reference-game-pack-versions/capybee-new-hive/1.5.0</directory><filtering>false</filtering></resource></resources>
             </configuration></execution>
           <execution><id>embed-retained-prefetch-polish-pack</id><phase>process-resources</phase><goals><goal>copy-resources</goal></goals>

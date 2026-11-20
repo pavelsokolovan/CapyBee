@@ -33,7 +33,7 @@ try{
       $names=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
       $folded=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
       [long]$expanded=0
-      if($opened.Zip.Entries.Count -gt 256){Fail 'ARCHIVE_FILE_LIMIT'}
+      if($opened.Zip.Entries.Count -gt 288){Fail 'ARCHIVE_FILE_LIMIT'}
       foreach($entry in $opened.Zip.Entries){
         Test-SafePath $entry.FullName
         if(-not $names.Add($entry.FullName)){Fail 'ARCHIVE_DUPLICATE_PATH'}

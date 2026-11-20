@@ -1,0 +1,24 @@
+{
+  "title": "Mały przystanek",
+  "narration": "Przy Mostku Dwóch Świateł jest ścieżka do nowego zakątka i miejsce na lampion ze wspomnieniem.",
+  "dialogue": [],
+  "choices": [
+    {
+      "id": "light-new-path",
+      "label": "Zapalam nowe światło"
+    },
+    {
+      "id": "keep-two-lights",
+      "label": "Zostawiam miejsce na oba światła"
+    },
+    {
+      "id": "back-to-board",
+      "label": "Wracam na polanę"
+    },
+    {
+      "id": "rest-now",
+      "label": "Odpoczywam na dziś"
+    }
+  ],
+  "continuityFacts": []
+}

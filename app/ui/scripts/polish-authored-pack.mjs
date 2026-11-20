@@ -92,7 +92,7 @@ export async function checkPolishPack({page,context,base,requests}) {
   await game.getByRole('button',{name:/Start another adventure|Rozpocznij inną przygodę/}).waitFor();
   const runId=requests.filter(r=>r.url.endsWith('/api/game/runs')&&r.body.packId==='capybee-new-hive').at(-1).body.id;
   const run=await (await context.request.get(`${base}/api/game/runs/${runId}`)).json();
-  assert.equal(run.status,'ENDED');assert.equal(run.endReason,'COMPLETED');assert.equal(run.view.outcome,outcome);assert.equal(run.packVersion,'1.5.0');
+  assert.equal(run.status,'ENDED');assert.equal(run.endReason,'COMPLETED');assert.equal(run.view.outcome,outcome);assert.equal(run.packVersion,'1.6.0');
   await assertCompanionUI({page,game,run});
   const panel=game.locator('.game-completion');await panel.waitFor();
   const completion=await (await context.request.get(`${base}/api/game/runs/${runId}/completion`)).json();

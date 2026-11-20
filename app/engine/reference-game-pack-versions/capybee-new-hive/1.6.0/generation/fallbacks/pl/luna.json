@@ -1,0 +1,20 @@
+{
+  "title": "Mały przystanek",
+  "narration": "Luna szuka znaku wskazującego miejsce na odpoczynek. Możesz pomóc jej go ułożyć.",
+  "dialogue": [],
+  "choices": [
+    {
+      "id": "help-luna",
+      "label": "Układam znak z Luną"
+    },
+    {
+      "id": "wave-luna",
+      "label": "Macham Lunie"
+    },
+    {
+      "id": "rest-now",
+      "label": "Odpoczywam na dziś"
+    }
+  ],
+  "continuityFacts": []
+}

@@ -1,0 +1,20 @@
+{
+  "title": "Mały przystanek",
+  "narration": "CapyBee sprawdza z tobą węzeł poręczy. Spotkania ze zwierzętami w tej baśni są dobrowolne.",
+  "dialogue": [],
+  "choices": [
+    {
+      "id": "tie-rail",
+      "label": "Wiążę poręcz"
+    },
+    {
+      "id": "back-to-board",
+      "label": "Wracam na polanę"
+    },
+    {
+      "id": "rest-now",
+      "label": "Odpoczywam na dziś"
+    }
+  ],
+  "continuityFacts": []
+}

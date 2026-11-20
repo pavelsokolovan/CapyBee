@@ -112,6 +112,7 @@ the implemented 30.2 contracts for the board, encounters and recruited party.
 
 ## Scene text and feedback
 
+- [40](40-capybee-short-text-pack-instruction.md) — Short authored Polish story and fallbacks.
 - [41](41-capybee-generated-text-limits-instruction.md) — Polish word limits, repair and playable fallback for generated scenes.
 
 - [42](42-capybee-progressive-scene-text-instruction.md) — Tap through illustrated scene blocks with full text available in reading modes.
