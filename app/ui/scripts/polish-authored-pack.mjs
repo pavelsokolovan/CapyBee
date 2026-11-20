@@ -134,7 +134,8 @@ export async function checkPolishPack({page,context,base,requests}) {
  await start();await choose('Continue');
  await checkSceneAdvance({page,game,zoom:true,advance:()=>choose('Odwiedzam Latarnię Wspomnień')});
  await captureExpeditionLantern({page,game});
- for(const label of ['Zabieram światło','Continue',
+ await checkLanternFeedback({page,game,choose});
+ for(const label of [
   'Odwiedzam Melę','Słucham z Melą','Continue',
   'Odwiedzam Borysa','Przytrzymuję trzcinę','Continue',
   'Odwiedzam Lunę','Układam znak z Luną','Continue',
@@ -160,4 +161,55 @@ export async function checkPolishPack({page,context,base,requests}) {
  await page.getByRole('button',{name:'Wróć do gier',exact:true}).click();await Promise.all([page.waitForResponse(r=>r.url().endsWith('/api/child-profile')&&r.request().method()==='PATCH'&&r.status()===200),page.locator('.locale-control select').first().selectOption('en')]);
  await page.getByRole('button',{name:'Play',exact:true}).click();await page.getByRole('button',{name:/Adventures/}).click();
  console.log('PASS: Polish reviewed ending bindings, offline Mission acceptance, optional dismissal, equally valid rest; packaged Polish authored Pack, three resolutions, optional companions, legal map movement, exact reload, EN/PL language labels and narrow/zoom/reduced motion');
+}
+
+
+async function checkLanternFeedback({page,game,choose}) {
+ const viewport=page.viewportSize();
+ await page.setViewportSize({width:360,height:640});
+ await page.emulateMedia({reducedMotion:'no-preference'});
+ const close=sheet=>sheet.getByRole('button',{name:'Close',exact:true}).click();
+ const tile=sheet=>sheet.locator('[data-place-id="old-lantern"]');
+ try{
+  let sheet=await openExpeditionMap(game);
+  assert.equal(await tile(sheet).locator('.game-tile-completion').count(),0);
+  await close(sheet);
+  await game.evaluate(node=>{
+   const encounter=node.querySelector('.game-encounter');
+   const animate=encounter.animate.bind(encounter);
+   encounter.animate=(...args)=>{
+    encounter.dataset.motionCount=String(Number(encounter.dataset.motionCount??0)+1);
+    return animate(...args);
+   };
+  });
+  await choose('Zabieram światło');
+  assert.equal(await game.locator('.game-encounter').getAttribute('data-motion-count'),'1');
+  sheet=await openExpeditionMap(game);
+  const fill=tile(sheet).locator('.game-tile-completion');
+  assert.equal(await fill.evaluate(node=>getComputedStyle(node).animationName),'game-honey-fill');
+  assert.equal(await tile(sheet).getAttribute('aria-current'),'location');
+  const card=await selectPlace(sheet,'old-lantern');
+  await card.getByText('Completed',{exact:true}).waitFor();
+  await page.emulateMedia({reducedMotion:'reduce'});
+  assert.equal(await fill.evaluate(node=>getComputedStyle(node).animationName),'none');
+  await close(sheet);
+  await choose('Continue');
+  assert.equal(await game.locator('.game-encounter').getAttribute('data-motion-count'),'1');
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  sheet=await openExpeditionMap(game);
+  assert.equal(await fill.evaluate(node=>getComputedStyle(node).animationName),'none');
+  assert.equal(await fill.evaluate(node=>getComputedStyle(node).fillOpacity),'0.58');
+  await close(sheet);
+  const menu=game.locator('.game-scene-menu > summary'),toggle=game.locator('.game-scene-menu button[aria-pressed]');
+  await menu.click();await toggle.click();
+  sheet=await openExpeditionMap(game);
+  await sheet.locator('.game-map-list').waitFor();
+  await tile(sheet).getByText(/Completed/).waitFor();
+  await close(sheet);
+  await menu.click();await toggle.click();
+ }finally{
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  await page.setViewportSize(viewport);
+ }
+ console.log('PASS: accepted Hive completion fills one map tile, with scene motion, reduced motion and Text mode');
 }

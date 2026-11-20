@@ -348,3 +348,27 @@ it.each(['legacy','episode'] as const)('shows all blocks in %s runs',async kind=
  expect(host.querySelector('.game-block[data-inactive]')).toBeNull();
  expect(host.querySelector('.game-encounter-content')?.textContent).toContain('Another block');
 });
+
+it.each([true,false])('shows saved Hive completion and animates only its first local map opening (%s)',async local=>{
+ const run=illustratedRun();
+ run.packId='capybee-new-hive';
+ run.view.places!.places.push({id:'old-lantern',label:'Latarnia',x:0,y:1});
+ run.view.places!.visitedPlaceIds.push('old-lantern');
+ run.view.objectives=[{id:'carry-memory',label:'Light',state:'ACTIVE'}];
+ const {accept}=await renderRun(run);
+ const tile=()=>host.querySelector('[data-place-id="old-lantern"]');
+ const open=()=>host.querySelector<HTMLButtonElement>('.game-map-button')!.click();
+ expect(tile()?.textContent).not.toContain('Completed');
+ if(local)await act(async()=>host.querySelector<HTMLButtonElement>('.game-actions button')!.click());
+ const finished=structuredClone(run);
+ finished.revision++;
+ finished.view.objectives[0].state='DONE';
+ await accept(finished);
+ await act(async()=>open());
+ expect(tile()?.textContent).toContain('Completed');
+ expect(tile()?.hasAttribute('data-new-completion')).toBe(local);
+ await act(async()=>host.querySelector<HTMLButtonElement>('.game-map-heading button')!.click());
+ await act(async()=>open());
+ expect(tile()?.hasAttribute('data-new-completion')).toBe(false);
+ expect(tile()?.textContent).toContain('Completed');
+});

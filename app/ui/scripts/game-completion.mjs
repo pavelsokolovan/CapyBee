@@ -60,8 +60,16 @@ export async function checkCompletion({page,context,base,requests}) {
  }finally{await peer.close();}
  // A fresh ending provides the opt-in cell UI; its projection is server-derived.
  await start();await finish();
+ assert.equal(await game.locator('.game-cell-glyph').count(),0);
+ await page.emulateMedia({reducedMotion:'no-preference'});
  const cell=game.getByRole('button',{name:'Add to my hive',exact:true});await cell.waitFor();await cell.click();
  await game.getByText('Added to your hive',{exact:true}).waitFor();
+ const glyph=game.locator('.game-cell-glyph');
+ assert.equal(await glyph.evaluate(node=>getComputedStyle(node).animationName),'game-cell-appear');
+ await page.emulateMedia({reducedMotion:'reduce'});
+ assert.equal(await glyph.evaluate(node=>getComputedStyle(node).animationName),'none');
+ assert.equal(await glyph.isVisible(),true);
+ await page.emulateMedia({reducedMotion:'no-preference'});
  const history=await (await context.request.get(base+'/api/games/results?limit=1000')).json();
  const rpg=history.filter(row=>row.gameKey==='capybee_rpg');assert.equal(rpg.length,1);assert.deepEqual(rpg[0].metrics,{});assert.equal(rpg[0].durationMs,0);
  assert.equal((await (await context.request.get(base+'/api/missions/completions')).json()).length,beforeCompletions);

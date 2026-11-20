@@ -59,3 +59,16 @@
  .game-map-list .game-map-tile[data-travel-state=unavailable]:not(:disabled) { opacity: 1; }
  .game-expedition .game-map-card button { background: ButtonFace; color: ButtonText; border-color: ButtonText; }
 }
+
+.game-map-grid .game-tile-completion {
+ fill: #f2b233;
+ fill-opacity: .58;
+}
+.game-map-card .game-map-completed { font-weight: 700; }
+@media (prefers-reduced-motion: no-preference) {
+ .game-map-tile[data-new-completion] .game-tile-completion { animation: game-honey-fill .42s ease-out; }
+}
+@keyframes game-honey-fill {
+ from { fill-opacity: 0; }
+ to { fill-opacity: .58; }
+}

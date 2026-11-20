@@ -126,3 +126,19 @@ body:has(.adventure-overlay .game-expedition) { min-width: 0; }
 @media (forced-colors: active) {
  .game-episode-interest button[aria-pressed=true] { background: Highlight; border-color: Highlight; color: HighlightText; }
 }
+
+.game-cell-status p { display: flex; align-items: center; gap: .5rem; }
+.game-cell-glyph {
+ display: inline-block; flex: none; inline-size: 1.25rem; block-size: 1.4rem;
+ background: #e8a92b; clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+}
+@media (prefers-reduced-motion: no-preference) {
+ .game-cell-status [data-new-cell] .game-cell-glyph { animation: game-cell-appear .35s ease-out; }
+}
+@keyframes game-cell-appear {
+ from { opacity: .35; transform: scale(.8); }
+ to { opacity: 1; transform: scale(1); }
+}
+@media (forced-colors: active) {
+ .game-cell-glyph { forced-color-adjust: none; background: CanvasText; }
+}

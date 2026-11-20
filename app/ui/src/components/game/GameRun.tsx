@@ -6,6 +6,7 @@ import {restoreGameSession} from '../../game/restoreGameSession';
 import {SceneBlocks,SceneActions,ScenePanels,SceneResult,hasTextInput} from './GameScene';
 import {adventureCopy} from '../../game/adventureCopy';
 import {adventureLocation,adventureTitle} from '../../game/savedAdventure';
+import {completedHivePlaces} from '../../game/hiveCompletion';
 import {sceneFirstKind} from '../../game/sceneFirst';
 import {focusScene,resetSceneScroll} from '../../game/sceneScroll';
 import {EpisodeInterest} from './EpisodeInterest';
@@ -38,6 +39,9 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
  const heading=useRef<HTMLHeadingElement>(null),runHeading=useRef<HTMLHeadingElement>(null),abandon=useRef<HTMLButtonElement>(null),dialog=useRef<HTMLDialogElement>(null);
  const mapDialog=useRef<HTMLDialogElement>(null),mapButton=useRef<HTMLButtonElement>(null);
  const menu=useRef<HTMLDetailsElement>(null),menuSummary=useRef<HTMLElement>(null);
+ const pendingFills=useRef(new Set<string>());
+ const [animatedFills,setAnimatedFills]=useState<string[]>([]);
+ const encounter=useRef<HTMLDivElement>(null);
  const [mapOpen,setMapOpen]=useState(false),[selectedPlace,setSelectedPlace]=useState<string|null>(null);
  useEffect(()=>{let alive=true;void controller.initialize().then(()=>{if(alive)setInitialized(true);}).catch(()=>{});return()=>{alive=false;controller.detach();};},[controller]);
 
@@ -51,10 +55,11 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
  const mapAvailable=expedition&&!!places?.places.length;
  const hasSceneHeading=expedition&&!!view;
  const currentLocation=adventureLocation(view);
- const intention=useRef<{command:GameCommand;revision:number;runId:string;entry:boolean}|null>(null);
+ const intention=useRef<{command:GameCommand;revision:number;runId:string;entry:boolean;completedPlaces:string[]}|null>(null);
  const focusBaseline=useRef<string|null>(null);
  const submit=(command:GameCommand)=>{
   intention.current={command,revision:state.run.revision,runId:state.run.runId,
+   completedPlaces:expedition?completedHivePlaces(state.run):[],
    entry:command.type==='MOVE'&&view?.places?.places.find(p=>p.id===command.placeId)?.moveBehavior==='ENTER_SCENE'};
   return controller.submit(command);
  };
@@ -64,17 +69,29 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
   if(focusBaseline.current!==state.run.runId){
    focusBaseline.current=state.run.runId;
    intention.current=null;
+   pendingFills.current.clear();
+   setAnimatedFills([]);
    if(expedition)resetSceneScroll(overlay);
    focusScene((episodeCompleted?endingHeading:hasSceneHeading?runHeading:heading).current,scroller);
    return;
   }
   const requested=intention.current;
   if(!requested||state.pending)return;
+  const feedback=()=>{
+   for(const place of completedHivePlaces(state.run)){
+    if(!requested.completedPlaces.includes(place))pendingFills.current.add(place);
+   }
+   if(requested.command.type!=='ABANDON'&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    encounter.current?.animate?.([{opacity:.78},{opacity:1}],{duration:220,easing:'ease-out'});
+   }
+  };
   if(expedition&&requested.command.type==='MOVE'){
    const accepted=state.message==='saved'&&state.run.revision>requested.revision;
    if(!accepted&&state.message!=='rejected'&&state.message!=='changed')return;
    intention.current=null;
    if(accepted&&requested.entry){
+    feedback();
+    setAnimatedFills([]);
     mapDialog.current?.close();
     setMapOpen(false);
     focusScene(heading.current,scroller);
@@ -87,6 +104,7 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
   if(state.run.revision<=requested.revision){if(state.message==='rejected')intention.current=null;return;}
   intention.current=null;
   if(state.message!=='saved'||requested.runId!==state.run.runId)return;
+  if(expedition)feedback();
   if(episode&&episodeMap.current)episodeMap.current.open=false;
   if(episodeCompleted)focusScene(endingHeading.current,scroller);
   else if(episode||expedition||requested.command.type!=='MOVE'||requested.entry||ended)focusScene(heading.current,scroller);
@@ -94,17 +112,19 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
    const cell=[...document.querySelectorAll<HTMLElement>('.game-run [data-place-id]')].find(n=>n.dataset.placeId===view?.places?.currentPlaceId);
    cell?.querySelector<HTMLButtonElement>('button')?.focus();
   }
- },[state.run.runId,state.run.revision,state.pending,state.message,ended,episode,episodeCompleted,expedition,hasSceneHeading,places?.currentPlaceId]);
+ },[state.run,state.pending,state.message,ended,episode,episodeCompleted,expedition,hasSceneHeading,places?.currentPlaceId]);
  const closeMenu=()=>{if(menu.current)menu.current.open=false;menuSummary.current?.focus();};
  const openMap=()=>{
   if(!mapDialog.current)return;
   if(menu.current)menu.current.open=false;
   setSelectedPlace(places?.currentPlaceId??null);
+  setAnimatedFills([...pendingFills.current]);
+  pendingFills.current.clear();
   mapDialog.current.showModal();
   setMapOpen(true);
   mapDialog.current.querySelector('h3')?.focus();
  };
- const closeMap=()=>{mapDialog.current?.close();setMapOpen(false);mapButton.current?.focus();};
+ const closeMap=()=>{mapDialog.current?.close();setMapOpen(false);setAnimatedFills([]);mapButton.current?.focus();};
  const cancel=()=>{dialog.current?.close();(expedition?menuSummary:abandon).current?.focus();};
  const title=adventureTitle(state.run);
  const endingLabel=view?.endReason==='ABANDONED' ? c.abandoned : 'Zagadka rozwiązana';
@@ -128,7 +148,7 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
   {state.cancellable?<button type="button" onClick={()=>void controller.removeUnsent()}>{c.remove}</button>:null}
   {state.pending?<button type="button" onClick={()=>void controller.check()}>{c.check}</button>:null}
  </>:null;
- const completion=!episode&&ended?<>{view?.endReason==='COMPLETED'?<GameCompletion owner={owner} runId={state.run.runId} revision={state.run.revision} locale={locale}/>:null}
+ const completion=!episode&&ended?<>{view?.endReason==='COMPLETED'?<GameCompletion key={`${owner}:${state.run.runId}`} owner={owner} runId={state.run.runId} revision={state.run.revision} locale={locale}/>:null}
   <button type="button" onClick={onAnother}>{c.newGame}</button></>:null;
  const exit=<>
   {!expedition&&state.run.status==='ACTIVE'?<button type="button" ref={abandon} disabled={locked} onClick={()=>dialog.current?.showModal()}>{c.abandon}</button>:null}
@@ -158,11 +178,12 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
    {mapAvailable&&mapOpen?null:status}
    {mapAvailable&&places?<ExpeditionMap places={places} presentation={presentation} locale={locale} dialog={mapDialog}
     selectedId={selectedPlace} onSelect={setSelectedPlace} onClose={closeMap} textMode={textMode}
-    pending={state.pending} locked={locked} status={mapOpen?status:null} submit={submit}/>:null}
+    pending={state.pending} locked={locked} status={mapOpen?status:null} submit={submit}
+    completedPlaces={completedHivePlaces(state.run)} animatedFills={animatedFills}/>:null}
    <div className="game-scene-body" ref={sceneBody}>
     {titleHeading}{notices}
     {view?<>
-    <GameEncounter view={view} stage caption={caption} textMode={textMode}>
+    <GameEncounter view={view} stage caption={caption} textMode={textMode} encounterRef={encounter}>
      <SceneBlocks key={JSON.stringify([state.run.runId,view.blocks])} view={view} locale={controlsLocale}
       progressive={!!presentation}/>
     </GameEncounter>

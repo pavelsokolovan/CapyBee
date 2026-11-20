@@ -17,12 +17,14 @@ type Props = {
   locked: boolean;
   pending: boolean;
   textMode: boolean;
+  completedPlaces: readonly string[];
+  animatedFills: readonly string[];
   status: ReactNode;
   submit: (command: GameCommand) => void;
 };
 
 export function ExpeditionMap({places, presentation, locale, dialog, onClose, selectedId, onSelect,
-  locked, pending, textMode, status, submit}: Props) {
+  locked, pending, textMode, status, submit, completedPlaces, animatedFills}: Props) {
   const titleId = useId(), copy = runCopy[locale], board = boardCopy[locale];
   const scroll = useRef<HTMLDivElement>(null);
   const layout = hexLayout(places), columns = layout?.columns;
@@ -71,17 +73,19 @@ export function ExpeditionMap({places, presentation, locale, dialog, onClose, se
           {places.places.map((place, index) => {
             const here = place.id === places.currentPlaceId, canGo = reachable(place.id);
             const wasVisited = !here && visited(place.id), picked = place.id === selected.id;
+            const completed = completedPlaces.includes(place.id);
             const terrain = presentation?.places.find(asset => asset.placeId === place.id)?.terrainAssetId;
             const state = here ? 'current' : canGo ? 'available' : 'unavailable';
             return <li key={`${place.id}-${index}`} style={graphical ? layout.cells[index] : undefined}>
               <button type="button" className="game-map-tile" data-place-id={place.id} data-travel-state={state}
+                data-new-completion={completed&&animatedFills.includes(place.id)?true:undefined}
                 aria-current={here ? 'location' : undefined} aria-pressed={picked}
                 disabled={pending} onClick={()=>onSelect(place.id)}>
                 {graphical ? <GameTileArt assetId={terrain} playerAssetId={presentation.playerAssetId}
-                  states={[state,...(wasVisited?['visited' as const]:[]),...(picked?['selected' as const]:[])]}/> : null}
+                  completed={completed} states={[state,...(wasVisited?['visited' as const]:[]),...(picked?['selected' as const]:[])]}/> : null}
                 <strong>{place.label}</strong>
                 <small className={graphical && !here ? 'game-visually-hidden' : undefined} lang={locale}>
-                  {here ? board.youAreHere : <>{wasVisited ? `${copy.visited}. ` : null}{canGo ? copy.moveAvailable : board.noRoute}</>}
+                  {completed ? `${board.completed}. ` : null}{here ? board.youAreHere : <>{wasVisited ? `${copy.visited}. ` : null}{canGo ? copy.moveAvailable : board.noRoute}</>}
                 </small>
               </button>
             </li>;
@@ -91,6 +95,7 @@ export function ExpeditionMap({places, presentation, locale, dialog, onClose, se
       <div className="game-map-card" aria-live="polite">
         <h4>{selected.label}</h4>
         <p className="game-map-state" lang={prerequisite ? undefined : locale}>{detailState}</p>
+        {completedPlaces.includes(selected.id)?<p className="game-map-completed" lang={locale}>{board.completed}</p>:null}
         <p lang={selected.description ? undefined : locale}>{selected.description ?? copy.noDescription}</p>
         {legal ? <>
           {locked ? <p lang={locale}>{copy.mapLocked}</p> : null}

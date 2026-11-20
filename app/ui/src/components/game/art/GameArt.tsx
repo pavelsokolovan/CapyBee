@@ -42,11 +42,12 @@ export function GameMotif({assetId, ...a11y}: ArtAccessibility & {assetId?: Moti
 
 export type TileState = 'current' | 'visited' | 'available' | 'unavailable' | 'selected' | 'pending';
 /** Presentation only; the host supplies semantic state text and owns all interaction. */
-export function GameTileArt({assetId, states = [], playerAssetId = "character.capy", showPlayer = true}: {assetId?: TerrainId; states?: readonly TileState[]; playerAssetId?: CharacterId | null; showPlayer?: boolean}) {
+export function GameTileArt({assetId, states = [], playerAssetId = "character.capy", showPlayer = true, completed = false}: {assetId?: TerrainId; states?: readonly TileState[]; playerAssetId?: CharacterId | null; showPlayer?: boolean; completed?: boolean}) {
   const current = states.includes('current');
   return <span className="game-tile-art" data-states={states.join(' ')} aria-hidden="true">
     <GameTerrain assetId={assetId} decorative/>
     <svg className="game-tile-outline" viewBox="0 0 120 140" focusable="false">
+      {completed && <polygon points={hexPoints} className="game-tile-completion"/>}
       <polygon points={hexPoints} className="game-tile-boundary"/>
       {current && <polygon points={hexPoints} transform="translate(6 7) scale(.9)" className="game-tile-inset"/>}
       {states.includes('selected') && <polygon points={hexPoints} transform="translate(14 16) scale(.77)" className="game-tile-inset"/>}

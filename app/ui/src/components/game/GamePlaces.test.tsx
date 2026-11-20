@@ -106,7 +106,7 @@ it('uses one selectable button per place and exposes the prerequisite and travel
  function Sheet({locked}:{locked:boolean}){
   const dialog=useRef<HTMLDialogElement>(null),[selectedId,onSelect]=useState<string|null>(null);
   return <ExpeditionMap places={places} dialog={dialog} onClose={()=>{}} selectedId={selectedId} onSelect={onSelect}
-   locale="en" pending={false} textMode={false} locked={locked} status={null} submit={submit}/>;
+   locale="en" pending={false} textMode={false} locked={locked} status={null} submit={submit} completedPlaces={[]} animatedFills={[]}/>;
  }
   await act(async()=>root.render(<Sheet locked={false}/>));
   expect(host.querySelectorAll('li > button[data-place-id]')).toHaveLength(3);
