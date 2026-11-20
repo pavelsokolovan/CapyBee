@@ -19,6 +19,7 @@ try {
  await page.goto(base);await page.getByRole('button',{name:'Play',exact:true}).click();
  await page.getByRole('button',{name:/Adventures/}).click();
  await page.getByRole('button',{name:/New AI-created adventure/}).click();
+ await page.getByRole('button',{name:/^Customize adventure/}).click();
  await page.getByRole('button',{name:'Next',exact:true}).click();
  await page.getByRole('button',{name:'Next',exact:true}).click();
  await page.getByRole('button',{name:'Next',exact:true}).click();
@@ -64,11 +65,9 @@ try {
   assert.ok(requests.length>beforeCommands);
  }
  await gameplay.getByRole('button',{name:'Start another adventure',exact:true}).click();
- // A separate authored fixture exercises explicit Continue in Polish.
+ // Quick Start jumps into the authored adventure with a legal random preset.
  await page.getByRole('button',{name:/Fixture — Minimal/}).click();
- while(await page.getByRole('button',{name:'Next',exact:true}).count())await page.getByRole('button',{name:'Next',exact:true}).click();
- await page.getByRole('button',{name:'Review',exact:true}).click();
- await page.getByRole('button',{name:'Start adventure',exact:true}).click();
+ await page.getByRole('button',{name:/^Quick start/}).click();
  await gameplay.getByRole('button',{name:'Wsiadam do łódki',exact:true}).click();
  await gameplay.getByRole('button',{name:'Continue',exact:true}).click();
  await gameplay.getByRole('button',{name:'Start another adventure',exact:true}).waitFor();
@@ -89,6 +88,7 @@ try {
  await gameplay.getByRole('button',{name:'Start another adventure',exact:true}).waitFor();
  await gameplay.getByRole('button',{name:'Start another adventure',exact:true}).click();
  await page.getByRole('button',{name:/Fixture — Minimal/}).click();
+ await page.getByRole('button',{name:/^Customize adventure/}).click();
  while(await page.getByRole('button',{name:'Next',exact:true}).count())await page.getByRole('button',{name:'Next',exact:true}).click();
  await page.getByRole('button',{name:'Review',exact:true}).click();await page.getByRole('button',{name:'Start adventure',exact:true}).click();
  const endButton=gameplay.getByRole('button',{name:'End adventure',exact:true});await endButton.click();

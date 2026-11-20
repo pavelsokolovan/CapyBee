@@ -146,7 +146,7 @@ it('clears a previously active current run when the server reports none after an
  const h=harness();vi.mocked(h.transport.read).mockImplementation(async(path:string)=>({status:200,body:path.endsWith('/current')?contracts.dynamic:path.endsWith('/capabilities')?caps:path.endsWith('/packs')?[pack]:[profile]}));
  await h.flow.load(false);expect(h.flow.getSnapshot().current?.status).toBe('ACTIVE');
  vi.mocked(h.transport.read).mockImplementation(async(path:string)=>({status:path.endsWith('/current')?404:200,body:path.endsWith('/capabilities')?caps:path.endsWith('/packs')?[pack]:[profile]}));
- await h.flow.load(false);expect(h.flow.getSnapshot().current).toBeNull();h.flow.select({kind:'PACK',pack});expect(h.flow.getSnapshot().phase).toBe('setup');h.flow.dispose();
+ await h.flow.load(false);expect(h.flow.getSnapshot().current).toBeNull();h.flow.select({kind:'PACK',pack});expect(h.flow.getSnapshot().phase).toBe('mode');h.flow.dispose();
 });
 
 describe('transient Pack preparation',()=>{

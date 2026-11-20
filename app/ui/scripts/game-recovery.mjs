@@ -10,6 +10,7 @@ async function open(page,base){await page.goto(base);await page.getByRole('butto
 async function start(page,name,generated=false){
  const another=page.getByRole('button',{name:'Start another adventure',exact:true});if(await another.count())await another.click();
  await page.getByRole('button',{name,exact:false}).click();
+ await page.getByRole('button',{name:/^Customize adventure/}).click();
  if(generated)await page.getByRole('checkbox',{name:/generated|AI/i}).check();
  while(await page.getByRole('button',{name:'Next',exact:true}).count())await page.getByRole('button',{name:'Next',exact:true}).click();
  await page.getByRole('button',{name:'Review',exact:true}).click();await page.getByRole('button',{name:'Start adventure',exact:true}).click();
@@ -75,6 +76,7 @@ export async function checkRecovery({page,context,base,requests,logs}){
  // Lose a confirmed start response and reload while the foreground POST is unresolved.
  await page.getByRole('button',{name:'End adventure',exact:true}).click();await page.locator('dialog').getByRole('button',{name:'End adventure',exact:true}).click();await page.getByText('Abandoned',{exact:true}).waitFor();
  await page.getByRole('button',{name:'Start another adventure',exact:true}).click();await page.getByRole('button',{name:/New AI-created adventure/}).click();
+ await page.getByRole('button',{name:/^Customize adventure/}).click();
  while(await page.getByRole('button',{name:'Next',exact:true}).count())await page.getByRole('button',{name:'Next',exact:true}).click();
  await page.getByRole('button',{name:'Review',exact:true}).click();
  let published=false,startId,release;

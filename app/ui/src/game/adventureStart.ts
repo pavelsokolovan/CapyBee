@@ -2,10 +2,10 @@ import {anonymousNotePackId} from './anonymousNote';
 import type { GameCapabilities, GamePackInfoDto, GameRunSummaryDto, GeneratorProfile } from './gameApi';
 import { decodeCapabilities, decodePack, decodeProfile, decodeSummary, object } from './gameDecoders';
 import { type GameReply, type OperationMarker } from '../offline/syncEngine';
-import { compatible, compatibleAnswers, transientPack, initialAnswers, startBody, type Adventure, type Answers } from './preparation';
+import { compatible, compatibleAnswers, transientPack, hasCustomization, initialAnswers, randomAnswers, startBody, type Adventure, type Answers } from './preparation';
 import type { AdventureMessage } from './adventureCopy';
 import {hasActiveAdventure} from './savedAdventure';
-export type StartPhase='catalog'|'setup'|'review'|'waiting'|'resuming'|'ready'|'unknown'|'needsInput'|'fallback'|'cancelled'|'failed'|'signin';
+export type StartPhase='catalog'|'mode'|'setup'|'review'|'waiting'|'resuming'|'ready'|'unknown'|'needsInput'|'fallback'|'cancelled'|'failed'|'signin';
 export interface StartState {
  phase:StartPhase; loading:boolean; message?:AdventureMessage; caps?:GameCapabilities; games:Adventure[];
  current:GameRunSummaryDto|null; ready:GameRunSummaryDto|null; selected:Adventure|null;
@@ -105,15 +105,23 @@ export class AdventureStart {
   if(this.value.current?.status==='PREPARING'){this.update({message:'waitHint'});return;}
   if(game.kind==='PACK' && !transientPack(game) && this.value.current && ['ACTIVE','PREPARING'].includes(this.value.current.status)){this.update({message:'packConflict'});return;}
   const direct = game.kind==='PACK' && game.pack.id===anonymousNotePackId;
-  this.generation++;this.pollAbort?.abort();this.forget();this.update({selected:game,answers:initialAnswers(game,this.locale),generated:false,replacement:false,step:0,phase:direct?'review':'setup',message:undefined,clearIdea:this.value.clearIdea+1});
+  this.generation++;this.pollAbort?.abort();this.forget();this.update({selected:game,answers:initialAnswers(game,this.locale),generated:false,replacement:false,step:0,phase:direct?'review':hasCustomization(game,this.value.caps)?'mode':'setup',message:undefined,clearIdea:this.value.clearIdea+1});
   if(direct)void this.confirm('');
+ }
+ manualSetup(){if(this.value.phase==='mode')this.update({phase:'setup',message:undefined});}
+ async quickStart(){
+  const selected=this.value.selected;
+  if(this.value.phase!=='mode'||!selected||!navigator.onLine)return;
+  if(selected.kind==='PACK'&&this.value.current?.status==='ACTIVE'){this.update({message:'packConflict'});return;}
+  this.update({answers:randomAnswers(selected,this.locale),generated:false,replacement:false,phase:'review',message:undefined,clearIdea:this.value.clearIdea+1});
+  if(selected.kind==='PACK')await this.confirm('');
  }
  answer(id:string,values:string[]) {if(this.sending)return;this.update({answers:{...this.value.answers,[id]:values},phase:'setup'});}
  generated(value:boolean) {if(!this.sending)this.update({generated:value,phase:'setup'});}
  replacement(value:boolean){if(!this.sending)this.update({replacement:value});}
  step(index:number){if(!['setup','review'].includes(this.value.phase)){this.generation++;this.pollAbort?.abort();this.sending=false;}this.update({step:Math.max(0,index),phase:'setup',message:undefined});}
  review(){if(this.value.selected)this.update({phase:'review',message:undefined});}
- back(){if(this.value.phase==='review')this.update({phase:'setup'});else if(this.value.phase==='setup' && this.value.step>0)this.step(this.value.step-1);else this.catalog();}
+ back(){if(this.value.phase==='review')this.update({phase:'setup'});else if(this.value.phase==='setup' && this.value.step>0)this.step(this.value.step-1);else if(this.value.phase==='setup' && this.value.selected && hasCustomization(this.value.selected,this.value.caps))this.update({phase:'mode',message:undefined});else this.catalog();}
  catalog(){this.generation++;this.pollAbort?.abort();this.sending=false;this.update({phase:'catalog',selected:null,message:undefined,clearIdea:this.value.clearIdea+1});}
  async shellLocale(locale:string) {
   this.locale=locale;this.transport.setLanguage(locale);

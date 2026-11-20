@@ -34,6 +34,7 @@ describe('preparation panel',()=>{
   const h=harness(),copy=adventureCopy[locale];
   await act(async()=>root.render(<AdventurePreparation owner="owner" locale={locale} onClose={h.close} flow={h.flow}/>));
   await click(contracts.profile.title);
+  await click(copy.customize);
   expect(host.querySelectorAll('input[type=checkbox]')).toHaveLength(2);
   await click(copy.next);await click(copy.next);await click(copy.next);
   const area=host.querySelector('textarea')!;expect(area).toBeTruthy();
@@ -63,4 +64,62 @@ describe('preparation panel',()=>{
   await act(async()=>window.dispatchEvent(new Event('online')));
   expect(h.transport.transient).not.toHaveBeenCalled();
  });
+});
+
+it('offers a catalog retry only until loading succeeds',async()=>{
+ const h=harness(),read=vi.mocked(h.transport.read);
+ read.mockResolvedValueOnce({status:503,body:{code:'SERVICE_UNAVAILABLE'}});
+ await act(async()=>root.render(<AdventurePreparation owner="owner" locale="en" onClose={h.close} flow={h.flow}/>));
+ expect(host.textContent).toContain(adventureCopy.en.unavailable);
+ await click(adventureCopy.en.catalogRetry);
+ expect(host.textContent).not.toContain(adventureCopy.en.catalogRetry);
+ const card=host.querySelector('.adventure-catalog-row');
+ expect(card?.querySelector('strong')?.textContent).toBe(contracts.profile.title);
+ expect(card?.querySelector('span')?.textContent).toBe(adventureCopy.en.dynamic);
+});
+
+it('shows the pack title once in manual setup and starts an authored pack with random presets',async()=>{
+ const h=harness(),copy=adventureCopy.en,title='Reviewed game';
+ const input=(contracts.profile as GeneratorProfile).inputs.find(i=>i.id==='tone')!;
+ const pack={id:'fixture',version:'1.0.0',locales:['en'],defaultLocale:'en',startInputs:[],generated:false,
+  setup:{schemaVersion:1,metadataLocale:'en',title,description:null,transientTextSupported:false,
+   steps:[{id:'setup',title,inputIds:[input.id]}],inputs:[input]}};
+ const fallback=vi.mocked(h.transport.read).getMockImplementation()!;
+ vi.mocked(h.transport.read).mockImplementation(path=>path.endsWith('/packs')
+  ?Promise.resolve({status:200,body:[pack]}):fallback(path));
+ vi.spyOn(Math,'random').mockReturnValue(0);
+ await act(async()=>root.render(<AdventurePreparation owner="owner" locale="en" onClose={h.close} flow={h.flow}/>));
+ await click(title);
+ expect(host.querySelector('fieldset')).toBeNull();
+ await click(copy.customize);
+ expect(Array.from(host.querySelectorAll('h3,h4')).filter(h=>h.textContent===title)).toHaveLength(1);
+ expect(host.querySelector('fieldset')).not.toBeNull();
+ const back=Array.from(host.querySelectorAll('button')).find(button=>button.textContent===copy.back)!;
+ await act(async()=>back.click());
+ await click(copy.quickStart);
+ expect(h.transport.transient).toHaveBeenCalledExactlyOnceWith(expect.anything(),'POST',
+  expect.objectContaining({packId:pack.id,generated:false,locale:'en',startInputs:{tone:input.options[0].id}}));
+});
+
+it('reviews random AI presets before sending a start request',async()=>{
+ const h=harness(),copy=adventureCopy.en;
+ await act(async()=>root.render(<AdventurePreparation owner="owner" locale="en" onClose={h.close} flow={h.flow}/>));
+ await click(contracts.profile.title);
+ await click(copy.customize);
+ for(let step=0;step<3;step++)await click(copy.next);
+ const area=host.querySelector('textarea')!;
+ await act(async()=>{
+  const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value')!.set!;
+  setter.call(area,'private-draft');
+  area.dispatchEvent(new Event('input',{bubbles:true}));
+ });
+ expect(area.value).toBe('private-draft');
+ await act(async()=>{while(h.flow.getSnapshot().phase==='setup')h.flow.back();});
+ await click(copy.quickStart);
+ expect(host.textContent).toContain(copy.ideaNone);
+ expect(host.textContent).toContain(copy.disclosure);
+ expect(h.transport.transient).not.toHaveBeenCalled();
+ await click(copy.start);
+ expect(h.transport.transient).toHaveBeenCalledTimes(1);
+ expect(vi.mocked(h.transport.transient).mock.calls[0][2]).not.toHaveProperty('suggestion');
 });

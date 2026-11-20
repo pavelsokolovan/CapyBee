@@ -5,6 +5,7 @@ import {GameTransport} from '../../offline/syncEngine';
 import {AdventureStart} from '../../game/adventureStart';
 import {adventureCopy} from '../../game/adventureCopy';
 import {compatible,transientPack,effective,inputsOf,localesOf,titleOf,validation,codePoints,type Adventure} from '../../game/preparation';
+import {hiveExpeditionPackId} from '../../game/hiveExpedition';
 import {anonymousNotePackId} from '../../game/anonymousNote';
 import {adventureLocation,adventureTitle} from '../../game/savedAdventure';
 import {sceneFirstKind} from '../../game/sceneFirst';
@@ -105,14 +106,33 @@ export function AdventurePreparation({owner,locale,onClose,resumeRunId,onRunRead
      <button type="button" className="primary-button" onClick={()=>void flow.resume()}>{copy.continue}</button></section>:null}
     <h3>{copy.newGame}</h3>
     {!state.loading&&!state.games.length&&!state.message?<p>{copy.empty}</p>:null}
-    {state.games.map(game=><button type="button" className="play-game-row" key={`${game.kind}:${game.kind==='DYNAMIC'?game.profile.id:game.pack.id}`}
-      disabled={state.loading||!compatible(game)||!state.caps?.viewFeatures.includes('canAdvance')} onClick={()=>select(game)}>
-      <span><strong>{titleOf(game)||copy.unsupported}</strong><small>{!compatible(game)?copy.unsupported:game.kind==='DYNAMIC'?copy.dynamic:copy.authored}</small>{game.kind==='PACK'&&game.pack.locales.length===1?<small>{copy.locale}: {new Intl.DisplayNames([locale],{type:'language'}).of(game.pack.locales[0])}</small>:null}</span>
-    </button>)}
-    <button type="button" className="secondary-button" onClick={()=>void flow.load()} disabled={state.loading}>{copy.retry}</button>
+    {state.games.map(game=>{
+     const supported=compatible(game),pack=game.kind==='PACK'?game.pack:null;
+     const description=!supported?copy.unsupported:!pack?copy.dynamic
+      :pack.id===anonymousNotePackId?copy.mysteryDescription:pack.id===hiveExpeditionPackId?copy.hiveDescription:copy.authored;
+     return <button type="button" className="play-game-row adventure-catalog-row"
+      key={game.kind==='PACK'?`PACK:${game.pack.id}`:`DYNAMIC:${game.profile.id}`}
+      disabled={state.loading||!supported||!state.caps?.viewFeatures.includes('canAdvance')} onClick={()=>select(game)}>
+      <strong>{titleOf(game)||copy.unsupported}</strong>
+      <span>{description}</span>
+      {pack?.locales.length===1?<small>{copy.locale}: {new Intl.DisplayNames([locale],{type:'language'}).of(pack.locales[0])}</small>:null}
+     </button>;
+    })}
+    {(state.message==='unavailable'||state.message==='offline')&&!state.loading?
+     <button type="button" className="secondary-button" onClick={()=>void flow.load()}>{copy.catalogRetry}</button>:null}
+   </>:null}
+   {state.phase==='mode'&&selected?<>
+    <h3>{titleOf(selected)}</h3>
+    <button type="button" className="play-game-row adventure-catalog-row" disabled={!online||state.loading}
+     onClick={()=>void flow.quickStart()}><strong>{copy.quickStart}</strong><span>{copy.quickDescription}</span></button>
+    <button type="button" className="play-game-row adventure-catalog-row"
+     onClick={()=>{setInvalid(false);flow.manualSetup();}}><strong>{copy.customize}</strong><span>{copy.customizeDescription}</span></button>
+    {!online?<p>{copy.offline}</p>:null}
+    <button type="button" className="secondary-button" onClick={()=>flow.back()}>{copy.back}</button>
    </>:null}
    {state.phase==='setup'&&selected?<>
-    <h3>{titleOf(selected)}</h3><h4>{currentStep?.title??copy.reviewTitle}</h4>
+    <h3>{titleOf(selected)}</h3>
+    {currentStep?.title.trim()&&currentStep.title.trim()!==titleOf(selected).trim()?<h4>{currentStep.title}</h4>:null}
     {currentInputs.map(renderInput)}
     {!allInputs.some(i=>i.id==='game-locale')?<label className="adventure-field">{copy.locale}<select value={state.answers['game-locale']?.[0]} onChange={e=>flow.answer('game-locale',[e.target.value])}>
       {localesOf(selected).map(l=><option value={l} key={l}>{l==='pl'?'Polski':l==='en'?'English':l}</option>)}

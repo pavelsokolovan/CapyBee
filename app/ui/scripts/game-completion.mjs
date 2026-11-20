@@ -4,6 +4,7 @@ export async function checkCompletion({page,context,base,requests}) {
  const start=async()=>{
   const another=game.getByRole('button',{name:'Start another adventure',exact:true});if(await another.count())await another.click();
   await page.getByRole('button',{name:/Fixture — Minimal/}).click();
+ await page.getByRole('button',{name:/^Customize adventure/}).click();
   while(await page.getByRole('button',{name:'Next',exact:true}).count())await page.getByRole('button',{name:'Next',exact:true}).click();
   await page.getByRole('button',{name:'Review',exact:true}).click();await page.getByRole('button',{name:'Start adventure',exact:true}).click();
   await game.waitFor();await page.waitForFunction(()=>document.querySelector('.game-run [role=status]')?.textContent==='Saved');

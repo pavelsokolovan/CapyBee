@@ -35,6 +35,18 @@ export function initialAnswers(game:Adventure, shellLocale:string):Answers {
   const locale=localesOf(game).includes(shellLocale) ? shellLocale : game.kind==='DYNAMIC' ? game.profile.defaultLocale : game.pack.defaultLocale;
   return {'game-locale':[locale]};
 }
+export function hasCustomization(game:Adventure, caps:GameCapabilities|undefined) {
+  return inputsOf(game).length>0 || localesOf(game).length>1
+    || (game.kind==='PACK' && game.pack.generated && caps?.packGenerationEnabled===true);
+}
+export function randomAnswers(game:Adventure, shellLocale:string):Answers {
+  const answers=initialAnswers(game,shellLocale);
+  for(const input of inputsOf(game)){
+    if(input.kind==='FREE_TEXT' || input.id==='game-locale' || input.id==='mood' && !input.required)continue;
+    if(input.options.length)answers[input.id]=[input.options[Math.floor(Math.random()*input.options.length)].id];
+  }
+  return answers;
+}
 /** Public preset state only. Never pass private text to a persistence helper. */
 export function compatibleAnswers(game:Adventure, answers:Answers):Answers {
   const result:Answers={};

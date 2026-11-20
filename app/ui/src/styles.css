@@ -2212,6 +2212,10 @@ a:hover {
 .adventure-panel dt { font-weight:700; }
 .adventure-panel dd { margin:4px 0 0; }
 .adventure-panel .play-game-row { margin-bottom:12px; width:100%; text-align:left; }
+.adventure-panel .adventure-catalog-row { display:grid; gap:.3rem; padding:.8rem 1rem; line-height:1.4; }
+.adventure-catalog-row strong { font-size:1.05em; }
+.adventure-catalog-row span { font-size:.95em; }
+.adventure-catalog-row small { font-size:.8em; }
 .adventure-field { display:block; border:1px solid #d5b977; border-radius:16px; padding:16px; margin:16px 0; min-width:0; }
 .adventure-field legend { padding:0 6px; font-weight:700; }
 .adventure-option { display:flex; align-items:center; gap:12px; min-height:44px; padding:8px; }

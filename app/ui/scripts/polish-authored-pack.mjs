@@ -47,7 +47,10 @@ export async function checkPolishPack({page,context,base,requests}) {
   if(await another.count())await another.click();
   const pack=page.getByRole('button',{name:/CapyBee — Nowy ul, dwa światła/});
   assert.ok((await pack.innerText()).includes(locale==='en'?'Story language: Polish':'Język historii: polski'));
-  await pack.click();assert.equal(await page.getByRole('checkbox',{name:/Use AI narration|Użyj narracji AI/}).count(),1);
+  await pack.click();
+  await page.getByRole('button',{name:/^Customize adventure|^Dostosuj przygodę/}).click();
+  assert.equal(await page.getByRole('heading',{name:'CapyBee — Nowy ul, dwa światła',exact:true}).count(),1);
+  assert.equal(await page.getByRole('checkbox',{name:/Use AI narration|Użyj narracji AI/}).count(),1);
   await page.getByRole('button',{name:locale==='en'?'Review':'Sprawdź',exact:true}).click();
   const before=requests.length;
   const viewport=page.viewportSize();

@@ -6,6 +6,7 @@ import {checkShortPolishBeat} from './game-expeditions.mjs';
 export async function checkPolishGeneration({page,context,base,requests,logs}) {
  const idea='Fikcyjna baśń srebrnego liścia '+crypto.randomUUID().replace(/[0-9]/g,d=>String.fromCharCode(107+Number(d)));
  await page.getByRole('button',{name:/CapyBee — Nowy ul, dwa światła/}).click();
+ await page.getByRole('button',{name:/^Customize adventure/}).click();
  await page.getByRole('checkbox',{name:'Use AI narration',exact:true}).check();
  const area=page.locator('textarea');await area.fill('😀'.repeat(241));
  await page.getByRole('button',{name:'Review',exact:true}).click();await page.getByText('Your idea is too long. Shorten it before continuing.',{exact:true}).waitFor();
@@ -55,6 +56,7 @@ export async function checkPolishGeneration({page,context,base,requests,logs}) {
  await game.getByRole('button',{name:'Odpoczywam na dziś',exact:true}).click();await game.getByRole('button',{name:'Start another adventure',exact:true}).waitFor();
  await game.getByRole('button',{name:'Start another adventure',exact:true}).click();
  await page.getByRole('button',{name:/CapyBee — Nowy ul, dwa światła/}).click();
+ await page.getByRole('button',{name:/^Customize adventure/}).click();
  await page.getByRole('checkbox',{name:'Use AI narration',exact:true}).check();
  await page.getByRole('button',{name:'Review',exact:true}).click();
  await page.getByRole('button',{name:'Start adventure',exact:true}).click();
