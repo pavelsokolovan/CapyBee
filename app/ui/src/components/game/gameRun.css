@@ -33,11 +33,11 @@
 .game-episode { max-width: 34rem; margin-inline: auto; color: #30271d; }
 .game-scene-first > h3 { font-size: clamp(1.6rem, 6vw, 2.35rem); line-height: 1.12; margin: 0 0 .55rem; }
 .game-scene-tools { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .5rem; }
-.game-scene-tools > button, .game-scene-map > summary {
+.game-scene-tools > button, .game-episode-map > summary, .game-scene-menu > summary {
  box-sizing: border-box; min-width: 44px; background: #fff8e9; color: #45311f; border: 1px solid #846746; border-radius: .75rem;
 }
-.game-run .game-scene-map { margin: 0; }
-.game-scene-map[open] { flex-basis: 100%; }
+.game-run .game-episode-map { margin: 0; }
+.game-episode-map[open] { flex-basis: 100%; }
 .game-episode-map ul { margin-block: .5rem 0; padding: 0; list-style: none; }
 .game-episode-map li { display: grid; gap: .35rem; padding: .65rem .8rem; background: #fffdf7; border-inline-start: 3px solid #947d58; }
 .game-episode-map li[aria-current] { border-color: #386a56; }
@@ -79,7 +79,25 @@ body:has(.adventure-overlay .game-expedition) { min-width: 0; }
 }
 .game-scene-body > h3 { font-size: clamp(1.4rem, 6vw, 2rem); line-height: 1.12; margin: 0 0 .45rem; }
 .game-scene-body > .game-actions button { margin-block: 4px; }
-.game-expedition .game-scene-tools { gap: .4rem; }
+.game-expedition .game-scene-tools { position: relative; flex-shrink: 0; flex-wrap: nowrap; gap: .4rem; }
+.game-expedition .game-scene-tools .game-map-button, .game-expedition .game-scene-menu > summary {
+ padding-inline: clamp(.3rem, 3vw, .8rem);
+}
+.game-expedition .game-scene-menu { margin: 0; }
+.game-scene-menu > summary { cursor: pointer; display: flex; align-items: center; gap: .35rem; }
+.game-scene-menu > summary::-webkit-details-marker { display: none; }
+.game-scene-menu-items {
+ position: absolute; z-index: 2; inset-block-start: calc(100% + .2rem);
+ inset-inline-start: clamp(0px, 100% - 12rem, 5rem); width: min(100%, 12rem);
+ display: grid; gap: .2rem; padding: .35rem;
+ border: 1px solid #846746; border-radius: .75rem; background: #fffdf7;
+}
+.game-scene-menu-items button { border: 0; background: transparent; color: #2e2413; text-align: start; }
+.game-scene-menu-items button[aria-pressed=true] { background: #dceadd; }
+@media (forced-colors: active) {
+ .game-scene-menu-items { border-color: CanvasText; background: Canvas; }
+ .game-scene-menu-items button[aria-pressed=true] { border: 2px solid Highlight; }
+}
 .game-scene-footer {
  box-sizing: border-box; flex: 0 0 auto; max-height: 45dvh; overflow-y: auto;
  display: grid; gap: .4rem; padding: .4rem .25rem max(.5rem, env(safe-area-inset-bottom, 0px)); margin-inline: -.25rem;

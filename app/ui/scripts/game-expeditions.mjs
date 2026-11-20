@@ -114,9 +114,8 @@ export async function checkExpedition({page,game,requests}){
  const text=await encounter.locator(bubble).innerText();
  const choices=()=>game.locator('.game-actions fieldset button').allTextContents();
  const labels=await choices(),before=requests.length;
- const toggle=game.getByRole('button',{name:'Text mode',exact:true});
- const map=game.locator('.game-scene-map');
- const mapWasOpen=await map.evaluate(node=>{const open=node.open;node.open=false;return open;});
+ const toggle=game.locator('.game-scene-menu button[aria-pressed]');
+ const menu=game.locator('.game-scene-menu > summary');
  const viewport=page.viewportSize();
  const tail=()=>encounter.locator(bubble).evaluate(node=>getComputedStyle(node,'::before').content);
  try{
@@ -131,10 +130,9 @@ export async function checkExpedition({page,game,requests}){
   }), 'a scene character is clipped by the artwork frame');
   assert.notEqual(await tail(),'none');
   await atMobile(page,game,async()=>{
-   await toggle.focus();await page.keyboard.press('Enter');
+   await menu.click();await toggle.focus();await page.keyboard.press('Enter');
    assert.equal(await toggle.getAttribute('aria-pressed'),'true');
-   assert.equal(await toggle.evaluate(node=>node===document.activeElement),true);
-   assert.equal(await game.locator('.game-board .game-hex-map').count(),0);
+   assert.equal(await menu.evaluate(node=>node===document.activeElement&&!node.parentElement.open),true);
    assert.equal(await encounter.locator(art).count(),0);
    assert.equal(await tail(),'none');
    assert.equal(await heading.isVisible(),true);
@@ -143,7 +141,7 @@ export async function checkExpedition({page,game,requests}){
    await checkFooter(page,game,labels.length);
    await screenshot(page,'text-mode-mobile');
 
-   await toggle.click();
+   await menu.click();await toggle.click();
    await page.emulateMedia({forcedColors:'active',reducedMotion:'reduce'});
    assert.equal(await encounter.locator(art+' > svg').isVisible(),false);
    assert.equal(await heading.isVisible(),true);
@@ -156,7 +154,6 @@ export async function checkExpedition({page,game,requests}){
   });
   assert.equal(requests.length,before);
  }finally{
-  await map.evaluate((node,open)=>{node.open=open;},mapWasOpen);
   await page.emulateMedia({forcedColors:'none',reducedMotion:'no-preference'});
   await page.setViewportSize(viewport);
  }

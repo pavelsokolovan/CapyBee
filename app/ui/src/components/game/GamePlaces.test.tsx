@@ -1,4 +1,4 @@
-import {act} from 'react';
+import {act, useRef, useState} from 'react';
 import {createRoot, type Root} from 'react-dom/client';
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
 import {GamePlaces, hexLayout} from './GamePlaces';
@@ -6,6 +6,8 @@ import {SceneBlocks, ScenePanels} from './GameScene';
 import type {PlacesView} from '../../game/gameApi';
 import {decodeSummary} from '../../game/gameDecoders';
 import fixtures from '../../game/fixtures/contracts.json';
+import {illustratedRun} from '../../game/fixtures/illustratedRun';
+import {ExpeditionMap} from './ExpeditionMap';
 
 (globalThis as typeof globalThis & {IS_REACT_ACT_ENVIRONMENT: boolean}).IS_REACT_ACT_ENVIRONMENT = true;
 let host: HTMLDivElement, root: Root;
@@ -94,4 +96,37 @@ it('shares public map and encounter rendering for authored and dynamic views, le
   await act(async () => root.render(<><SceneBlocks view={view} locale="pl"/><ScenePanels view={view} locale="pl" locked={false} submit={vi.fn()}/></>));
   expect(host.querySelector('.game-places')).toBeNull(); expect(host.querySelectorAll('.game-block')).toHaveLength(view.blocks.length);
  }
+});
+
+it('uses one selectable button per place and exposes the prerequisite and travel only in the card',async()=>{
+ const places=illustratedRun().view.places!;
+ places.movementHint='Choose where to go.';
+ places.places.push({id:'bridge',label:'Bridge',x:0,y:1,moveHint:'Build a rail.'});
+ const submit=vi.fn();
+ function Sheet({locked}:{locked:boolean}){
+  const dialog=useRef<HTMLDialogElement>(null),[selectedId,onSelect]=useState<string|null>(null);
+  return <ExpeditionMap places={places} dialog={dialog} onClose={()=>{}} selectedId={selectedId} onSelect={onSelect}
+   locale="en" pending={false} textMode={false} locked={locked} status={null} submit={submit}/>;
+ }
+  await act(async()=>root.render(<Sheet locked={false}/>));
+  expect(host.querySelectorAll('li > button[data-place-id]')).toHaveLength(3);
+  expect(host.querySelector('li button[aria-label],li button button')).toBeNull();
+  expect(host.querySelector('.game-map-card h4')?.textContent).toBe('Obóz');
+  expect(host.querySelector('.game-map-card button')).toBeNull();
+  expect(host.textContent?.match(/Choose where to go\./g)).toHaveLength(1);
+  expect(host.textContent).not.toContain('About these places');
+  expect(host.textContent).not.toContain('Build a rail.');
+  await act(async()=>host.querySelector<HTMLButtonElement>('[data-place-id=bridge]')!.click());
+  expect(host.querySelector('.game-map-card')?.textContent).toContain('Build a rail.');
+  expect(host.querySelector('.game-map-card button')).toBeNull();
+  await act(async()=>host.querySelector<HTMLButtonElement>('[data-place-id=river]')!.click());
+  const travel=host.querySelector<HTMLButtonElement>('.game-map-card button')!;
+  expect(travel.getAttribute('aria-label')).toBe('Visit: Rzeka');
+  expect(submit).not.toHaveBeenCalled();
+  await act(async()=>root.render(<Sheet locked/>));
+  expect(travel.disabled).toBe(true);
+  expect(host.querySelector('.game-map-card')?.textContent).toContain('Wait for the saved game');
+  await act(async()=>travel.click());expect(submit).not.toHaveBeenCalled();
+  await act(async()=>root.render(<Sheet locked={false}/>));
+  await act(async()=>travel.click());expect(submit).toHaveBeenCalledExactlyOnceWith({type:'MOVE',placeId:'river'});
 });

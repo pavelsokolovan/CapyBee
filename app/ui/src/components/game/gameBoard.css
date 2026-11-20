@@ -24,34 +24,3 @@
 /* Reserve state space so accepted movement does not shift the tile centers. */
 .game-board .game-hex-map .game-board-place-state { display: flex; flex-direction: column; min-height: 64px; }
 .game-board .game-hex-map .game-board-place-state p { font-size: .75rem; line-height: 1.4; margin: 2px 0; }
-
-.game-board-compact { margin-block: .35rem 0; padding-block: .35rem; }
-.game-board-compact .game-place-list { margin-block: .65rem; }
-.game-board-compact .game-hex-map { gap: .75rem 2px; }
-.game-board-compact .game-hex-map .game-place { text-align: center; }
-.game-board-compact .game-hex-map .game-place > strong { font-size: .875rem; line-height: 1.3; hyphens: auto; }
-.game-board-compact .game-board-art { max-width: 96px; }
-.game-board-compact [data-travel-state=unavailable] .game-board-art { opacity: .6; }
-.game-board-compact .game-board-travel { display: grid; align-content: start; gap: .2rem; margin-block-start: .35rem; }
-.game-board-compact .game-hex-map .game-board-travel { min-block-size: 4.1rem; }
-.game-board-compact .game-board-travel span { min-block-size: 44px; display: grid; align-content: center; font-size: .82rem; }
-.game-board-compact .game-board-travel small { font-size: .75rem; color: var(--game-muted); }
-.game-board-compact .game-board-travel button {
- margin: 0; background: #285745; border-color: #285745; color: #fffdf7; font-weight: 700;
-}
-.game-board-compact .game-board-travel button:hover:not(:disabled) { background: #204638; }
-.game-board-compact [aria-current=location] .game-board-travel span {
- font-weight: 700; background: #dceadd; color: #234c3d; border-radius: .65rem;
-}
-.game-board-compact .game-place-list:not(.game-hex-map) .game-place {
- display: flex; flex-wrap: wrap; gap: .25rem .7rem; align-items: start; padding: .65rem .8rem;
-}
-.game-board-compact .game-place-list:not(.game-hex-map) .game-place > strong { flex: 1 1 8rem; padding-block: .4rem; }
-.game-board-compact .game-place-list:not(.game-hex-map) .game-board-travel { flex: 1 1 8rem; margin: 0; }
-.game-board-compact .game-place-list:not(.game-hex-map) [aria-current=location] .game-board-travel span { padding-inline: .55rem; }
-.game-board-compact .game-board-descriptions { border-block-start: 1px solid #bca67c; }
-@media (forced-colors: active) {
- .game-board-compact [aria-current=location] .game-board-travel span { border: 1px solid CanvasText; color: CanvasText; background: Canvas; }
- .game-board-compact .game-board-travel button { background: ButtonFace; color: ButtonText; border-color: ButtonText; }
- .game-board-compact .game-board-travel button:hover:not(:disabled) { background: ButtonFace; }
-}

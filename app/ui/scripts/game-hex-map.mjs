@@ -8,6 +8,7 @@ export async function checkHexMap({page, context, base, requests}) {
  await page.getByRole('button',{name:'Review',exact:true}).click();
  await page.getByRole('button',{name:'Start adventure',exact:true}).click();
  await game.getByRole('status').filter({hasText:'Saved'}).waitFor();
+ assert.equal(await game.locator('.game-map-button,.game-scene-menu,.game-map-sheet').count(),0);
  const beforeOpen=requests.length;
  await game.getByText('Places',{exact:true}).click();
  const map=game.locator('.game-place-list'), current=map.locator('[aria-current=location]');

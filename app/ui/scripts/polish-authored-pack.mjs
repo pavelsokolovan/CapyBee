@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {checkBoardRoute,openExpeditionMap} from './game-honeycomb-board.mjs';
+import {checkBoardRoute,openExpeditionMap,selectPlace,travelTo} from './game-honeycomb-board.mjs';
 import {checkExpeditionOpening,captureExpeditionLantern} from './game-expeditions.mjs';
 import {assertCompanionUI,holdCompanionChoice,captureCompanionEvidence} from './game-companions.mjs';
 
@@ -60,10 +60,8 @@ export async function checkPolishPack({page,context,base,requests}) {
    assert.ok(action&&action.y>=0&&action.y+action.height<=640,'First story action is below the fold');
    assert.ok(action.height>=44&&action.width>=44);
    await game.getByRole('heading',{name:'Polana Nowego Ula',exact:true}).waitFor();
-   const map=game.locator('.game-scene-map');
-   assert.equal(await map.locator(':scope > summary').textContent(),locale==='en'?'Map':'Mapa');
-   assert.equal(await map.evaluate(node=>node.open),false);
-   assert.equal(await game.locator('.game-board').isVisible(),false);
+   await game.getByRole('button',{name:locale==='en'?'Map':'Mapa',exact:true}).waitFor();
+   assert.equal(await game.locator('.game-map-sheet').isVisible(),false);
    assert.equal(await game.locator('.game-current-characters').evaluate(node=>node.open),false);
    assert.equal(await game.locator('.game-party').count(),0);
    assert.equal(await game.getByText(/^(Story language: Polish|Język historii: polski)$/).count(),0);
@@ -111,15 +109,7 @@ export async function checkPolishPack({page,context,base,requests}) {
  await checkBoardRoute({page,context,base,requests});
  await choose('Na dziś wybieram odpoczynek');await ending('rest-here');
  await start();await choose('Continue');
- await openExpeditionMap(game);
- assert.equal(await game.locator('.game-board [data-place-id]').count(),7);
- const bridge=game.locator('[data-place-id="small-crossing"]');
- const prerequisite=(await currentRun()).view.places.places.find(place=>place.id==='small-crossing').moveHint;
- assert.ok(prerequisite);
- await bridge.getByText(prerequisite,{exact:true}).waitFor();
- assert.equal(await bridge.getByRole('button').count(),0);
- assert.equal(await game.getByText(prerequisite,{exact:true}).count(),1);
- await choose('Visit: Latarnia Wspomnień');await choose('Visit: Polana Nowego Ula');
+ await travelTo(game,'old-lantern');await travelTo(game,'hive-square');
  const current=await (await context.request.get(base+'/api/game/runs/current')).json(),posts=requests.length;
  assertPublic(current);assert.deepEqual(current.view.presentation.characters.map(c=>c.id),['actor:hive-guide'],'map movement disclosed a future hero');
  await page.reload();await page.getByRole('button',{name:'Play',exact:true}).click();await page.getByRole('button',{name:/Adventures/}).click();
@@ -141,8 +131,11 @@ export async function checkPolishPack({page,context,base,requests}) {
  await page.getByRole('button',{name:'Graj',exact:true}).click();await page.getByRole('button',{name:/Przygody/}).click();
  await start('pl');await checkExpeditionOpening({page,game});await choose('Dalej');await openExpeditionMap(game);
  await game.locator('[aria-current="location"]').getByText('Tu jesteś',{exact:true}).waitFor();
- await game.getByRole('button',{name:'Idź: Cicha Łąka',exact:true}).waitFor();
- await game.locator('.game-scene-map > summary').click();
+ const polishSheet=game.locator('.game-map-sheet');
+ await polishSheet.getByRole('heading',{name:'Mapa przygody',exact:true}).waitFor();
+ await selectPlace(polishSheet,'quiet-meadow');
+ await polishSheet.getByRole('button',{name:'Idź: Cicha Łąka',exact:true}).waitFor();
+ await polishSheet.getByRole('button',{name:'Zamknij',exact:true}).click();
  await choose('Na dziś wybieram odpoczynek');await ending('rest-here');
  await page.emulateMedia({reducedMotion:'reduce'});await game.evaluate(n=>n.style.zoom='2');
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth));

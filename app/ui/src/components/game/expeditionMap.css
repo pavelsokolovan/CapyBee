@@ -1,0 +1,61 @@
+.game-expedition .game-map-sheet {
+ position: fixed; inset: auto 0 0; margin: 0 auto;
+ width: min(100%, 45rem); max-width: none; max-height: 88dvh;
+ padding: 0; border: 0; border-radius: 18px 18px 0 0;
+ background: #fdf3d9; color: #2e2413; overflow: hidden;
+}
+.game-map-sheet[open] { display: flex; flex-direction: column; }
+.game-map-sheet::backdrop { background: #2e241366; }
+.game-map-sheet-content {
+ min-width: 0; width: 100%; min-height: 0; display: flex; flex-direction: column;
+ background: #fdf3d9; border: 1px solid #bca67c; border-radius: inherit;
+}
+.game-map-heading {
+ flex: none; display: flex; align-items: center; justify-content: space-between; gap: .5rem;
+ padding: .4rem 10px;
+}
+.game-map-heading h3 { margin: 0; font-size: 1rem; }
+.game-map-scroll { min-height: 0; padding-inline: 8px; overflow-y: auto; overscroll-behavior: contain; }
+.game-map-scroll .game-map-hint { margin: 0 0 .35rem; font-size: .875rem; text-align: center; }
+.game-map-grid, .game-map-list { list-style: none; margin: .2rem 0 .5rem; padding: 0; display: grid; gap: .35rem 2px; }
+.game-map-grid > li, .game-map-list > li { min-width: 0; }
+.game-map-sheet .game-map-tile {
+ position: relative; width: 100%; min-width: 44px; min-height: 44px; padding: .35rem;
+ text-align: start; font: inherit; line-height: 1.2; border: 1px solid #bca67c;
+ background: var(--game-paper); color: var(--game-ink);
+}
+.game-map-sheet .game-map-tile[aria-current=location] { border: 3px double var(--game-ink); }
+.game-map-sheet .game-map-tile[data-travel-state=unavailable] { border-style: dashed; }
+.game-map-sheet .game-map-tile[aria-pressed=true] { box-shadow: inset 0 0 0 2px var(--game-ink); }
+.game-map-tile strong, .game-map-tile small { display: block; }
+.game-map-grid .game-map-tile,
+.game-map-grid .game-map-tile:is([aria-current=location], [aria-pressed=true], [data-travel-state=unavailable]) {
+ padding: 0 0 .2rem; border: 0; border-radius: .5rem;
+ background: transparent; box-shadow: none; text-align: center; font-size: .8rem;
+}
+.game-map-grid .game-tile-art { width: 100%; margin-block-end: 2px; }
+.game-map-tile[data-travel-state=unavailable] .game-tile-art { opacity: .6; }
+.game-map-list .game-map-tile {
+ display: flex; justify-content: space-between; align-items: center; gap: .35rem; flex-wrap: wrap;
+}
+.game-map-list .game-map-tile[data-travel-state=unavailable]:not(:disabled) { opacity: .85; }
+.game-map-card {
+ flex: none; max-height: 44dvh; overflow-y: auto; overscroll-behavior: contain;
+ background: var(--game-paper); border-block-start: 1px solid #bca67c;
+ padding: .5rem 10px max(.65rem, env(safe-area-inset-bottom, 0px));
+}
+.game-map-card h4 { margin: 0; }
+.game-map-sheet .game-map-card p { margin: .15rem 0 .35rem; font-size: .875rem; line-height: 1.35; }
+.game-map-card .game-map-state { font-weight: 700; color: #234c3d; }
+.game-expedition .game-map-card button {
+ width: 100%; min-height: 48px; font-weight: 700;
+ background: #285745; border-color: #285745; color: #fffdf7;
+}
+.game-map-sheet .game-run-status:not(.game-visually-hidden) { margin-inline: 10px; }
+@media (forced-colors: active) {
+ .game-map-sheet-content, .game-map-card { background: Canvas; color: CanvasText; border-color: CanvasText; }
+ .game-map-sheet .game-map-tile, .game-map-sheet .game-map-tile[aria-current=location] { border-color: ButtonText; }
+ .game-map-sheet .game-map-tile[aria-pressed=true] { outline: 2px solid Highlight; outline-offset: -4px; }
+ .game-map-list .game-map-tile[data-travel-state=unavailable]:not(:disabled) { opacity: 1; }
+ .game-expedition .game-map-card button { background: ButtonFace; color: ButtonText; border-color: ButtonText; }
+}
