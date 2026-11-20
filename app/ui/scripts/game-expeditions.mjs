@@ -33,7 +33,7 @@ export async function checkSceneAdvance({page,game,advance,zoom=false,capture=tr
  try {
   await page.emulateMedia({reducedMotion:'reduce'});
   // At 200% page zoom a 360 × 640 viewport has half as many CSS pixels.
-  await page.setViewportSize(zoom?{width:180,height:320}:{width:360,height:480});
+  await page.setViewportSize(zoom?{width:180,height:320}:{width:360,height:400});
   const offset=await game.locator(body).evaluate(node=>{node.scrollTop=node.scrollHeight;return node.scrollTop;});
   assert.ok(offset>0,'the outgoing scene must scroll to exercise the reset');
   await advance();
@@ -99,22 +99,15 @@ export async function checkExpeditionOpening({page,game,capture=false}){
  });
 }
 
-export async function captureExpeditionHub({page,game}){
+export async function captureShortScene({page,game,scene,actions}){
+ const directory=fileURLToPath(new URL('../../../docs/evidence/40/',import.meta.url));
  await atMobile(page,game,async()=>{
-  const scroller=game.locator(body);
-  assert.equal(await scroller.locator('.game-actions button').count(),6);
-  assert.equal(await game.locator(footer).count(),0);
-  await screenshot(page,'hub-mobile');
-  assert.deepEqual(await scroller.evaluate(node=>{
-   const overlay=node.closest('.adventure-overlay');
-   const header=node.closest('.adventure-panel').querySelector('header');
-   const top=header.getBoundingClientRect().top;
-   node.scrollTop=120;
-   overlay.scrollTop=120;
-   return {bodyOverflow:getComputedStyle(node).overflowY,bodyScrolled:node.scrollTop>0,
-    overlayOverflow:getComputedStyle(overlay).overflowY,overlayScroll:overlay.scrollTop,
-    headerMoved:header.getBoundingClientRect().top!==top};
-  }),{bodyOverflow:'auto',bodyScrolled:true,overlayOverflow:'hidden',overlayScroll:0,headerMoved:false});
+  const frame=await checkFooter(page,game,actions);
+  await checkBackdrop(game);
+  const prose=await game.locator(bubble).boundingBox();
+  assert.ok(prose.y>=0&&prose.y+prose.height<=frame.y,`${scene} prose does not fit above its actions`);
+  assert.equal(await game.locator(body).evaluate(node=>node.scrollTop),0);
+  await screenshot(page,scene+'-mobile',directory);
  });
 }
 

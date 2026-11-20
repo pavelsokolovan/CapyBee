@@ -1,0 +1,12 @@
+{
+  "title": "Polana Nowego Ula",
+  "narration": "Wybierz miejsce na mapie. Każde spotkanie jest dobrowolne. Możesz też odpocząć.",
+  "dialogue": [],
+  "choices": [
+    {
+      "id": "rest-now",
+      "label": "Na dziś wybieram odpoczynek"
+    }
+  ],
+  "continuityFacts": []
+}

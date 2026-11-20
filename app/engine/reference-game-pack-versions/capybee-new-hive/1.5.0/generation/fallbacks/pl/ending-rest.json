@@ -1,0 +1,34 @@
+{
+  "title": "Odpoczynek na dziś",
+  "narration": "Odpoczynek na dziś. CapyBee składa planszę i zostawia latarnię w zasięgu wzroku. Pauza jest pełnoprawnym zakończeniem tej wyprawy. Możesz wrócić innym razem albo pozostać przy tym zakończeniu.\nJeśli chcesz, zrób teraz wygodną przerwę. Nie trzeba wykonywać żadnej Misji ani niczego udowadniać. Ta propozycja niczego nie zapisuje ani nie zalicza.",
+  "dialogue": [],
+  "choices": [],
+  "continuityFacts": [],
+  "ending": {
+    "headline": "Na dziś wystarczy spokojna przerwa",
+    "summary": "Ta baśniowa wyprawa ma na dziś swoje zakończenie. Dawny i nowy dom mogą pozostać ważne.",
+    "objectiveNotes": [
+      {
+        "objectiveId": "prepare-rail",
+        "text": "Poręcz jest jednym z możliwych kroków tej wyprawy."
+      },
+      {
+        "objectiveId": "carry-memory",
+        "text": "Wspomnienie ma miejsce, jeśli chcesz je zabrać."
+      },
+      {
+        "objectiveId": "listen-mela",
+        "text": "Spotkanie z Melą pozostaje twoim wyborem."
+      },
+      {
+        "objectiveId": "help-borys",
+        "text": "Borys poradzi sobie również podczas twojej przerwy."
+      },
+      {
+        "objectiveId": "mark-luna-rest",
+        "text": "Zakątek Luny może poczekać na inną wizytę."
+      }
+    ],
+    "reflection": "Możesz zostać przy tym zakończeniu. Odpoczynek także ma swoje miejsce."
+  }
+}

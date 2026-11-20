@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "id": "capybee-new-hive",
+  "version": "1.5.0",
+  "name": "CapyBee — Nowy ul, dwa światła",
+  "description": "Spokojna polska wyprawa z opcjonalną narracją AI i przygotowaną polską wersją zastępczą.",
+  "locales": [
+    "pl"
+  ],
+  "defaultLocale": "pl",
+  "features": [
+    "PLACES",
+    "GENERATION",
+    "ASSETS"
+  ],
+  "startInputs": [
+    {
+      "id": "story-tone",
+      "kind": "ENUM",
+      "required": false,
+      "labelKey": "setup.story-tone",
+      "values": [
+        "cozy",
+        "curious"
+      ]
+    },
+    {
+      "id": "interests",
+      "kind": "ENUM_SET",
+      "required": false,
+      "labelKey": "setup.interests",
+      "values": [
+        "nature",
+        "making",
+        "animals"
+      ],
+      "maxItems": 2
+    },
+    {
+      "id": "mood",
+      "kind": "ENUM",
+      "required": false,
+      "labelKey": "setup.mood",
+      "values": [
+        "heavy",
+        "okay",
+        "good"
+      ]
+    },
+    {
+      "id": "story-wish",
+      "kind": "FREE_TEXT",
+      "required": false,
+      "labelKey": "setup.story-wish",
+      "maxChars": 240
+    }
+  ],
+  "contentPolicy": {
+    "freeTextAllowed": true,
+    "audience": {
+      "minAge": 10,
+      "maxAge": 14
+    },
+    "forbiddenTags": [
+      "personal-data",
+      "pressure",
+      "human-replacement"
+    ]
+  },
+  "files": [
+    "generation/catalog.json",
+    "generation/fallbacks/pl/arrival.json",
+    "generation/fallbacks/pl/board.json",
+    "generation/fallbacks/pl/borys-thanks.json",
+    "generation/fallbacks/pl/borys.json",
+    "generation/fallbacks/pl/cast.json",
+    "generation/fallbacks/pl/crossing.json",
+    "generation/fallbacks/pl/ending-new.json",
+    "generation/fallbacks/pl/ending-rest.json",
+    "generation/fallbacks/pl/ending-two.json",
+    "generation/fallbacks/pl/lantern.json",
+    "generation/fallbacks/pl/luna-thanks.json",
+    "generation/fallbacks/pl/luna.json",
+    "generation/fallbacks/pl/mela-thanks.json",
+    "generation/fallbacks/pl/mela.json",
+    "generation/fallbacks/pl/memory-light.json",
+    "generation/fallbacks/pl/quest.json",
+    "generation/fallbacks/pl/scenario.json",
+    "generation/fallbacks/pl/theme.json",
+    "generation/fallbacks/pl/workshop.json",
+    "generation/quality/pl.json",
+    "generation/setup.json",
+    "generation/templates.json",
+    "places.json",
+    "prompts/pl/system.md",
+    "rules.json",
+    "scenes/pl/story.json",
+    "strings/pl.json",
+    "assets/catalog.json",
+    "presentation.json"
+  ]
+}

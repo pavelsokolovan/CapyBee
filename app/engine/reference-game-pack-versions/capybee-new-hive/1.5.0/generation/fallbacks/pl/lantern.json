@@ -1,0 +1,20 @@
+{
+  "title": "Mały przystanek",
+  "narration": "W Latarni Wspomnień pali się ciepłe światło. Może przypominać kuchnię, piosenkę lub wieczór w dawnym domu.\nNie musisz nikomu opowiadać o wspomnieniu. CapyBee zostawia mały lampion.",
+  "dialogue": [],
+  "choices": [
+    {
+      "id": "carry-light",
+      "label": "Zabieram światło na drogę"
+    },
+    {
+      "id": "back-to-board",
+      "label": "Wracam na polanę"
+    },
+    {
+      "id": "rest-now",
+      "label": "Na dziś wybieram odpoczynek"
+    }
+  ],
+  "continuityFacts": []
+}

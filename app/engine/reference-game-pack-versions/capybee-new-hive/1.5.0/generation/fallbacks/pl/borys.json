@@ -1,0 +1,20 @@
+{
+  "title": "Mały przystanek",
+  "narration": "Borys, pomysłowy bóbr, wiąże poręcz z trzciny. Przyda mu się pomoc przy trzcinie.\n„Możemy zrobić mały kawałek razem, jeśli masz ochotę” — mówi.",
+  "dialogue": [],
+  "choices": [
+    {
+      "id": "help-borys",
+      "label": "Przytrzymuję trzcinę dla Borysa"
+    },
+    {
+      "id": "wave-borys",
+      "label": "Macham i idę dalej"
+    },
+    {
+      "id": "rest-now",
+      "label": "Na dziś wybieram odpoczynek"
+    }
+  ],
+  "continuityFacts": []
+}

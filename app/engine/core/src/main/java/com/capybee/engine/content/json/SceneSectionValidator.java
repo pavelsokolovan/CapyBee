@@ -11,6 +11,9 @@ import com.capybee.engine.pack.Pack;
 import com.capybee.engine.pack.PackFeature;
 import com.capybee.engine.pack.PackValidationContext;
 import com.capybee.engine.pack.SectionValidator;
+import com.capybee.engine.places.PlaceEntryGraph;
+import com.capybee.engine.places.PlaceMap;
+import com.capybee.engine.places.json.PlacesParser;
 import com.capybee.engine.rules.Effect;
 import com.capybee.engine.rules.json.RulesParser;
 
@@ -29,6 +32,7 @@ public final class SceneSectionValidator implements SectionValidator {
     @Override
     public void validate(Pack pack, PackValidationContext context) {
         Map<LocaleTag, SceneSet> sceneSets = SceneSets.load(pack, context);
+        PlaceMap map = PlacesParser.parse(pack);
         boolean hasEndRun = hasEndRun(sceneSets, RulesParser.parse(pack));
         for (LocaleTag locale : pack.manifest().locales()) {
             SceneSet set = sceneSets.get(locale);
@@ -75,7 +79,7 @@ public final class SceneSectionValidator implements SectionValidator {
                     }
                 }
             }
-            checkReachability(set, locale, context, hasEndRun);
+            checkReachability(set, locale, context, hasEndRun, map);
         }
         validateLocaleParity(pack, context);
     }
@@ -171,7 +175,7 @@ public final class SceneSectionValidator implements SectionValidator {
         }
     }
 
-    private void checkReachability(SceneSet set, LocaleTag locale, PackValidationContext context, boolean hasEndRun) {
+    private void checkReachability(SceneSet set, LocaleTag locale, PackValidationContext context, boolean hasEndRun, PlaceMap map) {
         Map<String, Scene> scenes = set.scenes();
         if (set.startId() == null || !scenes.containsKey(set.startId())) {
             return;
@@ -184,6 +188,7 @@ public final class SceneSectionValidator implements SectionValidator {
             if (!visited.add(id)) continue;
             Scene scene = scenes.get(id);
             if (scene == null) continue;
+            PlaceEntryGraph.targets(map, scene).stream().filter(scenes::containsKey).forEach(queue::add);
             if (scene.options() != null) {
                 for (var option : scene.options()) {
                     if (option.next() != null && scenes.containsKey(option.next())) {
@@ -221,7 +226,7 @@ public final class SceneSectionValidator implements SectionValidator {
         }
         for (String sceneId : visited) {
             if (sceneId.equals(set.startId())) continue;
-            if (reachesEnd(scenes, sceneId, new HashSet<>(), withEnd)) {
+            if (reachesEnd(scenes, sceneId, new HashSet<>(), withEnd, map)) {
                 continue;
             }
             context.warn("SCENE_NO_PATH_TO_END", "pack.json", "/scenes", "Scene has no path to an end scene: " + sceneId);
@@ -239,24 +244,27 @@ public final class SceneSectionValidator implements SectionValidator {
         return effects.stream().anyMatch(Effect.EndRun.class::isInstance);
     }
 
-    private boolean reachesEnd(Map<String, Scene> scenes, String current, Set<String> seen, Set<String> endIds) {
+    private boolean reachesEnd(Map<String, Scene> scenes, String current, Set<String> seen, Set<String> endIds, PlaceMap map) {
         if (endIds.contains(current)) return true;
         if (!seen.add(current)) return false;
         Scene scene = scenes.get(current);
         if (scene == null) return false;
         if (scene.end()) return true;
+        for (String target : PlaceEntryGraph.targets(map, scene)) {
+            if (reachesEnd(scenes, target, seen, endIds, map)) return true;
+        }
         if (scene.options() != null) {
             for (var option : scene.options()) {
-                if (reachesEnd(scenes, option.next(), seen, endIds)) {
+                if (reachesEnd(scenes, option.next(), seen, endIds, map)) {
                     return true;
                 }
             }
         }
         for (var branch : scene.branches()) {
-            if (reachesEnd(scenes, branch.next(), new HashSet<>(seen), endIds)) return true;
+            if (reachesEnd(scenes, branch.next(), new HashSet<>(seen), endIds, map)) return true;
         }
         if (scene.next() != null && !scene.next().isBlank()) {
-            if (reachesEnd(scenes, scene.next(), new HashSet<>(seen), endIds)) {
+            if (reachesEnd(scenes, scene.next(), new HashSet<>(seen), endIds, map)) {
                 return true;
             }
         }

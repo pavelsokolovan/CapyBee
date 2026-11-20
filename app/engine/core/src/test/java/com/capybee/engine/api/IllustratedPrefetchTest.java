@@ -26,7 +26,7 @@ class IllustratedPrefetchTest {
  @Test void sceneRequestsCarryThemeAndTrustedArtAndPrefetchNeverEntersItsDestination() throws Exception {
   var json=new ObjectMapper();var spec=json.readTree(Files.readString(Path.of("../fixtures/reference-board-routes.json")));
   var id=new PackId(spec.path("packId").asString());var loader=new PackLoader(Engine.sectionValidators());
-  var loaded=loader.tryLoad(id,new DirectoryPackSource(Path.of("../reference-game-pack-versions",id.value(),"1.4.0")));
+  var loaded=loader.tryLoad(id,new DirectoryPackSource(Path.of("../reference-game-pack-versions",id.value(),"1.5.0")));
   assertThat(loaded.issues()).isEmpty();var pack=loaded.pack().orElseThrow();
   var requests=new ArrayList<StructuredGenerationRequest>();
   var engine=Engine.builder(new PackRegistry(List.of(pack))).clock(Clock.systemUTC()).ids(new UuidIdSource()).random(Randoms.seeded(4))

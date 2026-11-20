@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "profileId": "hive-family-pl-v1",
+  "locale": "pl",
+  "readability": {
+    "maxSentenceCodePoints": 300,
+    "maxParagraphCodePoints": 700,
+    "maxConsecutiveShortSentences": 8,
+    "maxUppercaseRatioBasisPoints": 4000
+  },
+  "repetition": {
+    "fieldDuplicateThresholdBasisPoints": 10000,
+    "recentSceneThresholdBasisPoints": 9500,
+    "choiceThresholdBasisPoints": 9500,
+    "recentSceneWindow": 4
+  },
+  "phraseSets": {
+    "completionClaims": [
+      "przygoda jest zakończona",
+      "wszystko zostało ukończone"
+    ],
+    "forbiddenAudienceTerms": [
+      "podaj swój adres",
+      "podaj hasło"
+    ],
+    "hostileTone": [
+      "to twoja wina",
+      "zawiodłeś wszystkich",
+      "musisz przestać tęsknić"
+    ],
+    "unsafePressure": [
+      "pośpiesz się albo ktoś ucierpi"
+    ]
+  },
+  "toneProfiles": {
+    "warm": {
+      "incompatiblePhraseSets": [
+        "hostileTone",
+        "unsafePressure"
+      ],
+      "advisoryPhraseSets": []
+    },
+    "reflective": {
+      "incompatiblePhraseSets": [
+        "hostileTone",
+        "unsafePressure"
+      ],
+      "advisoryPhraseSets": []
+    }
+  },
+  "truthPhrases": []
+}

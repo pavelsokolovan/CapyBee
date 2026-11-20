@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {checkExpedition, captureExpeditionHub, checkSceneFocus} from './game-expeditions.mjs';
+import {checkExpedition, captureShortScene, checkSceneFocus} from './game-expeditions.mjs';
 import {mkdir} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 
@@ -48,8 +48,8 @@ export async function checkBoardRoute({page,context,base,requests}){
  const sheet=game.locator('.game-map-sheet'),card=sheet.locator('.game-map-card');
  const tiles=sheet.locator('.game-map-tile'),close=sheet.getByRole('button',{name:'Close',exact:true});
  const menu=game.locator('.game-scene-menu > summary');
- const initial=await current(context,base);assert.equal(initial.packVersion,'1.4.0');
- await captureExpeditionHub({page,game});
+ const initial=await current(context,base);assert.equal(initial.packVersion,'1.5.0');
+ await captureShortScene({page,game,scene:'board',actions:1});
  const viewport=page.viewportSize(),beforeOpen=requests.length;
  await page.setViewportSize({width:360,height:640});
  for(const button of [mapButton,menu]){
@@ -73,6 +73,7 @@ export async function checkBoardRoute({page,context,base,requests}){
  assert.equal(await close.evaluate(node=>node===document.activeElement),true);
  await page.keyboard.press('Escape');await sheet.waitFor({state:'hidden'});
  assert.equal(await mapButton.evaluate(node=>node===document.activeElement),true);
+ await page.setViewportSize({width:360,height:400});
  const sceneBody=game.locator('.game-scene-body');
  const scrolled=await sceneBody.evaluate(node=>{node.scrollTop=node.scrollHeight;return node.scrollTop;});
  assert.ok(scrolled>0);
@@ -86,6 +87,7 @@ export async function checkBoardRoute({page,context,base,requests}){
  assert.equal(await sceneBody.evaluate(node=>node.scrollTop),scrolled);
  await page.mouse.click(1,1);await sheet.waitFor({state:'hidden'});
  assert.equal(await mapButton.evaluate(node=>node===document.activeElement),true);
+ await page.setViewportSize({width:360,height:640});
  await openExpeditionMap(game);await close.click();await sheet.waitFor({state:'hidden'});
  assert.equal(await mapButton.evaluate(node=>node===document.activeElement),true);
 

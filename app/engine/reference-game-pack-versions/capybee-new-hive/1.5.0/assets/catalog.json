@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": 1,
+  "assets": [
+    {
+      "id": "character.capy",
+      "kind": "CHARACTER"
+    },
+    {
+      "id": "character.mela-bee",
+      "kind": "CHARACTER"
+    },
+    {
+      "id": "character.borys-beaver",
+      "kind": "CHARACTER"
+    },
+    {
+      "id": "character.luna-moth",
+      "kind": "CHARACTER"
+    },
+    {
+      "id": "character.abstract-guide",
+      "kind": "CHARACTER"
+    },
+    {
+      "id": "terrain.meadow",
+      "kind": "TERRAIN"
+    },
+    {
+      "id": "terrain.water",
+      "kind": "TERRAIN"
+    },
+    {
+      "id": "terrain.willow",
+      "kind": "TERRAIN"
+    },
+    {
+      "id": "terrain.workshop",
+      "kind": "TERRAIN"
+    },
+    {
+      "id": "terrain.lantern",
+      "kind": "TERRAIN"
+    },
+    {
+      "id": "terrain.crossing",
+      "kind": "TERRAIN"
+    },
+    {
+      "id": "terrain.neutral",
+      "kind": "TERRAIN"
+    },
+    {
+      "id": "backdrop.hive-clearing",
+      "kind": "BACKDROP"
+    },
+    {
+      "id": "backdrop.lantern-grove",
+      "kind": "BACKDROP"
+    },
+    {
+      "id": "backdrop.quiet-meadow",
+      "kind": "BACKDROP"
+    },
+    {
+      "id": "backdrop.reed-bank",
+      "kind": "BACKDROP"
+    },
+    {
+      "id": "backdrop.willow-glen",
+      "kind": "BACKDROP"
+    },
+    {
+      "id": "backdrop.hive-workshop",
+      "kind": "BACKDROP"
+    },
+    {
+      "id": "backdrop.small-crossing",
+      "kind": "BACKDROP"
+    },
+    {
+      "id": "backdrop.neutral",
+      "kind": "BACKDROP"
+    }
+  ]
+}

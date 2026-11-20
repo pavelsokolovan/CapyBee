@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {checkBoardRoute,openExpeditionMap,selectPlace,travelTo} from './game-honeycomb-board.mjs';
-import {checkExpeditionOpening,captureExpeditionLantern,checkSceneAdvance} from './game-expeditions.mjs';
+import {checkExpeditionOpening,captureExpeditionLantern,checkSceneAdvance,captureShortScene} from './game-expeditions.mjs';
 import {assertCompanionUI,holdCompanionChoice,captureCompanionEvidence} from './game-companions.mjs';
 
 export async function checkPolishPack({page,context,base,requests}) {
@@ -19,14 +19,14 @@ export async function checkPolishPack({page,context,base,requests}) {
   assert.equal(JSON.stringify(p).includes('recruitedFlag'),false);assert.equal(JSON.stringify(p).includes('sceneIds'),false);
  };
  const choose=async label=>{
-  if(label==='Siadam na chwilę i słucham Meli')await holdCompanionChoice({page,context,base,game,run:await currentRun(),requests,label});
+  if(label==='Siadam obok Meli')await holdCompanionChoice({page,context,base,game,run:await currentRun(),requests,label});
   else await game.getByRole('button',{name:label,exact:true}).click();
   await saved();
-  if(label==='Odwiedzam Melę na Cichej Łące'||label==='Siadam na chwilę i słucham Meli'){
+  if(label==='Siadam obok Meli'){
    const run=await currentRun();assertPublic(run);const p=run.view.presentation,member=p.characters.find(c=>c.id==='actor:mela-bee');
    await assertCompanionUI({page,game,run});
    assert.equal(member.trait,'Cierpliwa');assert.ok(member.need.length>0);assert.equal(member.assetId,'character.mela-bee');
-   assert.equal(member.recruited,label==='Siadam na chwilę i słucham Meli');
+   assert.equal(member.recruited,label==='Siadam obok Meli');
    if(member.recruited)await game.getByText('Mela joined the adventure.',{exact:true}).waitFor();
    await captureCompanionEvidence({page,game,run,label:member.recruited?'mela-joined':'mela-needs'});
    if(member.recruited){
@@ -40,7 +40,7 @@ export async function checkPolishPack({page,context,base,requests}) {
     const restored=await currentRun();assert.deepEqual(restored.view,run.view);await assertCompanionUI({page,game,run:restored});
    }
   }
-  if(label==='Układam z Luną znak z liści')await captureCompanionEvidence({page,game,run:await currentRun(),label:'all-companions',full:true});
+  if(label==='Układam z Luną znak')await captureCompanionEvidence({page,game,run:await currentRun(),label:'all-companions',full:true});
  };
  const start=async(locale='en',scrolledReview=false)=>{
   const another=game.getByRole('button',{name:locale==='en'?'Start another adventure':'Rozpocznij inną przygodę',exact:true});
@@ -92,7 +92,7 @@ export async function checkPolishPack({page,context,base,requests}) {
   await game.getByRole('button',{name:/Start another adventure|Rozpocznij inną przygodę/}).waitFor();
   const runId=requests.filter(r=>r.url.endsWith('/api/game/runs')&&r.body.packId==='capybee-new-hive').at(-1).body.id;
   const run=await (await context.request.get(`${base}/api/game/runs/${runId}`)).json();
-  assert.equal(run.status,'ENDED');assert.equal(run.endReason,'COMPLETED');assert.equal(run.view.outcome,outcome);assert.equal(run.packVersion,'1.4.0');
+  assert.equal(run.status,'ENDED');assert.equal(run.endReason,'COMPLETED');assert.equal(run.view.outcome,outcome);assert.equal(run.packVersion,'1.5.0');
   await assertCompanionUI({page,game,run});
   const panel=game.locator('.game-completion');await panel.waitFor();
   const completion=await (await context.request.get(`${base}/api/game/runs/${runId}/completion`)).json();
@@ -116,7 +116,7 @@ export async function checkPolishPack({page,context,base,requests}) {
   }
 
  };
- await start('en',true);await checkExpeditionOpening({page,game,capture:true});
+ await start('en',true);await checkExpeditionOpening({page,game});await captureShortScene({page,game,scene:'arrival',actions:1});
  await checkSceneAdvance({page,game,advance:()=>choose('Continue')});
  await checkBoardRoute({page,context,base,requests});
  await choose('Na dziś wybieram odpoczynek');await ending('rest-here');
@@ -128,16 +128,27 @@ export async function checkPolishPack({page,context,base,requests}) {
  await page.getByRole('button',{name:'Continue',exact:true}).click();await saved();
  const resumed=await (await context.request.get(`${base}/api/game/runs/${current.runId}`)).json();
  assert.equal(resumed.revision,current.revision);assert.deepEqual(resumed.view,current.view);assert.equal(requests.length,posts,'reload created another start/action');
- for(const label of ['Idę do Warsztatu Plastra','Wiążę poręcz i ruszam do mostku','Zapalam światło przy nowej ścieżce'])await choose(label);
+ await travelTo(game,'hive-workshop');await choose('Wiążę poręcz, idę do mostku');
+ await choose('Wracam na polanę');await travelTo(game,'hive-workshop');await travelTo(game,'small-crossing');
+ await choose('Zapalam światło przy nowej ścieżce');
  await ending('new-path');
  await start();await choose('Continue');
- await checkSceneAdvance({page,game,zoom:true,advance:()=>choose('Zaglądam do Latarni Wspomnień')});
+ await checkSceneAdvance({page,game,zoom:true,advance:()=>travelTo(game,'old-lantern')});
  await captureExpeditionLantern({page,game});
- for(const label of ['Zabieram światło wspomnienia na drogę','Continue',
-  'Odwiedzam Melę na Cichej Łące','Siadam na chwilę i słucham Meli','Continue',
-  'Odwiedzam Borysa nad trzciną','Przytrzymuję trzcinę dla Borysa','Continue',
-  'Odwiedzam Lunę pod wierzbą','Układam z Luną znak z liści','Continue',
-  'Idę do Warsztatu Plastra','Wiążę poręcz i ruszam do mostku','Zostawiam miejsce na oba światła'])await choose(label);
+ await captureShortScene({page,game,scene:'lantern',actions:3});
+ await choose('Zabieram światło na drogę');await choose('Continue');
+ for(const [place,scene,label] of [
+  ['quiet-meadow','mela','Siadam obok Meli'],
+  ['reed-bank','borys','Przytrzymuję trzcinę dla Borysa'],
+  ['willow-glen','luna','Układam z Luną znak'],
+ ]){
+  await travelTo(game,place);
+  await captureShortScene({page,game,scene,actions:3});
+  if(scene==='mela')await captureCompanionEvidence({page,game,run:await currentRun(),label:'mela-needs'});
+  await choose(label);await choose('Continue');
+ }
+ await travelTo(game,'hive-workshop');
+ await choose('Wiążę poręcz, idę do mostku');await choose('Zostawiam miejsce na oba światła');
  await ending('two-lights');
  await page.getByRole('button',{name:'Back to Play',exact:true}).click();
  await Promise.all([page.waitForResponse(r=>r.url().endsWith('/api/child-profile')&&r.request().method()==='PATCH'&&r.status()===200),page.locator('.locale-control select').first().selectOption('pl')]);

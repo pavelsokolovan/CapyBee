@@ -6,6 +6,8 @@ import com.capybee.engine.content.json.SceneSets;
 import com.capybee.engine.pack.LocaleTag;
 import com.capybee.engine.pack.Pack;
 import com.capybee.engine.pack.PackValidationContext;
+import com.capybee.engine.places.PlaceEntryGraph;
+import com.capybee.engine.places.json.PlacesParser;
 import com.capybee.engine.rules.Effect;
 import com.capybee.engine.rules.ResultClass;
 import com.capybee.engine.rules.Rules;
@@ -82,6 +84,10 @@ public final class FullGeneratedGameValidator {
         validateLocaleParity(sets, catalog, context);
 
         Map<String, Set<String>> raw = edges(base.scenes());
+        if (authored) {
+            var map = PlacesParser.parse(pack);
+            base.scenes().values().forEach(scene -> raw.get(scene.id()).addAll(PlaceEntryGraph.targets(map, scene)));
+        }
         Map<String, Set<String>> graph = new LinkedHashMap<>();
         for (String story : phaseOf.keySet()) {
             Set<String> targets = new LinkedHashSet<>();

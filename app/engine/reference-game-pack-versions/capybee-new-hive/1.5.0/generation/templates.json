@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 2,
+  "templates": [
+    {
+      "id": "hive-theme-v1",
+      "stage": "THEME",
+      "toneTags": [
+        "warm",
+        "reflective"
+      ]
+    },
+    {
+      "id": "hive-plan-v1",
+      "stage": "SCENARIO",
+      "toneTags": [
+        "warm",
+        "reflective"
+      ],
+      "storyRoles": [
+        "arrival",
+        "exploration",
+        "encounter",
+        "cooperation",
+        "preparation",
+        "resolution",
+        "ending"
+      ]
+    },
+    {
+      "id": "hive-quests-v1",
+      "stage": "QUEST",
+      "objectiveIds": [
+        "prepare-rail",
+        "carry-memory",
+        "listen-mela",
+        "help-borys",
+        "mark-luna-rest"
+      ]
+    },
+    {
+      "id": "hive-cast-v1",
+      "stage": "CAST",
+      "actorSlots": [
+        "hive-guide",
+        "mela-bee",
+        "borys-beaver",
+        "luna-moth"
+      ]
+    },
+    {
+      "id": "hive-scene-v1",
+      "stage": "SCENE",
+      "toneTags": [
+        "warm",
+        "reflective"
+      ],
+      "storyRoles": [
+        "arrival",
+        "exploration",
+        "encounter",
+        "cooperation",
+        "preparation",
+        "resolution",
+        "ending"
+      ]
+    }
+  ]
+}
