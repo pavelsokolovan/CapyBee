@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {checkBoardRoute,openExpeditionMap,selectPlace,travelTo} from './game-honeycomb-board.mjs';
-import {checkExpeditionOpening,captureExpeditionLantern} from './game-expeditions.mjs';
+import {checkExpeditionOpening,captureExpeditionLantern,checkSceneAdvance} from './game-expeditions.mjs';
 import {assertCompanionUI,holdCompanionChoice,captureCompanionEvidence} from './game-companions.mjs';
 
 export async function checkPolishPack({page,context,base,requests}) {
@@ -42,7 +42,7 @@ export async function checkPolishPack({page,context,base,requests}) {
   }
   if(label==='Układam z Luną znak z liści')await captureCompanionEvidence({page,game,run:await currentRun(),label:'all-companions',full:true});
  };
- const start=async(locale='en')=>{
+ const start=async(locale='en',scrolledReview=false)=>{
   const another=game.getByRole('button',{name:locale==='en'?'Start another adventure':'Rozpocznij inną przygodę',exact:true});
   if(await another.count())await another.click();
   const pack=page.getByRole('button',{name:/CapyBee — Nowy ul, dwa światła/});
@@ -50,9 +50,20 @@ export async function checkPolishPack({page,context,base,requests}) {
   await pack.click();assert.equal(await page.getByRole('checkbox',{name:/Use AI narration|Użyj narracji AI/}).count(),1);
   await page.getByRole('button',{name:locale==='en'?'Review':'Sprawdź',exact:true}).click();
   const before=requests.length;
-  await page.getByRole('button',{name:locale==='en'?'Start adventure':'Rozpocznij przygodę',exact:true}).click();
-  await game.waitFor();await saved();assert.equal(await game.getAttribute('lang'),'pl');
   const viewport=page.viewportSize();
+  const overlay=page.locator('.adventure-overlay');
+  try{
+   if(scrolledReview){
+    await page.setViewportSize({width:360,height:320});
+    const offset=await overlay.evaluate(node=>{node.scrollTop=node.scrollHeight;return node.scrollTop;});
+    assert.ok(offset>0,'the review must scroll to exercise the run mount reset');
+   }
+   await page.getByRole('button',{name:locale==='en'?'Start adventure':'Rozpocznij przygodę',exact:true}).click();
+   await game.waitFor();await saved();assert.equal(await game.getAttribute('lang'),'pl');
+   if(scrolledReview)assert.equal(await overlay.evaluate(node=>node.scrollTop),0);
+  }finally{
+   if(scrolledReview)await page.setViewportSize(viewport);
+  }
   try {
    await page.setViewportSize({width:360,height:640});
    const first=game.getByRole('button',{name:locale==='en'?'Continue':'Dalej',exact:true});
@@ -105,7 +116,8 @@ export async function checkPolishPack({page,context,base,requests}) {
   }
 
  };
- await start();await checkExpeditionOpening({page,game,capture:true});await choose('Continue');
+ await start('en',true);await checkExpeditionOpening({page,game,capture:true});
+ await checkSceneAdvance({page,game,advance:()=>choose('Continue')});
  await checkBoardRoute({page,context,base,requests});
  await choose('Na dziś wybieram odpoczynek');await ending('rest-here');
  await start();await choose('Continue');
@@ -118,7 +130,8 @@ export async function checkPolishPack({page,context,base,requests}) {
  assert.equal(resumed.revision,current.revision);assert.deepEqual(resumed.view,current.view);assert.equal(requests.length,posts,'reload created another start/action');
  for(const label of ['Idę do Warsztatu Plastra','Wiążę poręcz i ruszam do mostku','Zapalam światło przy nowej ścieżce'])await choose(label);
  await ending('new-path');
- await start();await choose('Continue');await choose('Zaglądam do Latarni Wspomnień');
+ await start();await choose('Continue');
+ await checkSceneAdvance({page,game,zoom:true,advance:()=>choose('Zaglądam do Latarni Wspomnień')});
  await captureExpeditionLantern({page,game});
  for(const label of ['Zabieram światło wspomnienia na drogę','Continue',
   'Odwiedzam Melę na Cichej Łące','Siadam na chwilę i słucham Meli','Continue',
@@ -129,7 +142,9 @@ export async function checkPolishPack({page,context,base,requests}) {
  await page.getByRole('button',{name:'Back to Play',exact:true}).click();
  await Promise.all([page.waitForResponse(r=>r.url().endsWith('/api/child-profile')&&r.request().method()==='PATCH'&&r.status()===200),page.locator('.locale-control select').first().selectOption('pl')]);
  await page.getByRole('button',{name:'Graj',exact:true}).click();await page.getByRole('button',{name:/Przygody/}).click();
- await start('pl');await checkExpeditionOpening({page,game});await choose('Dalej');await openExpeditionMap(game);
+ await start('pl');await checkExpeditionOpening({page,game});
+ await checkSceneAdvance({page,game,capture:false,advance:()=>choose('Dalej')});
+ await openExpeditionMap(game);
  await game.locator('[aria-current="location"]').getByText('Tu jesteś',{exact:true}).waitFor();
  const polishSheet=game.locator('.game-map-sheet');
  await polishSheet.getByRole('heading',{name:'Mapa przygody',exact:true}).waitFor();

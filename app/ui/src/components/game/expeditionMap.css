@@ -2,7 +2,7 @@
  position: fixed; inset: auto 0 0; margin: 0 auto;
  width: min(100%, 45rem); max-width: none; max-height: 88dvh;
  padding: 0; border: 0; border-radius: 18px 18px 0 0;
- background: #fdf3d9; color: #2e2413; overflow: hidden;
+ background: #fdf3d9; color: #2e2413; overflow: hidden; overscroll-behavior: contain;
 }
 .game-map-sheet[open] { display: flex; flex-direction: column; }
 .game-map-sheet::backdrop { background: #2e241366; }

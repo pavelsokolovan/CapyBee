@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {checkExpedition, captureExpeditionHub} from './game-expeditions.mjs';
+import {checkExpedition, captureExpeditionHub, checkSceneFocus} from './game-expeditions.mjs';
 import {mkdir} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 
@@ -73,7 +73,18 @@ export async function checkBoardRoute({page,context,base,requests}){
  assert.equal(await close.evaluate(node=>node===document.activeElement),true);
  await page.keyboard.press('Escape');await sheet.waitFor({state:'hidden'});
  assert.equal(await mapButton.evaluate(node=>node===document.activeElement),true);
- await openExpeditionMap(game);await page.mouse.click(1,1);await sheet.waitFor({state:'hidden'});
+ const sceneBody=game.locator('.game-scene-body');
+ const scrolled=await sceneBody.evaluate(node=>{node.scrollTop=node.scrollHeight;return node.scrollTop;});
+ assert.ok(scrolled>0);
+ await openExpeditionMap(game);
+ for(const region of [sheet,sheet.locator('.game-map-scroll')]){
+  assert.equal(await region.evaluate(node=>getComputedStyle(node).overscrollBehavior),'contain');
+ }
+ assert.equal(await sceneBody.evaluate(node=>getComputedStyle(node).overflowY),'hidden');
+ await page.mouse.move(1,1);await page.mouse.wheel(0,-300);
+ await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ assert.equal(await sceneBody.evaluate(node=>node.scrollTop),scrolled);
+ await page.mouse.click(1,1);await sheet.waitFor({state:'hidden'});
  assert.equal(await mapButton.evaluate(node=>node===document.activeElement),true);
  await openExpeditionMap(game);await close.click();await sheet.waitFor({state:'hidden'});
  assert.equal(await mapButton.evaluate(node=>node===document.activeElement),true);
@@ -144,6 +155,7 @@ export async function checkBoardRoute({page,context,base,requests}){
   await sheet.waitFor({state:'hidden'});
   const location=game.getByRole('heading',{name:'Cicha Łąka',exact:true});
   assert.equal(await location.evaluate(node=>node===document.activeElement),true);
+  await checkSceneFocus(game);
   assert.ok(run.view.options.some(o=>o.id==='help-mela'));assert.equal(run.view.presentation.party.length,0);
   const writes=requests.slice(beforeOpen).filter(r=>r.url===url);
   assert.equal(writes.length,1);assert.deepEqual(writes[0].body.command,{type:'MOVE',placeId:'quiet-meadow'});

@@ -9,6 +9,7 @@ import {decodeSummary} from '../../game/gameDecoders';
 import fixtures from '../../game/fixtures/contracts.json';
 import {illustratedRun} from '../../game/fixtures/illustratedRun';
 import {adventureCopy} from '../../game/adventureCopy';
+import {anonymousNotePackId} from '../../game/anonymousNote';
 import type {GameRunSummaryDto} from '../../game/gameApi';
 import {RunController,type RunState} from '../../game/runController';
 import {GameTransport} from '../../game/gameTransport';
@@ -30,6 +31,41 @@ async function renderRun(run:GameRunSummaryDto) {
  });
  return {submit:controller.submit,update,accept:(run:GameRunSummaryDto)=>update({run})};
 }
+it.each(['expedition','legacy','episode'] as const)('clears stale overlay offsets and resets the %s scroller after a saved choice',async kind=>{
+ host.className='adventure-overlay';
+ host.scrollTop=90;host.scrollLeft=15;
+ const run=illustratedRun();
+ if(kind==='legacy')run.view.presentation=null;
+ if(kind==='episode')run.packId=anonymousNotePackId;
+ const {submit,accept}=await renderRun(run);
+ expect([host.scrollTop,host.scrollLeft]).toEqual([0,0]);
+ expect(document.activeElement).toBe(host.querySelector(kind==='expedition'?'.game-scene-body > h3':'.game-run > h3'));
+ const scroller=kind==='expedition'?host.querySelector<HTMLElement>('.game-scene-body')!:host;
+ const heading=host.querySelector<HTMLElement>(kind==='expedition'?'.game-expedition-location':'.game-run h3')!;
+ const focus=vi.spyOn(heading,'focus');
+ scroller.scrollTop=100;scroller.scrollLeft=20;
+ await act(async()=>host.querySelector<HTMLButtonElement>('.game-actions button')!.click());
+ expect(submit).toHaveBeenCalledExactlyOnceWith({type:'CHOOSE',optionId:run.view.options[0].id});
+ await accept({...run,revision:run.revision+1});
+ expect([scroller.scrollTop,scroller.scrollLeft]).toEqual([0,0]);
+ expect(document.activeElement).toBe(heading);
+ expect(focus).toHaveBeenCalledExactlyOnceWith({preventScroll:true});
+});
+it.each(['background','rejected'] as const)('preserves body scroll and focus after a %s update',async kind=>{
+ const run=illustratedRun(),{accept,update}=await renderRun(run);
+ const body=host.querySelector<HTMLElement>('.game-scene-body')!;
+ const summary=host.querySelector<HTMLElement>('.game-scene-menu > summary')!;
+ summary.focus();body.scrollTop=90;body.scrollLeft=15;
+ const focus=vi.spyOn(host.querySelector<HTMLElement>('.game-expedition-location')!,'focus');
+ if(kind==='background')await accept({...run,revision:run.revision+1});
+ else{
+  await act(async()=>host.querySelector<HTMLButtonElement>('.game-actions button')!.click());
+  await update({message:'rejected'});
+ }
+ expect([body.scrollTop,body.scrollLeft]).toEqual([90,15]);
+ expect(document.activeElement).toBe(summary);
+ expect(focus).not.toHaveBeenCalled();
+});
 it('shows a title-less illustrated pack as an expedition and preserves text and focus on travel',async()=>{
  const run=illustratedRun(),{submit,accept}=await renderRun(run);
  const game=host.querySelector('.game-scene-first.game-expedition')!;

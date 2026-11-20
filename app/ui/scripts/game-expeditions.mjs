@@ -3,15 +3,49 @@ import {mkdir} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 
 const evidence=fileURLToPath(new URL('../../../docs/evidence/37/',import.meta.url));
+const focusEvidence=fileURLToPath(new URL('../../../docs/evidence/39/',import.meta.url));
 const mobile={width:360,height:640};
 const art='.game-encounter-backdrop';
 const bubble='.game-encounter-content';
 const body='.game-scene-body';
 const footer='.game-scene-footer';
 
-async function screenshot(page,name){
- await mkdir(evidence,{recursive:true});
- await page.screenshot({path:evidence+name+'.png'});
+async function screenshot(page,name,directory=evidence){
+ await mkdir(directory,{recursive:true});
+ await page.screenshot({path:directory+name+'.png'});
+}
+
+export async function checkSceneFocus(game){
+ const state=await game.locator(body).evaluate(node=>{
+  const heading=node.querySelector('.game-expedition-location');
+  const frame=node.getBoundingClientRect(),caption=heading?.getBoundingClientRect();
+  return {
+   scrollTop:node.scrollTop,scrollLeft:node.scrollLeft,focused:heading===document.activeElement,
+   visible:!!caption&&caption.top>=frame.top&&caption.bottom<=frame.bottom,
+   containment:getComputedStyle(node).overscrollBehavior,
+  };
+ });
+ assert.deepEqual(state,{scrollTop:0,scrollLeft:0,focused:true,visible:true,containment:'contain'});
+}
+
+export async function checkSceneAdvance({page,game,advance,zoom=false,capture=true}){
+ const viewport=page.viewportSize();
+ try {
+  await page.emulateMedia({reducedMotion:'reduce'});
+  // At 200% page zoom a 360 × 640 viewport has half as many CSS pixels.
+  await page.setViewportSize(zoom?{width:180,height:320}:{width:360,height:480});
+  const offset=await game.locator(body).evaluate(node=>{node.scrollTop=node.scrollHeight;return node.scrollTop;});
+  assert.ok(offset>0,'the outgoing scene must scroll to exercise the reset');
+  await advance();
+  await checkSceneFocus(game);
+  if(await game.locator(footer).count()){
+   assert.equal(await game.locator(footer).evaluate(node=>getComputedStyle(node).overscrollBehavior),'contain');
+  }
+  if(capture)await screenshot(page,zoom?'after-advance-200-zoom':'after-advance-small-viewport',focusEvidence);
+ }finally{
+  await page.setViewportSize(viewport);
+  await page.emulateMedia({reducedMotion:'no-preference'});
+ }
 }
 
 async function atMobile(page,game,check){

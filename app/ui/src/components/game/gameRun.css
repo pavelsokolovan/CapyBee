@@ -1,4 +1,4 @@
-.game-run { min-width: 0; overflow-wrap: anywhere; padding-block: 1rem; }
+.game-run { min-width: 0; overflow-wrap: anywhere; padding-block: 1rem; scroll-margin-block-start: 4rem; }
 .game-run p { white-space: pre-wrap; }
 .game-run button, .game-run summary { min-height: 44px; padding: .65rem; }
 .game-run button { max-width: 100%; white-space: normal; }
@@ -74,9 +74,10 @@ body:has(.adventure-overlay .game-expedition) { min-width: 0; }
 .adventure-panel:has(> .game-expedition) > header { position: static; flex-shrink: 0; }
 .game-run.game-expedition { display: flex; flex-direction: column; flex: 1; min-height: 0; padding-block: 0; }
 .game-scene-body {
- flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain;
+ flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
  padding: .25rem .25rem .5rem; margin-inline: -.25rem;
 }
+.game-expedition:has(.game-map-sheet[open]) > .game-scene-body { overflow: hidden; }
 .game-scene-body > h3 { font-size: clamp(1.4rem, 6vw, 2rem); line-height: 1.12; margin: 0 0 .45rem; }
 .game-scene-body > .game-actions button { margin-block: 4px; }
 .game-expedition .game-scene-tools { position: relative; flex-shrink: 0; flex-wrap: nowrap; gap: .4rem; }
@@ -99,8 +100,12 @@ body:has(.adventure-overlay .game-expedition) { min-width: 0; }
  .game-scene-menu-items button[aria-pressed=true] { border: 2px solid Highlight; }
 }
 .game-scene-footer {
- box-sizing: border-box; flex: 0 0 auto; max-height: 45dvh; overflow-y: auto;
+ box-sizing: border-box; flex: 0 0 auto; max-height: 45dvh; overflow-y: auto; overscroll-behavior: contain;
  display: grid; gap: .4rem; padding: .4rem .25rem max(.5rem, env(safe-area-inset-bottom, 0px)); margin-inline: -.25rem;
+}
+@media (max-height: 24rem) {
+ .game-expedition:has(> .game-run-status.game-visually-hidden) > .game-scene-body { min-height: min(8.5rem, 42dvh); }
+ .game-scene-footer { flex-shrink: 1; min-height: 0; }
 }
 .game-scene-footer fieldset { display: grid; gap: .4rem; margin: 0; }
 .game-expedition .game-scene-footer button { width: 100%; min-height: 48px; }

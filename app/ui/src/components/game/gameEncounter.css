@@ -28,6 +28,14 @@
  margin: 0; padding: .2rem .55rem; border: 1px solid #bca67c; border-radius: .625rem;
  background: var(--game-paper); color: #2e2413; font-size: .875rem; line-height: 1.25;
 }
+.game-expedition .game-encounter-backdrop .game-expedition-location:focus-visible {
+ outline: 3px solid var(--game-focus); outline-offset: 2px;
+}
+@media (max-height: 24rem) {
+ .game-expedition .game-encounter-backdrop .game-expedition-location {
+  inset-block: .5rem auto;
+ }
+}
 .game-expedition .game-encounter > .game-encounter-content {
  position: relative; border: 2px solid #846746; border-radius: 16px;
  padding: .55rem .75rem; background: var(--game-paper, #fffdf7); color: #2e2413;
@@ -50,6 +58,7 @@
   position: static; max-inline-size: none; margin: 0 0 .4rem; padding: 0; border: 0;
   background: Canvas; color: CanvasText; font-size: revert; line-height: inherit;
  }
+ .game-expedition .game-encounter-backdrop .game-expedition-location:focus-visible { outline-color: Highlight; }
  .game-expedition .game-encounter > .game-encounter-content {
   margin-top: 0; border-color: CanvasText; background: Canvas; color: CanvasText;
  }

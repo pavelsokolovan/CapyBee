@@ -7,6 +7,7 @@ import {SceneBlocks,SceneActions,ScenePanels,SceneResult,hasTextInput} from './G
 import {adventureCopy} from '../../game/adventureCopy';
 import {adventureLocation,adventureTitle} from '../../game/savedAdventure';
 import {sceneFirstKind} from '../../game/sceneFirst';
+import {focusScene,resetSceneScroll} from '../../game/sceneScroll';
 import {EpisodeInterest} from './EpisodeInterest';
 import {EpisodeMap} from './EpisodeMap';
 import {runCopy} from './runCopy';
@@ -33,6 +34,7 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
   return()=>window.clearTimeout(timeout);
  },[episode,initialized,state.message,state.pending,state.run.revision]);
  const textMode=textPreference?.runId===state.run.runId&&textPreference.enabled;
+ const section=useRef<HTMLElement>(null),sceneBody=useRef<HTMLDivElement>(null);
  const heading=useRef<HTMLHeadingElement>(null),runHeading=useRef<HTMLHeadingElement>(null),abandon=useRef<HTMLButtonElement>(null),dialog=useRef<HTMLDialogElement>(null);
  const mapDialog=useRef<HTMLDialogElement>(null),mapButton=useRef<HTMLButtonElement>(null);
  const menu=useRef<HTMLDetailsElement>(null),menuSummary=useRef<HTMLElement>(null);
@@ -57,7 +59,15 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
   return controller.submit(command);
  };
  useLayoutEffect(()=>{
-  if(focusBaseline.current!==state.run.runId){focusBaseline.current=state.run.runId;intention.current=null;(episodeCompleted?endingHeading:hasSceneHeading?runHeading:heading).current?.focus();return;}
+  const overlay=section.current?.closest<HTMLElement>('.adventure-overlay')??null;
+  const scroller=expedition?sceneBody.current:overlay;
+  if(focusBaseline.current!==state.run.runId){
+   focusBaseline.current=state.run.runId;
+   intention.current=null;
+   if(expedition)resetSceneScroll(overlay);
+   focusScene((episodeCompleted?endingHeading:hasSceneHeading?runHeading:heading).current,scroller);
+   return;
+  }
   const requested=intention.current;
   if(!requested||state.pending)return;
   if(expedition&&requested.command.type==='MOVE'){
@@ -67,7 +77,7 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
    if(accepted&&requested.entry){
     mapDialog.current?.close();
     setMapOpen(false);
-    heading.current?.focus();
+    focusScene(heading.current,scroller);
    }else{
     setSelectedPlace(places?.currentPlaceId??null);
     if(mapDialog.current?.open)mapDialog.current.querySelector<HTMLButtonElement>('button[aria-current="location"]')?.focus();
@@ -78,8 +88,8 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
   intention.current=null;
   if(state.message!=='saved'||requested.runId!==state.run.runId)return;
   if(episode&&episodeMap.current)episodeMap.current.open=false;
-  if(episodeCompleted)endingHeading.current?.focus();
-  else if(episode||expedition||requested.command.type!=='MOVE'||requested.entry||ended)heading.current?.focus();
+  if(episodeCompleted)focusScene(endingHeading.current,scroller);
+  else if(episode||expedition||requested.command.type!=='MOVE'||requested.entry||ended)focusScene(heading.current,scroller);
   else {
    const cell=[...document.querySelectorAll<HTMLElement>('.game-run [data-place-id]')].find(n=>n.dataset.placeId===view?.places?.currentPlaceId);
    cell?.querySelector<HTMLButtonElement>('button')?.focus();
@@ -131,7 +141,7 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
   const caption=<h4 className={currentLocation?'game-expedition-location':'game-visually-hidden'} tabIndex={-1} ref={heading}
    lang={currentLocation?state.run.locale:locale}>{currentLocation??boardCopy[locale].moment}</h4>;
   const canAbandon=state.run.status==='ACTIVE';
-  return <section className={runClass} data-text-mode={textMode} lang={state.run.locale}>
+  return <section ref={section} className={runClass} data-text-mode={textMode} lang={state.run.locale}>
    {mapAvailable||textToggle||canAbandon?<div className="game-scene-tools" lang={locale}>
     {mapAvailable?<button className="game-map-button" type="button" aria-haspopup="dialog" ref={mapButton} onClick={openMap}>
      <span aria-hidden="true">🗺</span> {boardCopy[locale].map}
@@ -149,7 +159,7 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
    {mapAvailable&&places?<ExpeditionMap places={places} presentation={presentation} locale={locale} dialog={mapDialog}
     selectedId={selectedPlace} onSelect={setSelectedPlace} onClose={closeMap} textMode={textMode}
     pending={state.pending} locked={locked} status={mapOpen?status:null} submit={submit}/>:null}
-   <div className="game-scene-body">
+   <div className="game-scene-body" ref={sceneBody}>
     {titleHeading}{notices}
     {view?<>
     <GameEncounter view={view} stage caption={caption} textMode={textMode}>
@@ -165,7 +175,7 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
   </section>;
  }
 
- return <section className={runClass} data-text-mode={textMode} lang={state.run.locale}>
+ return <section ref={section} className={runClass} data-text-mode={textMode} lang={state.run.locale}>
   {titleHeading}
   {!episode?<><p>{adventureCopy[locale].locale}: {new Intl.DisplayNames([locale],{type:'language'}).of(state.run.locale)}</p>
    {initialized&&state.message==='saved'?<p>{adventureCopy[locale].ready}</p>:null}{status}</>:null}
