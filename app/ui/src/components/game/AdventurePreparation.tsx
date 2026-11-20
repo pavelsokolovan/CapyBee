@@ -6,8 +6,8 @@ import {AdventureStart} from '../../game/adventureStart';
 import {adventureCopy} from '../../game/adventureCopy';
 import {compatible,transientPack,effective,inputsOf,localesOf,titleOf,validation,codePoints,type Adventure} from '../../game/preparation';
 import {anonymousNotePackId} from '../../game/anonymousNote';
-import {hiveExpeditionPackId} from '../../game/hiveExpedition';
 import {adventureLocation,adventureTitle} from '../../game/savedAdventure';
+import {sceneFirstKind} from '../../game/sceneFirst';
 import {GameRun} from './GameRun';
 import {restoreGameSession} from '../../game/restoreGameSession';
 
@@ -73,8 +73,8 @@ export function AdventurePreparation({owner,locale,onClose,resumeRunId,onRunRead
    {invalid&&problems.includes(input.id)?<p role="alert">{input.kind==='FREE_TEXT'?copy.textTooLong:copy.required}</p>:null}
   </fieldset>;
  };
- const episodeReady=state.phase==='ready'&&state.ready?.packId===anonymousNotePackId;
- const sceneFirstReady=episodeReady||(state.phase==='ready'&&state.ready?.packId===hiveExpeditionPackId);
+ const readyKind=state.phase==='ready'&&state.ready?sceneFirstKind(state.ready):null;
+ const episodeReady=readyKind==='episode',sceneFirstReady=readyKind!==null;
  const panelCopy=episodeReady?adventureCopy.pl:copy;
  const openingEpisode=selected?.kind==='PACK'&&selected.pack.id===anonymousNotePackId&&state.loading;
  const activeCurrent=state.caps?.gameEnabled&&state.current&&['ACTIVE','PREPARING'].includes(state.current.status)?state.current:null;

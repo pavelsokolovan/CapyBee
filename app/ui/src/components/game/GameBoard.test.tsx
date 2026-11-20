@@ -62,13 +62,14 @@ it('keeps compact travel available in a text-only fallback and shows a locked pr
  await act(async()=>button('Visit: River').click());
  expect(submit).toHaveBeenCalledExactlyOnceWith({type:'MOVE',placeId:'river'});
 });
-it.each(['ENTER_SCENE','LOCATION_ONLY'])('keeps pending/rejected state and sends only one MOVE, then focuses accepted %s appropriately',async behavior=>{
+it.each(['ENTER_SCENE','LOCATION_ONLY'])('keeps pending/rejected state and focuses the location after accepted %s travel',async behavior=>{
  const initial=view();initial.places!.places[1].moveBehavior=behavior;
  const run:GameRunSummaryDto={runId:'run',source:{kind:'PACK',packId:'fixture',packVersion:'1.0.0'},packId:'fixture',packVersion:'1.0.0',status:'ACTIVE',locale:'en',revision:0,updatedAt:'2026-11-16T00:00:00Z',viewSchema:2,view:initial};
  let state:RunState={run,pending:false,message:'saved'};const listeners=new Set<()=>void>();
  const update=(next:RunState)=>{state=next;listeners.forEach(fn=>fn());};
  const controller={getSnapshot:()=>state,subscribe:(fn:()=>void)=>{listeners.add(fn);return()=>{listeners.delete(fn);};},initialize:vi.fn(async()=>{}),detach:vi.fn(),submit:vi.fn(async()=>update({...state,pending:true,message:'checking'}))};
  await act(async()=>root.render(<GameRun run={run} owner="owner" locale="en" onAnother={vi.fn()} controller={controller as unknown as RunController}/>));
+ host.querySelector<HTMLDetailsElement>('.game-scene-map')!.open=true;
  const move=button(behavior==='ENTER_SCENE'?'Visit: River':'Go to: River');move.focus();await act(async()=>move.click());
  expect(controller.submit).toHaveBeenCalledExactlyOnceWith({type:'MOVE',placeId:'river'});expect(host.querySelector('.game-board-player')?.getAttribute('data-current-place')).toBe('camp');
  expect(document.activeElement).toBe(move);expect(host.textContent).toContain('We can take our time.');
@@ -77,9 +78,11 @@ it.each(['ENTER_SCENE','LOCATION_ONLY'])('keeps pending/rejected state and sends
  const accepted=structuredClone(initial);accepted.places!.currentPlaceId='river';accepted.places!.visitedPlaceIds.push('river');accepted.places!.availableMoves=['camp'];accepted.blocks=[{kind:'NARRATION',text:'Accepted river moment.',refs:[]}];
  await act(async()=>update({run:{...run,revision:1,view:accepted},pending:false,message:'saved'}));
  expect(controller.submit).toHaveBeenCalledTimes(2);expect(host.querySelector('.game-board-player')?.getAttribute('data-current-place')).toBe('river');expect(host.textContent).toContain('Accepted river moment.');
- expect(document.activeElement).toBe(behavior==='ENTER_SCENE'? [...host.querySelectorAll('h4')].find(n=>n.textContent==='Current moment'):button('Look: River'));
+ expect(document.activeElement).toBe(host.querySelector('.game-expedition-location'));
+ expect(document.activeElement?.textContent).toBe('River');
  const focus=document.activeElement;await act(async()=>update({...state}));expect(document.activeElement).toBe(focus);
- button('Look: Camp').focus();await act(async()=>update({run:{...state.run,revision:2},pending:false,message:'saved'}));expect(document.activeElement).toBe(button('Look: Camp'));
+ const summary=host.querySelector<HTMLElement>('.game-scene-map > summary')!;summary.focus();
+ await act(async()=>update({run:{...state.run,revision:2},pending:false,message:'saved'}));expect(document.activeElement).toBe(summary);
 });
 it('decodes optional entry fields without rejecting story for bad hints or unknown behavior',()=>{
  const raw=structuredClone(fixtures.placeEntry);expect(decodeSummary(raw).view!.places!.movementHint).toBe('Choose or pause.');

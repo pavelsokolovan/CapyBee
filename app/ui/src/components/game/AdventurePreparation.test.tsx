@@ -6,6 +6,7 @@ import {AdventurePreparation} from './AdventurePreparation';
 import {AdventureStart,type StartTransport} from '../../game/adventureStart';
 import type {GameCapabilities,GeneratorProfile} from '../../game/gameApi';
 import contracts from '../../game/fixtures/contracts.json';
+import {illustratedRun} from '../../game/fixtures/illustratedRun';
 import {adventureCopy} from '../../game/adventureCopy';
 (globalThis as typeof globalThis & {IS_REACT_ACT_ENVIRONMENT:boolean}).IS_REACT_ACT_ENVIRONMENT=true;
 let host:HTMLDivElement,root:Root;
@@ -18,6 +19,17 @@ async function click(label:string){const button=Array.from(host.querySelectorAll
 beforeEach(()=>{sessionStorage.clear();host=document.createElement('div');document.body.append(host);root=createRoot(host);});
 afterEach(async()=>{await act(()=>root.unmount());host.remove();vi.restoreAllMocks();});
 describe('preparation panel',()=>{
+ it('resumes a non-hive illustrated run in the scene panel',async()=>{
+  const h=harness(),run=illustratedRun();
+  vi.mocked(h.transport.read).mockImplementation(async path=>({
+   status:200,body:path.endsWith('/capabilities')?caps:run,
+  }));
+  await act(async()=>root.render(<AdventurePreparation owner="owner" locale="en" onClose={h.close}
+   flow={h.flow} resumeRunId={run.runId}/>));
+  expect(host.querySelector('.adventure-scene-panel .game-scene-first')).not.toBeNull();
+  expect(host.querySelector('.game-expedition-location')?.textContent).toBe('Obóz');
+  expect(h.transport.transient).not.toHaveBeenCalled();
+ });
  it.each(['en','pl'] as const)('renders metadata controls, masks private review and starts only after confirmation (%s)',async locale=>{
   const h=harness(),copy=adventureCopy[locale];
   await act(async()=>root.render(<AdventurePreparation owner="owner" locale={locale} onClose={h.close} flow={h.flow}/>));

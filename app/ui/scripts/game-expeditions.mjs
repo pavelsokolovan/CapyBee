@@ -6,7 +6,19 @@ export async function checkExpedition({page,game,requests}){
  const encounter=game.locator('.game-encounter');assert.equal(await encounter.count(),1);
  assert.equal(await encounter.locator('.game-encounter-backdrop > svg').count(),1);
  const text=await encounter.innerText(),choices=await encounter.locator('fieldset button').allTextContents(),before=requests.length;
- const viewport=page.viewportSize();await page.setViewportSize({width:360,height:1500});
+ const viewport=page.viewportSize();await page.setViewportSize({width:360,height:640});
+ const map=game.locator('.game-scene-map');
+ const mapWasOpen=await map.evaluate(node=>{const open=node.open;node.open=false;return open;});
+ try {
+  assert.equal(await game.evaluate(node=>node.classList.contains('game-scene-first')),true);
+  await game.evaluate(node=>{node.closest('.adventure-overlay').scrollTop=0;});
+  const firstAction=await encounter.locator('fieldset button:enabled').first().boundingBox();
+  assert.ok(firstAction&&firstAction.y>=0&&firstAction.y+firstAction.height<=640,
+   'the first expedition action is outside the 360 × 640 viewport');
+ } finally {
+  await map.evaluate((node,open)=>{node.open=open;},mapWasOpen);
+  await page.setViewportSize({width:360,height:1500});
+ }
  assert.ok(await encounter.locator('.game-encounter-stage').evaluate(stage=>{
   const frame=stage.getBoundingClientRect();
   return stage.children.length>0&&[...stage.children].every(figure=>{

@@ -15,7 +15,7 @@ it.each(['en','pl'] as const)('composes accepted art and preserves draft, focus 
  let state:RunState={run,pending:false,message:'saved'};const listeners=new Set<()=>void>();
  const controller={getSnapshot:()=>state,subscribe:(fn:()=>void)=>{listeners.add(fn);return()=>{listeners.delete(fn);};},initialize:vi.fn(async()=>{}),detach:vi.fn(),submit:vi.fn()};
  await act(async()=>root.render(<GameRun run={run} owner="owner" locale={locale} controller={controller as unknown as RunController} onAnother={vi.fn()}/>));
- expect(host.querySelectorAll('.game-encounter-backdrop svg')).toHaveLength(1);expect(host.querySelectorAll('.game-current-characters')).toHaveLength(1);expect(host.querySelectorAll('fieldset')).toHaveLength(1);
+ expect(host.querySelectorAll('.game-encounter-backdrop > svg')).toHaveLength(1);expect(host.querySelectorAll('.game-current-characters')).toHaveLength(1);expect(host.querySelectorAll('fieldset')).toHaveLength(1);
  const area=host.querySelector('textarea')!;const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value')!.set!;
  await act(async()=>{setter.call(area,'A quiet fictional wish');area.dispatchEvent(new Event('input',{bubbles:true}));});
  const toggle=[...host.querySelectorAll('button')].find(b=>b.textContent===(locale==='en'?'Text mode':'Tryb tekstowy'))!;toggle.focus();

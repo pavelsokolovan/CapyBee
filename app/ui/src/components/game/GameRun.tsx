@@ -5,14 +5,13 @@ import {RunController} from '../../game/runController';
 import {restoreGameSession} from '../../game/restoreGameSession';
 import {SceneBlocks,SceneActions,ScenePanels,SceneResult} from './GameScene';
 import {adventureCopy} from '../../game/adventureCopy';
-import {anonymousNotePackId} from '../../game/anonymousNote';
-import {hiveExpeditionPackId} from '../../game/hiveExpedition';
 import {adventureLocation,adventureTitle} from '../../game/savedAdventure';
+import {sceneFirstKind} from '../../game/sceneFirst';
 import {EpisodeInterest} from './EpisodeInterest';
 import {EpisodeMap} from './EpisodeMap';
 import {runCopy} from './runCopy';
 import './gameRun.css';
-import {GamePlaces,hexLayout} from './GamePlaces';
+import {GamePlaces} from './GamePlaces';
 import {boardCopy} from './boardCopy';
 import {GameEncounter,encounterCopy} from './GameEncounter';
 import {GameCompletion} from './GameCompletion';
@@ -22,8 +21,8 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
  const [textPreference,setTextPreference]=useState<{runId:string;enabled:boolean}|null>(null);
  const [controller]=useState(()=>provided??new RunController(run,new GameTransport(()=>owner,()=>restoreGameSession(owner)),owner));
  const state=useSyncExternalStore(controller.subscribe,controller.getSnapshot),view=state.run.view;
- const episode=state.run.packId===anonymousNotePackId;
- const expedition=state.run.packId===hiveExpeditionPackId;
+ const sceneKind=sceneFirstKind(state.run);
+ const episode=sceneKind==='episode',expedition=sceneKind==='expedition';
  const controlsLocale=episode?'pl':locale,c=runCopy[controlsLocale];
  const episodeMap=useRef<HTMLDetailsElement>(null);
  const [saveVisible,setSaveVisible]=useState(false);
@@ -42,9 +41,8 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
  const endingHeading=useRef<HTMLHeadingElement>(null);
  const unsupported=!view||typeof view.canAdvance!=='boolean'||!!(view.input?.mode==='TEXT'&&view.options.some(o=>o.enabled))||!!(view.places?.availableMoves.some(id=>!view.places?.places.some(p=>p.id===id)));
  const locked=!initialized||state.pending||state.run.status!=='ACTIVE'||!!view?.ended||unsupported;
- const presentation=view&&'presentation' in view?view.presentation:null;
- const illustrated=!episode&&!!view?.places&&!!presentation&&!!hexLayout(view.places);
- const hasSceneHeading=illustrated||(expedition&&!!view);
+ const presentation=view?.presentation;
+ const hasSceneHeading=expedition&&!!view;
  const currentLocation=adventureLocation(view);
  const intention=useRef<{command:GameCommand;revision:number;runId:string;entry:boolean}|null>(null);
  const focusBaseline=useRef<string|null>(null);
@@ -69,7 +67,7 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
   }
  },[state.run.runId,state.run.revision,state.pending,state.message,ended,episode,episodeCompleted,expedition,hasSceneHeading,view?.places?.currentPlaceId]);
  const cancel=()=>{dialog.current?.close();abandon.current?.focus();};
- const title=adventureTitle(state.run)??c.scene;
+ const title=adventureTitle(state.run);
  const endingLabel=view?.endReason==='ABANDONED' ? c.abandoned : 'Zagadka rozwiązana';
  const textToggle=presentation?<button type="button" lang={controlsLocale} aria-pressed={textMode}
   onClick={()=>setTextPreference({runId:state.run.runId,enabled:!textMode})}>{encounterCopy[controlsLocale].text}</button>:null;
@@ -78,14 +76,16 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
   ? (!episode||state.message!=='saved'||saveVisible ? c[state.message] : '') : c.checking}</p>;
  const actions=view&&initialized&&(!locked||state.pending)?<SceneActions key={state.run.revision} view={view}
   locale={controlsLocale} locked={locked} selection={state.selection} submit={submit}/>:null;
- const board=(illustrated||expedition)&&view?.places?.places.length?<GamePlaces places={view.places} presentation={presentation} compact={expedition}
+ const board=expedition&&view?.places?.places.length?<GamePlaces places={view.places} presentation={presentation} compact
   runId={state.run.runId} revision={state.run.revision} pending={state.pending} forceList={textMode}
   locale={locale} locked={locked&&!ended} submit={submit}/>:null;
  const party=view?<GameParty view={view} locale={locale} runId={state.run.runId} revision={state.run.revision}
   ready={initialized} announce={initialized&&!locked&&state.message==='saved'} hideEmpty={expedition}/>:null;
  const runClass=episode?'game-run game-scene-first game-episode':expedition?'game-run game-scene-first game-expedition':'game-run';
  return <section className={runClass} data-text-mode={textMode} lang={state.run.locale}>
- <h3 tabIndex={-1} ref={hasSceneHeading?runHeading:heading}>{title}</h3>
+ <h3 tabIndex={-1} ref={hasSceneHeading?runHeading:heading}
+  className={expedition&&title===null?'game-visually-hidden':undefined}
+  lang={expedition&&title===null?controlsLocale:undefined}>{title??c.scene}</h3>
  {!episode?<>{!expedition?<><p>{adventureCopy[locale].locale}: {new Intl.DisplayNames([locale],{type:'language'}).of(state.run.locale)}</p>
  {initialized&&state.message==='saved'?<p>{adventureCopy[locale].ready}</p>:null}</>:null}{status}</>:null}
  {unsupported?<p>{c.unsupported}</p>:null}{state.run.status!=='ACTIVE'&&!ended?<p>{c.unavailable}</p>:null}
@@ -102,14 +102,14 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
   {board?<details className="game-scene-map"><summary lang={locale}>{boardCopy[locale].map}</summary>{board}</details>:null}
   {textToggle}
  </div>:<>{textToggle}{board}{party}</>}
- {hasSceneHeading?<h4 className={expedition?'game-expedition-location':undefined} tabIndex={-1} ref={heading}
+ {hasSceneHeading?<h4 className={expedition?(currentLocation?'game-expedition-location':'game-visually-hidden'):undefined} tabIndex={-1} ref={heading}
   lang={expedition&&currentLocation?state.run.locale:locale}>{expedition&&currentLocation?currentLocation:boardCopy[locale].moment}</h4>:null}
  <GameEncounter view={view} stage={expedition}>
  {!expedition?<GameCurrentCharacters view={view} locale={locale}/>:null}
  <SceneBlocks view={view} locale={locale}/>{actions}
  </GameEncounter>
  {expedition?<><GameCurrentCharacters view={view} locale={locale} collapsible/>{party}</>:null}
- <ScenePanels hidePlaces={illustrated||expedition} view={view} locale={locale} locked={locked} submit={submit}/>{ended?<SceneResult view={view} locale={locale}/>:null}</>:episode?status:null}
+ <ScenePanels hidePlaces={expedition} view={view} locale={locale} locked={locked} submit={submit}/>{ended?<SceneResult view={view} locale={locale}/>:null}</>:episode?status:null}
  {state.retryable?<button type="button" onClick={()=>void controller.retryUnsent()}>{c.retry}</button>:null}
  {state.cancellable?<button type="button" onClick={()=>void controller.removeUnsent()}>{c.remove}</button>:null}
  {state.pending?<button type="button" onClick={()=>void controller.check()}>{c.check}</button>:null}

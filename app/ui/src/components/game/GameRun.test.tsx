@@ -7,13 +7,91 @@ import {SceneActions,SceneBlocks,ScenePanels,SceneResult} from './GameScene';
 import {GameRun} from './GameRun';
 import {decodeSummary} from '../../game/gameDecoders';
 import fixtures from '../../game/fixtures/contracts.json';
-import {RunController} from '../../game/runController';
+import {illustratedRun} from '../../game/fixtures/illustratedRun';
+import {adventureCopy} from '../../game/adventureCopy';
+import type {GameRunSummaryDto} from '../../game/gameApi';
+import {RunController,type RunState} from '../../game/runController';
 import {GameTransport} from '../../game/gameTransport';
 (globalThis as typeof globalThis & {IS_REACT_ACT_ENVIRONMENT:boolean}).IS_REACT_ACT_ENVIRONMENT=true;
 let host:HTMLDivElement,root:Root;
 beforeEach(()=>{sessionStorage.clear();host=document.createElement('div');document.body.append(host);root=createRoot(host);});
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.restoreAllMocks();});
 const run=()=>decodeSummary(structuredClone(fixtures.dynamic));
+async function renderRun(run:GameRunSummaryDto) {
+ let state:RunState={run,pending:false,message:'saved'};
+ const listeners=new Set<()=>void>();
+ const controller={getSnapshot:()=>state,subscribe:(listener:()=>void)=>{
+  listeners.add(listener);return()=>{listeners.delete(listener);};
+ },initialize:vi.fn(async()=>{}),detach:vi.fn(),submit:vi.fn()};
+ await act(async()=>root.render(<GameRun run={run} owner="owner" locale="en" onAnother={vi.fn()}
+  controller={controller as unknown as RunController}/>));
+ return {submit:controller.submit,accept:async(run:GameRunSummaryDto)=>act(async()=>{
+  state={...state,run};listeners.forEach(listener=>listener());
+ })};
+}
+it('shows a title-less illustrated pack as an expedition and preserves text and focus on travel',async()=>{
+ const run=illustratedRun(),{submit,accept}=await renderRun(run);
+ const game=host.querySelector('.game-scene-first.game-expedition')!;
+ const title=game.querySelector(':scope > h3')!;
+ expect(title.textContent).toBe('Adventure');
+ expect(title.classList.contains('game-visually-hidden')).toBe(true);
+ expect(title.getAttribute('lang')).toBe('en');
+ expect(document.activeElement).toBe(title);
+ expect(game.textContent).not.toContain(adventureCopy.en.locale);
+ expect(game.textContent).not.toContain(adventureCopy.en.ready);
+ expect(game.querySelector('p[role="status"].game-visually-hidden')?.textContent).toBe('Saved');
+ const map=game.querySelector<HTMLDetailsElement>('details.game-scene-map')!;
+ expect(map.open).toBe(false);
+ expect(map.querySelector('summary')?.textContent).toBe('Map');
+ expect([...game.querySelectorAll('.game-board')]).toEqual([map.querySelector('.game-board')]);
+ const travel=[...map.querySelectorAll<HTMLButtonElement>('[data-place-id] button')];
+ expect(travel.map(button=>button.getAttribute('aria-label'))).toEqual(['Visit: Rzeka']);
+ expect(game.querySelector<HTMLDetailsElement>('details.game-current-characters')?.open).toBe(false);
+ expect(game.querySelector('.game-party')).toBeNull();
+ const encounter=game.querySelector('.game-encounter')!;
+ const text=encounter.textContent;
+ const choices=()=>[...encounter.querySelectorAll('.game-actions button')].map(button=>button.textContent);
+ expect(choices()).toEqual(['Hold the reed']);
+ const toggle=[...game.querySelectorAll('button')].find(button=>button.textContent==='Text mode')!;
+ await act(async()=>toggle.click());
+ expect(toggle.getAttribute('aria-pressed')).toBe('true');
+ expect(encounter.textContent).toBe(text);
+ expect(choices()).toEqual(['Hold the reed']);
+ expect(submit).not.toHaveBeenCalled();
+ map.open=true;
+ await act(async()=>map.querySelector<HTMLButtonElement>('[aria-label="Visit: Rzeka"]')!.click());
+ expect(submit).toHaveBeenCalledExactlyOnceWith({type:'MOVE',placeId:'river'});
+ const accepted=structuredClone(run);
+ accepted.revision++;
+ accepted.view.places!.currentPlaceId='river';
+ await accept(accepted);
+ expect(document.activeElement).toBe(game.querySelector('.game-expedition-location'));
+ expect(document.activeElement?.textContent).toBe('Rzeka');
+ expect(document.activeElement?.getAttribute('lang')).toBe('pl');
+});
+it('keeps the fallback moment heading accessible when an illustrated run has no location',async()=>{
+ const run=illustratedRun();delete run.view.places;
+ await renderRun(run);
+ const heading=host.querySelector('.game-run > h4.game-visually-hidden');
+ expect(heading?.textContent).toBe('Current moment');
+ expect(heading?.getAttribute('lang')).toBe('en');
+});
+it('keeps the legacy text layout, status, actions and focus for a run without presentation',async()=>{
+ const run=illustratedRun();delete run.view.presentation;
+ run.view.places!.places[1].moveBehavior='LOCATION_ONLY';
+ await renderRun(run);
+ const game=host.querySelector('.game-run')!;
+ const title=game.querySelector(':scope > h3')!;
+ expect(game.classList.contains('game-scene-first')).toBe(false);
+ expect(title.classList.contains('game-visually-hidden')).toBe(false);
+ expect(document.activeElement).toBe(title);
+ expect(game.textContent).toContain(adventureCopy.en.locale);
+ expect(game.textContent).toContain(adventureCopy.en.ready);
+ expect(game.querySelector('.game-scene-map')).toBeNull();
+ expect(game.querySelector('.game-encounter svg')).toBeNull();
+ expect(game.querySelector('.game-actions legend')?.textContent).toBe('Adventure');
+ expect([...game.querySelectorAll('button')].some(button=>button.textContent==='Go to: Rzeka'&&!button.disabled)).toBe(true);
+});
 it('renders escaped ordered prose and resolves only discovered speakers',async()=>{
  const v=run().view!;v.blocks=[{kind:'NARRATION',text:'<img src="https://evil.test" onerror="alert(1)">',refs:[]},{kind:'SPEECH',speaker:'secret',text:'Zażółć\nHello',refs:[]},{kind:'FUTURE',text:'https://evil.test',refs:[]}];
  await act(async()=>root.render(<SceneBlocks view={v} locale="pl"/>));
