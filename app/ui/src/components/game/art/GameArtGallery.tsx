@@ -1,5 +1,5 @@
 import {useState} from 'react';
-import {catalog, expressions, type AssetId, type CharacterId} from '../../../assets/game/catalog';
+import {catalog, type AssetId, type CharacterId} from '../../../assets/game/catalog';
 import {GameBackdrop, GameCharacter, GameMotif, GameTerrain, GameTileArt, type TileState} from './GameArt';
 import {galleryCopy} from './galleryCopy';
 import './gallery.css';
@@ -74,7 +74,7 @@ export default function GameArtGallery() {
       </figure>)}</div>
       {characterIds.map((id, i) => <section className="art-character-sheet" key={id} data-testid={id}>
         <h3>{c.names[i]}</h3><code aria-hidden="true">{id}</code>
-        <div className="art-character-variants">{catalog[id].variants.flatMap(variant => (variant === 'marker' ? ['neutral'] as const : expressions).map(expression =>
+        <div className="art-character-variants">{catalog[id].variants.flatMap(variant => (variant === 'marker' ? ['neutral'] as const : catalog[id].expressions).map(expression =>
           <figure key={`${variant}-${expression}`}><div className={`art-character art-character-${variant}`}>
             <GameCharacter assetId={id} variant={variant} expression={expression} decorative/>
           </div><figcaption>{c.variant[variant]} · {c.expression[expression]}</figcaption></figure>))}</div>

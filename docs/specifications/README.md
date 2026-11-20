@@ -118,6 +118,8 @@ the implemented 30.2 contracts for the board, encounters and recruited party.
 
 - [43](43-capybee-honeycomb-feedback-instruction.md) — Place completion, hive-cell confirmation, and scene feedback.
 
+- [44](44-capybee-expressions-instruction.md) — CapyBee character art and reactions to accepted Hive story beats.
+
 ### Roadmap reconciliation
 
 The web host and server-side SDK wiring move from the earlier "spec 29" plan

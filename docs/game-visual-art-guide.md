@@ -58,7 +58,10 @@ pending art do not advance Capy or recruit anyone.
 The central 48% of the tile is clear. Terrain examples are shown at 64px wide;
 the gallery includes a 32px Capy marker and 40/64px portraits with names.
 Full figures use a `160×180` viewBox; portraits crop consistently to a 120px
-square. Facial expressions are fixed enums, never inferred from child mood.
+square. The public expression vocabulary is neutral, attentive, and pleased.
+CapyBee also has a local playful drawing. Illustrated Hive expeditions select
+his expression using accepted art bindings, objectives, and outcomes.
+[Spec 44](specifications/44-capybee-expressions-instruction.md)
 Only character geometry is mirrored for inward orientation, never HTML labels.
 
 Backdrops use an opaque `640×360` viewBox with background, middle-distance and

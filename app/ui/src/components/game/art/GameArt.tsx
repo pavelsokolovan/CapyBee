@@ -1,6 +1,6 @@
 import {useId, type ReactNode} from 'react';
-import {catalog, expressions, hexPoints, resolveAsset, type BackdropId, type CharacterId,
-  type CharacterVariant, type Expression, type MotifId, type Orientation, type TerrainId} from '../../../assets/game/catalog';
+import {catalog, hexPoints, resolveAsset, type BackdropId, type CharacterId,
+  type CharacterVariant, type CharacterExpression, type MotifId, type Orientation, type TerrainId} from '../../../assets/game/catalog';
 import {CharacterArtwork} from '../../../assets/game/CharacterArtwork';
 import {BackdropArtwork, TerrainArtwork} from '../../../assets/game/EnvironmentArtwork';
 import {MotifArtwork} from '../../../assets/game/MotifArtwork';
@@ -18,11 +18,11 @@ function ArtFrame({viewBox, children, cover=false, ...a11y}: ArtAccessibility & 
 }
 
 export function GameCharacter({assetId, variant = 'figure', expression = 'neutral', orientation = 'right', ...a11y}:
-  ArtAccessibility & {assetId?: CharacterId | null; variant?: CharacterVariant; expression?: Expression; orientation?: Orientation}) {
+  ArtAccessibility & {assetId?: CharacterId | null; variant?: CharacterVariant; expression?: CharacterExpression; orientation?: Orientation}) {
   const id = resolveAsset('character', assetId)!;
   const supported = catalog[id].variants.some(v => v === variant);
   const safeVariant = supported ? variant : 'figure';
-  const safeExpression = supported && expressions.some(e => e === expression) && safeVariant !== 'marker' ? expression : 'neutral';
+  const safeExpression = supported && catalog[id].expressions.some(e => e === expression) && safeVariant !== 'marker' ? expression : 'neutral';
   return <ArtFrame viewBox={safeVariant === 'portrait' ? '20 18 120 120' : '0 0 160 180'} {...a11y}>
     <g transform={orientation === 'left' ? 'translate(160 0) scale(-1 1)' : undefined}>
       <CharacterArtwork id={id} variant={safeVariant} expression={safeExpression}/>

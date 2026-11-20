@@ -1,4 +1,5 @@
 import {useEffect, useId, useRef, useState} from 'react';
+import type {CharacterExpression} from '../../assets/game/catalog';
 import type {GameView} from '../../game/gameApi';
 import {gameCompanions, type PresentedCharacter} from '../../game/gameCompanions';
 import {GameCharacter} from './art/GameArt';
@@ -7,10 +8,10 @@ import './gameCharacters.css';
 
 type Props = {view: GameView; locale: 'en' | 'pl'};
 
-function CharacterCard({character: c, locale, history = false}: {character: PresentedCharacter; locale: 'en' | 'pl'; history?: boolean}) {
+function CharacterCard({character: c, locale, history = false, expression}: {expression?:CharacterExpression; character: PresentedCharacter; locale: 'en' | 'pl'; history?: boolean}) {
   const copy = companionCopy[locale], Heading = history ? 'h4' : 'h5';
   return <article className={`game-character-card${history ? ' game-character-card-history' : ''}`} data-character-id={c.id}>
-    <span className="game-character-portrait"><GameCharacter assetId={c.assetId} variant="portrait" expression={c.expression} decorative/></span>
+    <span className="game-character-portrait"><GameCharacter assetId={c.assetId} variant="portrait" expression={expression??c.expression} decorative/></span>
     <div className="game-character-copy"><Heading>{c.name}</Heading>
       {c.joined ? <p className="game-character-joined" lang={locale}>{copy.joined}</p> : null}
       {c.trait || c.need ? <dl>
@@ -22,12 +23,12 @@ function CharacterCard({character: c, locale, history = false}: {character: Pres
   </article>;
 }
 
-export function GameCurrentCharacters({view, locale, collapsible = false}: Props & {collapsible?: boolean}) {
+export function GameCurrentCharacters({view, locale, collapsible = false, capyExpression}: Props & {collapsible?: boolean; capyExpression?:CharacterExpression}) {
   const data = gameCompanions(view), titleId = useId();
   if (!data?.current.length) return null;
   const title = companionCopy[locale].current;
   const list = <ul className="game-character-list">{data.current.map(c =>
-    <li key={c.id}><CharacterCard character={c} locale={locale}/></li>)}</ul>;
+    <li key={c.id}><CharacterCard character={c} locale={locale} expression={c.assetId==='character.capy'?capyExpression:undefined}/></li>)}</ul>;
   const className = 'game-art game-current-characters';
   return collapsible ? <details className={className}>
     <summary lang={locale}>{title}</summary>{list}

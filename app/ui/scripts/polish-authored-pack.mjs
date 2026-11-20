@@ -131,16 +131,18 @@ export async function checkPolishPack({page,context,base,requests}) {
  assert.equal(resumed.revision,current.revision);assert.deepEqual(resumed.view,current.view);assert.equal(requests.length,posts,'reload created another start/action');
  for(const label of ['Idę do Warsztatu','Wiążę poręcz','Zapalam nowe światło'])await choose(label);
  await ending('new-path');
- await start();await choose('Continue');
+ await start();await checkCapyExpression({page,game,expression:'neutral'});await choose('Continue');
  await checkSceneAdvance({page,game,zoom:true,advance:()=>choose('Odwiedzam Latarnię Wspomnień')});
+ await checkCapyExpression({page,game,expression:'attentive'});
  await captureExpeditionLantern({page,game});
  await checkLanternFeedback({page,game,choose});
  for(const label of [
-  'Odwiedzam Melę','Słucham z Melą','Continue',
-  'Odwiedzam Borysa','Przytrzymuję trzcinę','Continue',
-  'Odwiedzam Lunę','Układam znak z Luną','Continue',
+  'Odwiedzam Melę','Słucham z Melą','Continue','Odwiedzam Borysa','Przytrzymuję trzcinę'])await choose(label);
+ await checkCapyExpression({page,game,expression:'playful',inspect:true});
+ for(const label of ['Continue','Odwiedzam Lunę','Układam znak z Luną','Continue',
   'Idę do Warsztatu','Wiążę poręcz','Zostawiam miejsce na oba światła'])await choose(label);
  await ending('two-lights');
+ await checkCapyExpression({page,game,expression:'pleased'});
  await page.getByRole('button',{name:'Back to Play',exact:true}).click();
  await Promise.all([page.waitForResponse(r=>r.url().endsWith('/api/child-profile')&&r.request().method()==='PATCH'&&r.status()===200),page.locator('.locale-control select').first().selectOption('pl')]);
  await page.getByRole('button',{name:'Graj',exact:true}).click();await page.getByRole('button',{name:/Przygody/}).click();
@@ -212,4 +214,39 @@ async function checkLanternFeedback({page,game,choose}) {
   await page.setViewportSize(viewport);
  }
  console.log('PASS: accepted Hive completion fills one map tile, with scene motion, reduced motion and Text mode');
+}
+
+
+async function checkCapyExpression({page,game,expression,inspect=false}) {
+ const viewport=page.viewportSize();
+ await page.setViewportSize({width:360,height:640});
+ const stage=game.locator('.game-encounter-stage [data-capy-expression]');
+ try{
+  assert.equal(await stage.getAttribute('data-capy-expression'),expression);
+  assert.equal(await stage.isVisible(),true);
+  if(!inspect)return;
+  await game.locator(".game-encounter-backdrop").screenshot({path:"/tmp/capy44-stage.png"});
+  const characters=game.locator('.game-current-characters');
+  const summary=characters.locator('summary');
+  await summary.click();
+  const portrait=characters.locator('.game-character-portrait');
+  const capy=portrait.filter({has:page.locator('[data-capy-expression]')});
+  assert.equal(await capy.locator('[data-capy-expression]').getAttribute('data-capy-expression'),expression);
+  assert.equal(await capy.isVisible(),true);
+  const sheet=await openExpeditionMap(game);
+  const marker=sheet.locator('.game-tile-marker');
+  assert.equal(await marker.locator('[data-capy-expression]').getAttribute('data-capy-expression'),'neutral');
+  for(const part of ['antennae','wings']){
+   const bounds=await marker.locator(`[data-capy-${part}]`).boundingBox();
+   assert.ok(bounds.width>0&&bounds.height>0);
+  }
+  await sheet.getByRole('button',{name:'Close',exact:true}).click();
+  const menu=game.locator('.game-scene-menu > summary'),toggle=game.locator('.game-scene-menu button[aria-pressed]');
+  await menu.click();await toggle.click();
+  assert.equal(await stage.count(),0);
+  assert.equal(await capy.isVisible(),false);
+  await menu.click();await toggle.click();
+  assert.equal(await stage.getAttribute('data-capy-expression'),expression);
+  await summary.click();
+ }finally{await page.setViewportSize(viewport);}
 }

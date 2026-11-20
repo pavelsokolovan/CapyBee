@@ -2,6 +2,8 @@
 export const catalogVersion = 1 as const;
 export const expressions = ['neutral', 'attentive', 'pleased'] as const;
 export type Expression = typeof expressions[number];
+const capyExpressions = [...expressions, 'playful'] as const;
+export type CharacterExpression = typeof capyExpressions[number];
 export type Orientation = 'left' | 'right';
 const provenance = 'Original vector artwork authored for CapyBee, Spec 30.1; no third-party artwork incorporated.';
 const character = (marker = false) => ({
@@ -19,7 +21,7 @@ const motif = () => ({kind: 'motif' as const, variants: ['default'] as const, di
   safeArea: 'Inset 8%.', fallback: null, source: 'MotifArtwork.tsx', provenance});
 
 export const catalog = {
-  'character.capy': character(true),
+  'character.capy': {...character(true), expressions: capyExpressions},
   'character.mela-bee': character(),
   'character.borys-beaver': character(),
   'character.luna-moth': character(),

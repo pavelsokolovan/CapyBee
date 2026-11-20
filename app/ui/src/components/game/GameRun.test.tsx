@@ -372,3 +372,38 @@ it.each([true,false])('shows saved Hive completion and animates only its first l
  expect(tile()?.hasAttribute('data-new-completion')).toBe(false);
  expect(tile()?.textContent).toContain('Completed');
 });
+
+it('projects CapyBee’s reaction from the accepted Hive beat on stage and in the current portrait',async()=>{
+ const run=illustratedRun();
+ run.packId='capybee-new-hive';
+ run.view.presentation!.backdropAssetId='backdrop.reed-bank';
+ const guide=run.view.presentation!.characters[0];
+ guide.assetId='character.capy';
+ run.view.characters.find(character=>character.id===guide.id)!.inCurrentScene=true;
+ run.view.objectives=[{id:'help-borys',label:'Help Borys',state:'ACTIVE'}];
+ const {accept,update}=await renderRun(run);
+ const expression=(region:string)=>host.querySelector(`${region} [data-capy-expression]`)?.getAttribute('data-capy-expression');
+ const stage='.game-encounter-stage', portrait='.game-current-characters';
+ expect(expression(stage)).toBe('attentive');
+ await update({pending:true,message:'checking'});
+ expect(expression(stage)).toBe('attentive');
+ const finished=structuredClone(run);
+ finished.revision++;
+ finished.view.objectives[0].state='DONE';
+ await update({run:finished,pending:false,message:'saved'});
+ expect(expression(stage)).toBe('playful');
+ expect(expression(portrait)).toBe('playful');
+ const ending=structuredClone(finished);
+ ending.revision++;
+ ending.status='ENDED';
+ ending.view.ended=true;
+ ending.view.endReason='COMPLETED';
+ ending.view.outcome='two-lights';
+ await accept(ending);
+ expect(expression(stage)).toBe('pleased');
+ ending.view.outcome='rest-here';
+ await accept({...ending,view:structuredClone(ending.view),revision:ending.revision+1});
+ expect(expression(stage)).toBe('neutral');
+ await accept({...run,packId:'fixture-art'});
+ expect(expression(stage)).toBe(guide.expression);
+});

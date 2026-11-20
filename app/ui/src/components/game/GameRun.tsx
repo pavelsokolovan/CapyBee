@@ -6,6 +6,7 @@ import {restoreGameSession} from '../../game/restoreGameSession';
 import {SceneBlocks,SceneActions,ScenePanels,SceneResult,hasTextInput} from './GameScene';
 import {adventureCopy} from '../../game/adventureCopy';
 import {adventureLocation,adventureTitle} from '../../game/savedAdventure';
+import {hiveCapyExpression} from '../../game/hiveCapyExpression';
 import {completedHivePlaces} from '../../game/hiveCompletion';
 import {sceneFirstKind} from '../../game/sceneFirst';
 import {focusScene,resetSceneScroll} from '../../game/sceneScroll';
@@ -156,6 +157,7 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
  </>;
 
  if(expedition) {
+  const capyExpression=hiveCapyExpression(state.run);
   const actionCount=view?view.options.length+Number(view.canAdvance===true):0;
   const pinned=actions&&view&&!ended&&!hasTextInput(view)&&actionCount>=1&&actionCount<=3;
   const caption=<h4 className={currentLocation?'game-expedition-location':'game-visually-hidden'} tabIndex={-1} ref={heading}
@@ -183,12 +185,12 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
    <div className="game-scene-body" ref={sceneBody}>
     {titleHeading}{notices}
     {view?<>
-    <GameEncounter view={view} stage caption={caption} textMode={textMode} encounterRef={encounter}>
+    <GameEncounter view={view} stage caption={caption} textMode={textMode} encounterRef={encounter} capyExpression={capyExpression}>
      <SceneBlocks key={JSON.stringify([state.run.runId,view.blocks])} view={view} locale={controlsLocale}
       progressive={!!presentation}/>
     </GameEncounter>
     {pinned?null:actions}
-    <GameCurrentCharacters view={view} locale={locale} collapsible/>{party}
+    <GameCurrentCharacters view={view} locale={locale} collapsible capyExpression={capyExpression}/>{party}
     <ScenePanels hidePlaces view={view} locale={locale} locked={locked} submit={submit}/>
     {ended?<SceneResult view={view} locale={locale}/>:null}</>:null}
     {completion}{exit}
