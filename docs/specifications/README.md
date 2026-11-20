@@ -114,6 +114,8 @@ the implemented 30.2 contracts for the board, encounters and recruited party.
 
 - [41](41-capybee-generated-text-limits-instruction.md) — Polish word limits, repair and playable fallback for generated scenes.
 
+- [42](42-capybee-progressive-scene-text-instruction.md) — Tap through illustrated scene blocks with full text available in reading modes.
+
 ### Roadmap reconciliation
 
 The web host and server-side SDK wiring move from the earlier "spec 29" plan

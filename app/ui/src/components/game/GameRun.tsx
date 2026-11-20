@@ -163,7 +163,8 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
     {titleHeading}{notices}
     {view?<>
     <GameEncounter view={view} stage caption={caption} textMode={textMode}>
-     <SceneBlocks view={view} locale={controlsLocale}/>
+     <SceneBlocks key={JSON.stringify([state.run.runId,view.blocks])} view={view} locale={controlsLocale}
+      progressive={!!presentation}/>
     </GameEncounter>
     {pinned?null:actions}
     <GameCurrentCharacters view={view} locale={locale} collapsible/>{party}

@@ -63,3 +63,25 @@
   margin-top: 0; border-color: CanvasText; background: Canvas; color: CanvasText;
  }
 }
+
+.game-read-more {
+ display: none;
+}
+@media (forced-colors: none) {
+ .game-expedition[data-text-mode="false"] .game-progressive-text .game-block {
+  margin-block-start: 0;
+ }
+ .game-expedition[data-text-mode="false"] .game-progressive-text [data-inactive] {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+ }
+ .game-expedition[data-text-mode="false"] .game-read-more {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 44px;
+  margin-block-start: .3rem;
+ }
+}

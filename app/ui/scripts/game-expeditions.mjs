@@ -142,6 +142,46 @@ export async function captureExpeditionLantern({page,game}){
  });
 }
 
+export async function checkProgressiveText({page,game,requests,locale}) {
+ await atMobile(page,game,async()=>{
+  const panel=game.locator('.game-progressive-text');
+  const blocks=panel.locator('.game-block');
+  const count=await blocks.count();
+  assert.ok(count>=3);
+  const action=panel.getByRole('button',{name:locale==='pl'?'Czytaj dalej':'Read more',exact:true});
+  const menu=game.locator('.game-scene-menu > summary');
+  const toggle=game.locator('.game-scene-menu button[aria-pressed]');
+  const visible=()=>blocks.evaluateAll(nodes=>nodes.map((node,i)=>getComputedStyle(node).clipPath==='none'?i:null).filter(i=>i!==null));
+  const writes=requests.length;
+  assert.deepEqual(await visible(),[0]);
+  assert.ok((await action.boundingBox()).height>=44);
+  const accessible=await panel.ariaSnapshot();
+  for(const block of await blocks.locator('p').allTextContents())assert.ok(accessible.includes(block));
+  await action.focus();
+  await page.keyboard.press('Space');
+  assert.deepEqual(await visible(),[1]);
+  await menu.click();await toggle.click();
+  assert.equal(await action.isVisible(),false);
+  assert.deepEqual(await visible(),Array.from({length:count},(_,i)=>i));
+  await menu.click();await toggle.click();
+  assert.deepEqual(await visible(),[1]);
+  try{
+   await page.emulateMedia({forcedColors:'active'});
+   assert.equal(await action.isVisible(),false);
+   assert.equal((await visible()).length,count);
+  }finally{await page.emulateMedia({forcedColors:'none'});}
+  await action.focus();
+  for(let i=2;i<count;i++){
+   await page.keyboard.press('Enter');
+   assert.deepEqual(await visible(),[i]);
+  }
+  assert.equal(await action.count(),0);
+  assert.equal(await blocks.last().evaluate(node=>node===document.activeElement),true);
+  assert.equal(requests.length,writes);
+ });
+ console.log('PASS: 360 × 640 progressive story blocks, accessible full text, keyboard focus, reading modes and no game writes');
+}
+
 export async function checkShortPolishBeat({page,game,text,labels}) {
  await atMobile(page,game,async()=>{
   const bubbleNode=game.locator(bubble);

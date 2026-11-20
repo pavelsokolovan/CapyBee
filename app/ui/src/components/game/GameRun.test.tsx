@@ -307,3 +307,44 @@ it('keeps controls locked when a replay summary has not reached appliedRevision'
   expect(h.controller.getSnapshot().pending).toBe(true);expect(h.controller.getSnapshot().run.revision).toBe(h.r.revision);h.controller.detach();
  }finally{vi.useRealTimers();}
 });
+
+it('pages illustrated scene text without commands and resets only for different content',async()=>{
+ const run=illustratedRun();
+ run.view.blocks=[
+  {kind:'NARRATION',text:'First block',refs:[]},
+  {kind:'SPEECH',text:'Second block',speaker:run.view.characters[0]?.id,refs:[]},
+  {kind:'NARRATION',text:'Third block',refs:[]},
+ ];
+ const {accept,submit}=await renderRun(run);
+ const more=()=>host.querySelector<HTMLButtonElement>('.game-read-more');
+ const current=()=>host.querySelector('.game-progressive-text .game-block:not([data-inactive])');
+ expect(current()?.textContent).toBe('First block');
+ expect(host.querySelectorAll('.game-progressive-text .game-block')).toHaveLength(3);
+ more()!.focus();
+ await act(async()=>more()!.click());
+ expect(current()?.textContent).toContain('Second block');
+ expect(document.activeElement).toBe(more());
+ await accept({...run,revision:run.revision+1,view:structuredClone(run.view)});
+ expect(current()?.textContent).toContain('Second block');
+ await act(async()=>more()!.click());
+ expect(current()?.textContent).toBe('Third block');
+ expect(more()).toBeNull();
+ expect(document.activeElement).toBe(current());
+ const fresh=structuredClone(run);
+ fresh.revision+=2;
+ fresh.view.blocks[0].text='New scene';
+ await accept(fresh);
+ expect(current()?.textContent).toBe('New scene');
+ expect(submit).not.toHaveBeenCalled();
+});
+
+it.each(['legacy','episode'] as const)('shows all blocks in %s runs',async kind=>{
+ const run=illustratedRun();
+ if(kind==='legacy')run.view.presentation=null;
+ else run.packId=anonymousNotePackId;
+ run.view.blocks.push({kind:'NARRATION',text:'Another block',refs:[]});
+ await renderRun(run);
+ expect(host.querySelector('.game-read-more')).toBeNull();
+ expect(host.querySelector('.game-block[data-inactive]')).toBeNull();
+ expect(host.querySelector('.game-encounter-content')?.textContent).toContain('Another block');
+});

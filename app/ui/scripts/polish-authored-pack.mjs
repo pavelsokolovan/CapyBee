@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {checkBoardRoute,openExpeditionMap,selectPlace,travelTo} from './game-honeycomb-board.mjs';
-import {checkExpeditionOpening,captureExpeditionLantern,checkSceneAdvance} from './game-expeditions.mjs';
+import {checkExpeditionOpening,captureExpeditionLantern,checkSceneAdvance,checkProgressiveText} from './game-expeditions.mjs';
 import {assertCompanionUI,holdCompanionChoice,captureCompanionEvidence} from './game-companions.mjs';
 
 export async function checkPolishPack({page,context,base,requests}) {
@@ -120,6 +120,7 @@ export async function checkPolishPack({page,context,base,requests}) {
  await checkSceneAdvance({page,game,advance:()=>choose('Continue')});
  await checkBoardRoute({page,context,base,requests});
  await choose('Odpoczywam na dziś');await ending('rest-here');
+ await checkProgressiveText({page,game,requests,locale:'en'});
  await start();await choose('Continue');
  await travelTo(game,'old-lantern');await travelTo(game,'hive-square');
  const current=await (await context.request.get(base+'/api/game/runs/current')).json(),posts=requests.length;
@@ -152,6 +153,7 @@ export async function checkPolishPack({page,context,base,requests}) {
  await polishSheet.getByRole('button',{name:'Idź: Cicha Łąka',exact:true}).waitFor();
  await polishSheet.getByRole('button',{name:'Zamknij',exact:true}).click();
  await choose('Odpoczywam na dziś');await ending('rest-here');
+ await checkProgressiveText({page,game,requests,locale:'pl'});
  await page.emulateMedia({reducedMotion:'reduce'});await game.evaluate(n=>n.style.zoom='2');
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth));
  await game.evaluate(n=>n.style.zoom='1');await page.screenshot({path:'/tmp/291-polish-rest-360.png'});
