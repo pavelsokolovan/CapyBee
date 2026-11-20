@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CapyBee one-screen scene prototype</title>
+<style>
+:root{--bg:#fbf6ea;--fg:#2e2413;--card:#fff;--line:#c9b68f;--on:#285745;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1d1a14;--fg:#f1e7d0;--card:#2a251b;--line:#5b4e36;--on:#7fc4a3}}
+:root[data-theme="dark"]{--bg:#1d1a14;--fg:#f1e7d0;--card:#2a251b;--line:#5b4e36;--on:#7fc4a3}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:12px}
+h1{font-size:1.05rem;margin:0 0 4px}.sub{margin:0 0 10px;opacity:.8;font-size:.85rem}
+.ctl{max-width:360px;margin:0 auto 10px;display:grid;gap:6px}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.row b{font-size:.78rem;min-width:62px}
+.seg button,.sc button{font:inherit;font-size:.8rem;padding:7px 10px;min-height:36px;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:10px}
+.seg button[aria-pressed=true],.sc button[aria-pressed=true]{background:var(--on);color:#fff;border-color:var(--on)}
+.badge{max-width:360px;margin:0 auto 8px;font-size:.82rem;font-weight:700}
+.dev{width:min(100%,360px);margin:0 auto;border:2px solid #846746;border-radius:18px;overflow:hidden;display:flex;flex-direction:column;background:#fdf3d9;color:#503b24;font-size:16px}
+.dev.big{font-size:20px}
+.bar{display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:#fdf3d9}
+.bar h2{font-size:1rem;margin:0}
+.dev button{font:inherit;cursor:pointer}
+.ghost{min-height:44px;padding:8px 12px;border:2px solid #2b2418;border-radius:12px;background:#efefef;color:#111;font-size:.85rem}
+.scroll{flex:1;overflow-y:auto;display:flex;flex-direction:column;padding:0 12px}
+.tools{display:flex;gap:8px;margin:2px 0 6px}
+.tools button{min-height:44px;padding:0 12px;border:1px solid #846746;border-radius:12px;background:#fff8e9;color:#45311f;font-size:.85rem}
+.art{position:relative;aspect-ratio:2.4;border:1px solid #bca67c;border-radius:16px;overflow:hidden;background:#fdf6e3;flex:none}
+.art>svg.bg{position:absolute;inset:0;width:100%;height:100%}
+.stage{position:absolute;inset:0;display:flex;justify-content:center;align-items:flex-end;gap:4%}
+.stage svg{height:87%;width:auto;max-width:44%}
+.chip{position:absolute;left:8px;bottom:8px;background:#fffdf7;border:1px solid #bca67c;border-radius:10px;padding:3px 9px;font-size:.8rem;font-weight:700;color:#2e2413}
+.bubble{position:relative;background:#fffdf7;color:#2e2413;border:2px solid #846746;border-radius:16px;padding:12px 14px;margin:12px 0 10px;line-height:1.45}
+.bubble.plain{border:1px solid #bca67c;border-radius:12px}
+.bubble:not(.plain)::before{content:"";position:absolute;top:-9px;left:50%;width:14px;height:14px;background:#fffdf7;border-left:2px solid #846746;border-top:2px solid #846746;transform:translateX(-50%) rotate(45deg)}
+.bubble p{margin:0}.bubble p+p{margin-top:.5em}
+.actions{display:grid;gap:8px;padding:8px 0 12px;margin-top:auto}
+.actions.pin{position:sticky;bottom:0;background:linear-gradient(#fdf3d900,#fdf3d9 12px);padding-top:14px;border-top:0}
+.actions button{width:100%;min-height:48px;padding:10px 12px;border:2px solid #285745;border-radius:12px;background:#285745;color:#fffdf7;font-weight:700;text-align:center}
+.note{font-size:.75rem;opacity:.75;text-align:center;margin:0}
+</style>
+</head>
+<body>
+<div class="ctl">
+ <h1>One-screen scene (spec 37)</h1>
+ <p class="sub">Pick a scene, then compare options. The badge says whether the beat fits without scrolling. Art here is simplified placeholder art, not the catalog.</p>
+ <div class="row sc" id="sc"><b>Scene</b></div>
+ <div class="row seg" id="gAct"><b>Actions</b></div>
+ <div class="row seg" id="gTxt"><b>Text</b></div>
+ <div class="row seg" id="gSize"><b>Text size</b></div>
+ <div class="row seg" id="gH"><b>Screen height</b></div>
+</div>
+<div class="badge" id="badge"></div>
+<div class="dev" id="dev" style="height:640px">
+ <div class="bar"><h2>Przygody</h2><button class="ghost" type="button">Wróć do gier</button></div>
+ <div class="scroll" id="scroll"></div>
+</div>
+<script>
+const CAPY='<svg viewBox="0 0 160 180" aria-hidden="true"><g stroke="#6c5a3a" stroke-width="3" stroke-linejoin="round"><rect x="52" y="140" width="14" height="30" rx="6" fill="#c79a70"/><rect x="94" y="140" width="14" height="30" rx="6" fill="#c79a70"/><ellipse cx="80" cy="118" rx="48" ry="38" fill="#c79a70"/><circle cx="52" cy="56" r="9" fill="#c79a70"/><circle cx="108" cy="56" r="9" fill="#c79a70"/><rect x="42" y="50" width="76" height="54" rx="26" fill="#c79a70"/><rect x="58" y="74" width="58" height="26" rx="13" fill="#dcb48c"/><rect x="48" y="100" width="64" height="12" rx="6" fill="#f2b233"/></g><circle cx="70" cy="68" r="3" fill="#2e2413"/><circle cx="94" cy="68" r="3" fill="#2e2413"/><circle cx="108" cy="84" r="3.5" fill="#2e2413"/></svg>';
+const BEE='<svg viewBox="0 0 160 180" aria-hidden="true"><g stroke="#6c5a3a" stroke-width="3"><ellipse cx="54" cy="96" rx="26" ry="14" fill="#dff0f2" opacity=".9"/><ellipse cx="106" cy="96" rx="26" ry="14" fill="#dff0f2" opacity=".9"/><ellipse cx="80" cy="128" rx="34" ry="28" fill="#f2b233"/><path d="M56 118h48M52 136h56" stroke="#3a2b12" stroke-width="6" fill="none"/><circle cx="80" cy="92" r="18" fill="#f2b233"/><path d="M72 76l-8-14M88 76l8-14" fill="none"/></g><circle cx="74" cy="92" r="3" fill="#2e2413"/><circle cx="87" cy="92" r="3" fill="#2e2413"/></svg>';
+const HIVE='<g stroke="#6c5a3a" stroke-width="4" fill="#e8c47f"><path d="M110 250c0-40 20-62 52-62s52 22 52 62z"/><rect x="150" y="215" width="24" height="35" rx="10" fill="#b08a5a"/></g>';
+const LAMP='<g stroke="#503b24" stroke-width="4"><circle cx="320" cy="150" r="42" fill="#f7e3a8" stroke="none"/><rect x="304" y="130" width="32" height="46" rx="6" fill="#b08a5a"/><rect x="312" y="138" width="16" height="30" fill="#f2b233"/></g>';
+const FLW='<g stroke="#6c5a3a" stroke-width="3"><circle cx="440" cy="230" r="9" fill="#c9bed9"/><circle cx="470" cy="245" r="9" fill="#f2b233"/><circle cx="500" cy="228" r="9" fill="#c9bed9"/></g>';
+const SUN='<circle cx="470" cy="90" r="34" fill="#f5e2b0"/>';
+const back=x=>'<svg class="bg" viewBox="0 0 640 267" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><path d="M0 170c120-60 240-40 330-10s200 10 310-30v137H0z" fill="#d7e0cb"/><path d="M0 200c160-50 300-20 420-10s160 0 220-20v97H0z" fill="#c4d5bc"/><path d="M0 235c200-25 400-25 640-5v37H0z" fill="#e6e4cc"/>'+x+'</svg>';
+const T={
+ arrival:{loc:'Polana Nowego Ula',art:HIVE+SUN,cast:[CAPY],text:['Nowy ul, dwa światła. CapyBee rozkłada planszę plastra miodu. Możesz tęsknić za dawnym domem i zauważyć coś nowego. Oba miejsca mogą być ważne. To baśniowa wyprawa: jej zwierzęcy towarzysze mieszkają w tej historii.'],opts:[['Dalej','board']]},
+ board:{loc:'Polana Nowego Ula',art:HIVE+SUN,cast:[CAPY],text:['Na Polanie Nowego Ula wybierasz następny przystanek. Każde spotkanie jest dobrowolne. Możesz wracać, obejrzeć planszę albo zakończyć wyprawę odpoczynkiem.'],opts:[['Zaglądam do Latarni Wspomnień','lantern'],['Odwiedzam Melę na Cichej Łące','mela'],['Odwiedzam Borysa nad trzciną'],['Odwiedzam Lunę pod wierzbą'],['Idę do Warsztatu Plastra'],['Na dziś wybieram odpoczynek','end']]},
+ lantern:{loc:'Latarnia Wspomnień',art:LAMP,cast:[CAPY],text:['W Latarni Wspomnień pali się ciepłe światło. Może przypominać zapach kuchni, piosenkę albo zwykły wieczór w dawnym domu. Nie musisz opowiadać nikomu, jakie to wspomnienie. CapyBee zostawia obok mały lampion na drogę.'],opts:[['Zabieram światło wspomnienia na drogę','board'],['Wracam na polanę','board'],['Na dziś wybieram odpoczynek','end']]},
+ mela:{loc:'Cicha Łąka',art:FLW+SUN,cast:[BEE,CAPY],text:['Mela to cierpliwa pszczoła. Potrzebuje chwili ciszy, żeby wybrać spokojny kierunek lotu. „Możesz posiedzieć obok albo pójść dalej. Obie drogi są w porządku” — mówi.'],opts:[['Siadam na chwilę i słucham Meli','board'],['Macham na pożegnanie i idę dalej','board'],['Na dziś wybieram odpoczynek','end']]},
+ end:{loc:'Polana Nowego Ula',art:SUN,cast:[CAPY],text:['Nowa ścieżka. Małe światło rozjaśnia tylko najbliższy krok. To wystarczy na tę wyprawę. Wspomnienia dawnego domu nadal mają swoje miejsce.','Jeśli chcesz, po grze możesz podziękować komuś za drobną pomoc. Możesz też zostać przy odpoczynku. Ta propozycja niczego nie zapisuje ani nie zalicza.'],opts:[['Wróć do gier','arrival']]}
+};
+const NAMES={arrival:'Opening',board:'Hub (6 actions)',lantern:'Lantern (3)',mela:'Mela (speech)',end:'Ending (long)'};
+const S={scene:'arrival',act:'pin',txt:'bubble',size:'n',h:'640'};
+const $=i=>document.getElementById(i);
+function seg(id,key,items){const g=$(id);items.forEach(([v,l])=>{const b=document.createElement('button');b.type='button';b.textContent=l;b.dataset.v=v;b.onclick=()=>{S[key]=v;render()};g.append(b)})}
+seg('sc','scene',Object.keys(NAMES).map(k=>[k,NAMES[k]]));
+seg('gAct','act',[['pin','Pinned bar'],['inline','Inline (today)']]);
+seg('gTxt','txt',[['bubble','Speech bubble'],['plain','Plain card']]);
+seg('gSize','size',[['n','Normal'],['l','Large']]);
+seg('gH','h',[['560','560'],['640','640'],['740','740']]);
+function render(){
+ const sc=T[S.scene],many=sc.opts.length>3,pin=S.act==='pin'&&!many;
+ for(const [id,key] of [['sc','scene'],['gAct','act'],['gTxt','txt'],['gSize','size'],['gH','h']])
+  $(id).querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===S[key])));
+ $('dev').style.height=S.h+'px';$('dev').classList.toggle('big',S.size==='l');
+ $('scroll').innerHTML='<div class="tools"><button type="button">Mapa</button><button type="button">Tryb tekstowy</button></div>'
+  +'<div class="art">'+back(sc.art)+'<div class="stage">'+sc.cast.join('')+'</div><span class="chip">'+sc.loc+'</span></div>'
+  +'<div class="bubble'+(S.txt==='plain'?' plain':'')+'">'+sc.text.map(t=>'<p>'+t+'</p>').join('')+'</div>'
+  +'<div class="actions'+(pin?' pin':'')+'">'+sc.opts.map(o=>'<button type="button" data-go="'+(o[1]||'')+'">'+o[0]+'</button>').join('')+'</div>';
+ $('scroll').scrollTop=0;
+ $('scroll').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{if(b.dataset.go){S.scene=b.dataset.go;render()}});
+ requestAnimationFrame(()=>{const s=$('scroll'),fits=s.scrollHeight<=s.clientHeight+1;
+  $('badge').textContent=(fits?'✓ Fits without scrolling':'↕ Scrolls')+(many&&S.act==='pin'?' · more than 3 actions, so they stay in the flow':pin?' · actions pinned to the bottom':'');
+  $('badge').style.color=fits?'var(--on)':'#b5651d'});
+}
+render();
+</script>
+</body>
+</html>

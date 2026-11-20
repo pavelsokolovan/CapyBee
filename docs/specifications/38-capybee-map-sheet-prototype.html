@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CapyBee map sheet prototype</title>
+<style>
+:root{--bg:#fbf6ea;--fg:#2e2413;--card:#fff;--line:#c9b68f;--on:#285745;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1d1a14;--fg:#f1e7d0;--card:#2a251b;--line:#5b4e36;--on:#7fc4a3}}
+:root[data-theme="dark"]{--bg:#1d1a14;--fg:#f1e7d0;--card:#2a251b;--line:#5b4e36;--on:#7fc4a3}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:12px}
+h1{font-size:1.05rem;margin:0 0 4px}.sub{margin:0 0 10px;opacity:.8;font-size:.85rem}
+.ctl{max-width:360px;margin:0 auto 10px;display:grid;gap:6px}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.row b{font-size:.78rem;min-width:62px}
+.ctl button{font:inherit;font-size:.8rem;padding:7px 10px;min-height:36px;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:10px}
+.ctl button[aria-pressed=true]{background:var(--on);color:#fff;border-color:var(--on)}
+.dev{position:relative;width:min(100%,360px);height:640px;margin:0 auto;border:2px solid #846746;border-radius:18px;overflow:hidden;display:flex;flex-direction:column;background:#fdf3d9;color:#503b24;font-size:16px}
+.dev button{font:inherit;cursor:pointer}
+.bar{display:flex;justify-content:space-between;align-items:center;padding:6px 12px}
+.bar h2{font-size:1rem;margin:0}
+.ghost{min-height:44px;padding:8px 12px;border:2px solid #2b2418;border-radius:12px;background:#efefef;color:#111;font-size:.85rem}
+.tools{display:flex;gap:8px;padding:0 12px 6px;position:relative}
+.tools>button{min-height:44px;padding:0 12px;border:1px solid #846746;border-radius:12px;background:#fff8e9;color:#45311f;font-size:.85rem}
+.menu{position:absolute;left:100px;top:48px;z-index:3;background:#fffdf7;border:2px solid #846746;border-radius:12px;padding:6px;display:grid;gap:4px;min-width:190px}
+.menu button{min-height:44px;border:0;background:none;text-align:left;padding:0 10px;border-radius:8px;color:#2e2413}
+.menu button[aria-pressed=true]{background:#dceadd}
+.body{flex:1;overflow:auto;padding:0 12px;display:flex;flex-direction:column}
+.art{position:relative;aspect-ratio:2.4;border:1px solid #bca67c;border-radius:16px;background:#d7e0cb;flex:none;overflow:hidden}
+.art i{position:absolute;left:0;right:0;bottom:0;height:45%;background:#c4d5bc}
+.chip{position:absolute;left:8px;bottom:8px;background:#fffdf7;border:1px solid #bca67c;border-radius:10px;padding:3px 9px;font-size:.8rem;font-weight:700;color:#2e2413;z-index:1}
+.bubble{background:#fffdf7;color:#2e2413;border:2px solid #846746;border-radius:16px;padding:12px 14px;margin:12px 0}
+.foot{padding:8px 12px 12px}.foot button{width:100%;min-height:48px;border:2px solid #285745;border-radius:12px;background:#285745;color:#fffdf7;font-weight:700}
+.sheet{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;justify-content:flex-end;background:#2e241366}
+.panel{background:#fdf3d9;border-radius:18px 18px 0 0;max-height:88%;display:flex;flex-direction:column;box-shadow:0 -4px 16px #0003}
+.ph{display:flex;justify-content:space-between;align-items:center;padding:8px 12px 4px}.ph h3{margin:0;font-size:1rem}
+.pb{overflow:auto;padding:0 10px}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px 2px;margin:6px 0}
+.cell{min-width:0;background:none;border:0;padding:0 0 2px;text-align:center;color:#2e2413;font-size:.78rem;font-weight:700;line-height:1.25;position:relative}
+.cell svg{display:block;width:100%;height:auto}
+.cell.un svg{opacity:.55}.cell.un polygon.o{stroke-dasharray:6 5}
+.cell.sel polygon.o{stroke:#2e2413;stroke-width:5}
+.cell small{display:block;font-weight:600;color:#234c3d}
+.mark{position:absolute;left:50%;top:30%;width:34%;transform:translateX(-50%);pointer-events:none}
+.vis{position:absolute;left:50%;bottom:34%;transform:translateX(-50%);background:#fdf6e3;border-radius:50%;padding:0 4px;font-size:.8rem}
+.list{display:grid;gap:6px;margin:6px 0}
+.list .cell{display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left;font-size:.95rem;min-height:48px;padding:6px 12px;background:#fffdf7;border:1px solid #bca67c;border-radius:12px}
+.list .cell.sel{border:3px double #2e2413}.list .cell.un{opacity:.65}
+.det{border-top:1px solid #bca67c;background:#fffdf7;padding:10px 12px 12px}
+.det h4{margin:0 0 2px;font-size:1rem}.det p{margin:2px 0 8px;font-size:.9rem}.det .st{font-weight:700;color:#234c3d}
+.det button{width:100%;min-height:48px;border:2px solid #285745;border-radius:12px;background:#285745;color:#fffdf7;font-weight:700}
+.tip{font-size:.8rem;text-align:center;margin:4px 0 8px;opacity:.8}
+</style>
+</head>
+<body>
+<div class="ctl">
+ <h1>Map sheet and menu (spec 38)</h1>
+ <p class="sub">Tap Mapa. Reach the crossing by visiting the workshop first. Art is simplified placeholder art.</p>
+ <div class="row" id="gT"><b>Travel</b></div>
+ <div class="row" id="gR"><b>Reset</b></div>
+</div>
+<div class="dev" id="dev"></div>
+<script>
+const P=[
+['hive-square','Polana Nowego Ula',0,0,'#dce6d0','Na środku planszy leży plaster miodu z drogami do znajomych i nowych zakątków.'],
+['old-lantern','Latarnia Wspomnień',-1,0,'#dce6d0','Łagodne światło przypomina, że wspomnienia dawnego domu mogą zostać z tobą.'],
+['quiet-meadow','Cicha Łąka',0,-1,'#dce6d0','Mela szuka spokojnego kierunku lotu wśród kwiatów.'],
+['reed-bank','Trzcinowy Brzeg',1,-1,'#b5d5d8','Borys przytrzymuje trzcinę, z której powstaje poręcz małego mostku.'],
+['willow-glen','Wierzbowa Zatoczka',1,0,'#dce6d0','Luna odpoczywa pod liściem i wypatruje czytelnego znaku na drodze.'],
+['hive-workshop','Warsztat Plastra',0,1,'#dce6d0','Tutaj można związać poręcz i przygotować małe światło na wyprawę.'],
+['small-crossing','Mostek Dwóch Świateł',1,1,'#b5d5d8','Dwa brzegi łączy krótki mostek. Można przejść albo zawrócić.']];
+const L=[[0,1],[0,2],[0,3],[0,4],[0,5],[2,3],[5,6],[4,6]];
+const HEX='60,2 118,36 118,104 60,138 2,104 2,36';
+const S={cur:0,vis:new Set([0]),sel:null,open:false,menu:false,text:false,mode:'card'};
+const $=i=>document.getElementById(i);
+const nb=(a,b)=>L.some(l=>l[0]==a&&l[1]==b||l[1]==a&&l[0]==b);
+const legal=i=>i!=S.cur&&nb(S.cur,i)&&(i!=6||S.vis.has(5));
+const hint=i=>i==6&&!S.vis.has(5)?'Najpierw przygotuj poręcz w Warsztacie Plastra.':'Brak przejścia.';
+function tog(id,key,items){const g=$(id);items.forEach(([v,l])=>{const b=document.createElement('button');b.type='button';b.textContent=l;b.dataset.v=v;b.onclick=()=>{S[key]=v;render()};g.append(b)})}
+tog('gT','mode',[['card','Hex, then card + Idź'],['direct','Tap reachable hex = go']]);
+const r=document.createElement('button');r.type='button';r.textContent='Start over';r.onclick=()=>{Object.assign(S,{cur:0,vis:new Set([0]),sel:null,open:false,menu:false,text:false});render()};$('gR').append(r);
+function go(i){S.cur=i;S.vis.add(i);S.open=false;S.sel=null;render()}
+function pick(i){if(S.mode==='direct'&&legal(i)){go(i);return}S.sel=i;render()}
+const mk='<svg class="mark" viewBox="0 0 40 40"><circle cx="20" cy="22" r="14" fill="#c79a70" stroke="#6c5a3a" stroke-width="3"/><rect x="8" y="30" width="24" height="6" rx="3" fill="#f2b233"/></svg>';
+function cell(i){const p=P[i],c=i==S.cur,v=S.vis.has(i),ok=legal(i),sel=S.sel==i;
+ const cls='cell'+(ok||c?'':' un')+(sel?' sel':'');
+ const al=p[1]+(c?', tu jesteś':v?', odwiedzone':ok?'':', brak przejścia');
+ if(S.text)return '<button class="'+cls+'" data-i="'+i+'" aria-label="'+al+'"><span>'+p[1]+'</span><small>'+(c?'Tu jesteś':v?'Odwiedzone':ok?'':'Brak przejścia')+'</small></button>';
+ return '<button class="'+cls+'" data-i="'+i+'" aria-label="'+al+'" style="grid-column:'+(2*p[2]+p[3]+3)+' / span 2;grid-row:'+(p[3]+2)+'"><span style="position:relative;display:block"><svg viewBox="0 0 120 140"><polygon points="'+HEX+'" fill="'+p[4]+'"/><path d="M2 110c30-22 60-12 116-2v-4L60 138 2 104z" fill="#c4d5bc"/><polygon class="o" points="'+HEX+'" fill="none" stroke="'+(c?'#2e2413':'#6c5a3a')+'" stroke-width="'+(c?5:3)+'"/></svg>'+(c?mk:'')+(v&&!c?'<span class="vis">✓</span>':'')+'</span>'+p[1]+(c?'<small>Tu jesteś</small>':'')+'</button>'}
+function card(){const i=S.sel==null?S.cur:S.sel;if(S.mode==='direct'&&S.sel==null)return '<div class="det"><p class="tip" style="margin:0">Tap a reachable place to go there.</p></div>';
+ const p=P[i],c=i==S.cur,ok=legal(i);
+ return '<div class="det"><h4>'+p[1]+'</h4><p class="st">'+(c?'Tu jesteś':S.vis.has(i)?'Odwiedzone':ok?'Możesz tu przejść':hint(i))+'</p><p>'+p[5]+'</p>'+(ok?'<button type="button" data-go="'+i+'" aria-label="Idź: '+p[1]+'">Idź</button>':'')+'</div>'}
+function render(){
+ for(const b of $('gT').querySelectorAll('button'))b.setAttribute('aria-pressed',String(b.dataset.v===S.mode));
+ const p=P[S.cur];
+ $('dev').innerHTML='<div class="bar"><h2>Przygody</h2><button class="ghost" type="button">Wróć do gier</button></div>'
+ +'<div class="tools"><button type="button" id="bm">🗺 Mapa</button><button type="button" id="bk" aria-label="Menu" aria-expanded="'+S.menu+'">⋯ Menu</button>'
+ +(S.menu?'<div class="menu"><button type="button" id="bt" aria-pressed="'+S.text+'">Tryb tekstowy</button><button type="button" id="be">Zakończ przygodę</button></div>':'')+'</div>'
+ +'<div class="body"><div class="art"><i></i><span class="chip">'+p[1]+'</span></div><div class="bubble">'+p[5]+'</div></div>'
+ +'<div class="foot"><button type="button">Dalej</button></div>'
+ +(S.open?'<div class="sheet" id="sh"><div class="panel" role="dialog" aria-label="Mapa przygody"><div class="ph"><h3>Mapa przygody</h3><button class="ghost" type="button" id="bc">Zamknij</button></div><div class="pb"><div class="'+(S.text?'list':'grid')+'">'+P.map((_,i)=>cell(i)).join('')+'</div></div>'+card()+'</div></div>':'');
+ $('bm').onclick=()=>{S.open=true;S.menu=false;S.sel=null;render()};
+ $('bk').onclick=()=>{S.menu=!S.menu;render()};
+ if(S.menu){$('bt').onclick=()=>{S.text=!S.text;S.menu=false;render()};$('be').onclick=()=>{S.menu=false;render()}}
+ if(S.open){$('bc').onclick=()=>{S.open=false;render()};$('sh').onclick=e=>{if(e.target.id==='sh'){S.open=false;render()}};
+  $('dev').querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>pick(+b.dataset.i));
+  const g=$('dev').querySelector('[data-go]');if(g)g.onclick=()=>go(+g.dataset.go)}
+}
+render();
+</script>
+</body>
+</html>
