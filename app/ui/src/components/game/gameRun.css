@@ -104,8 +104,11 @@ body:has(.adventure-overlay .game-expedition) { min-width: 0; }
  display: grid; gap: .4rem; padding: .4rem .25rem max(.5rem, env(safe-area-inset-bottom, 0px)); margin-inline: -.25rem;
 }
 @media (max-height: 24rem) {
- .game-expedition:has(> .game-run-status.game-visually-hidden) > .game-scene-body { min-height: min(8.5rem, 42dvh); }
- .game-scene-footer { flex-shrink: 1; min-height: 0; }
+ .adventure-scene-panel:has(> .game-expedition) > header { padding-block: .2rem; }
+ .game-expedition .game-scene-body > h3 { font-size: 1rem; }
+ .game-expedition .game-encounter { margin-block-start: .35rem; }
+ .game-expedition:has(> .game-run-status.game-visually-hidden) > .game-scene-body { min-height: min(7rem, 35dvh); }
+ .game-scene-footer { flex-shrink: 1; min-height: min(4rem, 45dvh); }
 }
 .game-scene-footer fieldset { display: grid; gap: .4rem; margin: 0; }
 .game-expedition .game-scene-footer button { width: 100%; min-height: 48px; }

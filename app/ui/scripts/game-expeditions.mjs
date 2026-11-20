@@ -21,7 +21,7 @@ export async function checkSceneFocus(game){
   const frame=node.getBoundingClientRect(),caption=heading?.getBoundingClientRect();
   return {
    scrollTop:node.scrollTop,scrollLeft:node.scrollLeft,focused:heading===document.activeElement,
-   visible:!!caption&&caption.top>=frame.top&&caption.bottom<=frame.bottom,
+   visible:!!caption&&caption.top>=frame.top&&caption.bottom<=Math.min(frame.bottom,innerHeight),
    containment:getComputedStyle(node).overscrollBehavior,
   };
  });
@@ -138,7 +138,7 @@ export async function captureExpeditionLantern({page,game}){
   await lastAction.focus();
   const last=await lastAction.boundingBox();
   const zoomedFooter=await game.locator(footer).boundingBox();
-  assert.ok(last.y+last.height<=zoomedFooter.y+zoomedFooter.height+1,'the zoomed footer cannot scroll to its last action');
+  assert.ok(last.y+last.height<=zoomedFooter.y+zoomedFooter.height+1,`the zoomed footer cannot scroll to its last action (button bottom ${last.y+last.height}, footer bottom ${zoomedFooter.y+zoomedFooter.height})`);
  });
 }
 
