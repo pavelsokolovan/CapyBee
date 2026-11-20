@@ -1,5 +1,8 @@
 package com.capybee.server.game;
 
+import com.capybee.engine.port.TextGenerator;
+import org.springframework.beans.factory.ObjectProvider;
+
 import com.capybee.engine.api.Command;
 import com.capybee.engine.api.EndReason;
 import com.capybee.engine.api.Event;
@@ -58,7 +61,7 @@ public class GameRunController {
                              @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:4173,https://capybee.fly.dev}") String origins,
                              FamilyProfileRepository profiles,
                              @Value("${capybee.game.enabled:false}") boolean enabled,
-                             @Value("${capybee.game.generation-enabled:false}") boolean generationEnabled,
+                             @Value("${capybee.game.generation-enabled:false}") boolean generationEnabled, ObjectProvider<TextGenerator> generators,
                              @Value("${capybee.game.allow-seed:false}") boolean allowSeed,
                              @Value("${capybee.game.sync-wait-ms:8000}") long syncWaitMs,
                              GameCommandRateLimiter commandRateLimiter,
@@ -69,7 +72,7 @@ public class GameRunController {
         this.users = users;
         this.profiles = profiles;
         this.enabled = enabled;
-        this.generationEnabled = generationEnabled;
+        this.generationEnabled = generationEnabled && generators.getIfAvailable() != null;
         this.allowSeed = allowSeed;
         this.syncWaitMs = Math.min(20_000, Math.max(0, syncWaitMs));
         this.commandRateLimiter = commandRateLimiter;

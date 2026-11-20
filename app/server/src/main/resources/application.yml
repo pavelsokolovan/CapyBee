@@ -71,11 +71,9 @@ capybee:
     web-client-enabled: ${CAPYBEE_GAME_WEB_CLIENT_ENABLED:false}
     enabled: ${CAPYBEE_GAME_ENABLED:false}
     pack-preparation:
-      enabled: ${CAPYBEE_GAME_PACK_PREPARATION_ENABLED:false}
       provider-approved: ${CAPYBEE_GAME_PACK_PROVIDER_APPROVED:false}
-    generation-enabled: ${CAPYBEE_GAME_GENERATION_ENABLED:false}
+    generation-enabled: ${CAPYBEE_GAME_GENERATION_ENABLED:true}
     dynamic:
-      enabled: ${CAPYBEE_GAME_DYNAMIC_ENABLED:false}
       profile-root: ${CAPYBEE_GAME_DYNAMIC_PROFILE_ROOT:}
       profile-ids: ${CAPYBEE_GAME_DYNAMIC_PROFILE_IDS:generic-adventure}
     allow-seed: ${CAPYBEE_GAME_ALLOW_SEED:false}

@@ -42,7 +42,7 @@ class GameMetadataTest {
         @SuppressWarnings("unchecked") ObjectProvider<DynamicStartOperationService> operations=mock(ObjectProvider.class);
         when(operations.getIfAvailable()).thenReturn(mock(DynamicStartOperationService.class));
         var controller = new DynamicGameController(catalog,operations,users,profiles,mock(DynamicStartRateLimiter.class),false,0,
-                "https://example.invalid",Clock.fixed(Instant.parse("2026-11-14T00:00:00Z"),ZoneOffset.UTC),false,true,true);
+                "https://example.invalid",Clock.fixed(Instant.parse("2026-11-14T00:00:00Z"),ZoneOffset.UTC),false,true,true,new org.springframework.beans.factory.ObjectProvider<com.capybee.engine.port.TextGenerator>() { @Override public com.capybee.engine.port.TextGenerator getIfAvailable() { return mock(com.capybee.engine.port.TextGenerator.class); } });
         var http = org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(controller).build();
         http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/game/capabilities").principal(auth))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())

@@ -83,9 +83,9 @@ operator/content review before live child use.
 No evidence of contractual approval for provider retention, child-audience
 eligibility, subprocessing, regional handling or deletion has been supplied.
 An operator must review those current terms and record an accountable decision
-before setting `CAPYBEE_GAME_PACK_PROVIDER_APPROVED=true`. Both that flag and
-`CAPYBEE_GAME_PACK_PREPARATION_ENABLED` default false, as does the existing
-`CAPYBEE_GAME_GENERATION_ENABLED`. Deterministic fixtures explicitly enable them
+before setting `CAPYBEE_GAME_PACK_PROVIDER_APPROVED=true`. Pack narration uses
+the shared `CAPYBEE_GAME_GENERATION_ENABLED` switch, which defaults to `true`.
+Provider approval defaults to `false`. Deterministic fixtures explicitly enable them
 for tests only; no paid calls or live certification are authorized by this work.
 Host completion rollout remains separately disabled by default.
 

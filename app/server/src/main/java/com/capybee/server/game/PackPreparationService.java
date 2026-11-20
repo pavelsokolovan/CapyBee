@@ -1,5 +1,8 @@
 package com.capybee.server.game;
 
+import com.capybee.engine.port.TextGenerator;
+import org.springframework.beans.factory.ObjectProvider;
+
 import com.capybee.engine.api.*;
 import com.capybee.engine.input.*;
 import com.capybee.engine.pack.*;
@@ -40,12 +43,11 @@ public final class PackPreparationService {
     private final Semaphore slots;
     public PackPreparationService(SessionPorts.EngineFactory engines,SessionPorts.PackCatalog packs,
             JdbcSessionStore store,ReviewedInputGuard guard,@Qualifier("gameSessionWorkers") Executor workers,
-            @Value("${capybee.game.pack-preparation.enabled:false}") boolean enabled,
             @Value("${capybee.game.pack-preparation.provider-approved:false}") boolean approved,
-            @Value("${capybee.game.generation-enabled:false}") boolean generation,
+            @Value("${capybee.game.generation-enabled:false}") boolean generation, ObjectProvider<TextGenerator> generators,
             @Value("${capybee.game.max-concurrent-generation:2}") int concurrent) {
         this.engines=engines;this.packs=packs;this.store=store;this.guard=guard;this.workers=workers;
-        this.enabled=enabled&&approved&&generation;this.slots=new Semaphore(Math.max(1,concurrent));
+        this.enabled=approved&&generation&&generators.getIfAvailable()!=null;this.slots=new Semaphore(Math.max(1,concurrent));
     }
     public boolean enabled(){return enabled;}
     public static String fingerprint(Pack pack){

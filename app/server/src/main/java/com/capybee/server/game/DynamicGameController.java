@@ -1,5 +1,7 @@
 package com.capybee.server.game;
 
+import com.capybee.engine.port.TextGenerator;
+
 import com.capybee.engine.generation.GenerationSetup.SetupOption;
 import com.capybee.engine.generation.profile.*;
 import com.capybee.engine.pack.LocaleTag;
@@ -45,8 +47,8 @@ public class DynamicGameController {
             String configuredOrigins, java.time.Clock clock,
             @Value("${capybee.game.web-client-enabled:false}") boolean webEnabled,
             @Value("${capybee.game.enabled:false}") boolean gameEnabled,
-            @Value("${capybee.game.generation-enabled:false}") boolean generationEnabled) {
-        this.clock = clock; this.webEnabled = webEnabled; this.gameEnabled = gameEnabled; this.generationEnabled = generationEnabled;
+            @Value("${capybee.game.generation-enabled:false}") boolean generationEnabled, ObjectProvider<TextGenerator> generators) {
+        this.clock = clock; this.webEnabled = webEnabled; this.gameEnabled = gameEnabled; this.generationEnabled = generationEnabled && generators.getIfAvailable() != null;
         this.catalog = catalog; this.operations = operations; this.users = users;
         this.familyProfiles = familyProfiles; this.rateLimiter = rateLimiter; this.allowSeed = allowSeed;
         this.syncWaitMs = Math.max(0, Math.min(20_000, syncWaitMs));

@@ -49,19 +49,19 @@ host reward writes.
 
 ## Configuration and audience
 
-All production flags retain their default `false` values:
+Fly enables the game and web client by default. AI generation defaults to `true` and requires a configured provider.
 
 | Environment variable | Purpose |
 |---|---|
 | `CAPYBEE_GAME_WEB_CLIENT_ENABLED` | Show the web entry |
 | `CAPYBEE_GAME_ENABLED` | Enable the game API, including saved runs |
-| `CAPYBEE_GAME_GENERATION_ENABLED` | Permit generated presentation/new paid starts |
-| `CAPYBEE_GAME_DYNAMIC_ENABLED` | Enable new dynamic preparation/start operations |
+| `CAPYBEE_GAME_GENERATION_ENABLED` | Enable AI generation across games, including prepared pack narration and new dynamic adventures |
+| `CAPYBEE_GAME_PACK_PROVIDER_APPROVED` | Record the operator’s provider approval for live pack narration |
 | `CAPYBEE_GAME_DYNAMIC_PROFILE_ROOT` | Reviewed profile directory |
 | `CAPYBEE_GAME_DYNAMIC_PROFILE_IDS` | Reviewed allowlist (default `generic-adventure`) |
 
 To stop new paid starts while preserving saved runs, keep the API and client
-available and disable generation and dynamic starts. Do not disable the entire
+available and set `CAPYBEE_GAME_GENERATION_ENABLED=false`. Do not disable the entire
 game API to pause paid creation. Existing authored starts can remain available.
 Keep the command HMAC key stable across server restarts. Do not log keys or
 private bodies. Deployment does not automatically enable generation.

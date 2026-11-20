@@ -49,9 +49,9 @@ import static org.assertj.core.api.Assertions.*;
 @EnabledIfEnvironmentVariable(named="CI", matches="true")
 @SpringBootTest(classes=CapyBeeApplication.class,webEnvironment=SpringBootTest.WebEnvironment.DEFINED_PORT,
  properties={"server.address=127.0.0.1","capybee.game.enabled=true","capybee.game.web-client-enabled=true",
- "capybee.game.generation-enabled=true","capybee.game.dynamic.enabled=true","capybee.game.dynamic.profile-ids=generic-adventure",
+ "capybee.game.generation-enabled=true","capybee.game.dynamic.profile-ids=generic-adventure",
  "capybee.game.command-hmac-key=preparation-fixture-key-32-bytes-long","capybee.game.sync-wait-ms=0",
- "capybee.game.limits.profile-calls-per-day=1000","capybee.game.pack-preparation.enabled=true","capybee.game.pack-preparation.provider-approved=true",
+ "capybee.game.limits.profile-calls-per-day=1000","capybee.game.pack-preparation.provider-approved=true",
  "capybee.game.completion.enabled=true","capybee.game.dynamic.starts-per-hour=100",
  // The browser drives multiple complete stories as one fixture owner at automation speed.
  "capybee.game.limits.commands-per-minute=300","spring.session.jdbc.initialize-schema=never"})
@@ -149,7 +149,6 @@ class PreparationHttpIntegrationTest {
     }
     @DynamicPropertySource static void database(DynamicPropertyRegistry properties){
         properties.add("server.port",()->HTTP_PORT);
-        properties.add("capybee.game.dynamic.enabled",()->!RESTARTED);
         properties.add("capybee.game.generation-enabled",()->!RESTARTED);
         properties.add("app.cors.allowed-origins",()->"http://localhost:5173,http://127.0.0.1:"+HTTP_PORT);
         properties.add("spring.datasource.url",()->"jdbc:postgresql://localhost:5432/capybee?currentSchema="+SCHEMA);
@@ -197,7 +196,11 @@ class PreparationHttpIntegrationTest {
         var user=new UserAccount();user.setGoogleSubject("preparation-fixture");user.setEmail("fixture@example.invalid");user.setDisplayName("Fixture");user.setAvatarUrl("");user=users.saveAndFlush(user);
         var child=new FamilyProfile();child.setParentUser(user);child.setNickname("Fixture");child.setBirthYear(Year.now().getValue()-12);child.setPreferredLocale("en");child.setHasSeenOnboarding(true);profiles.saveAndFlush(child);
         try{
-            assertThat(request("GET","/api/game/capabilities",null).statusCode()).isEqualTo(200);
+            var capabilityResponse=request("GET","/api/game/capabilities",null);
+            assertThat(capabilityResponse.statusCode()).isEqualTo(200);
+            var capabilities=SessionJson.tree(capabilityResponse.body());
+            assertThat(capabilities.path("dynamicStartEnabled").asBoolean()).isTrue();
+            assertThat(capabilities.path("packGenerationEnabled").asBoolean()).isTrue();
             var invalidPreset=request("POST","/api/game/runs",Map.of("id",UUID.randomUUID().toString(),"packId","capybee-new-hive","locale","pl","startInputs",Map.of("story-tone","private-enum-sentinel")));
             assertThat(invalidPreset.statusCode()).isEqualTo(400);
             assertThat(jdbc.queryForObject("SELECT count(*) FROM game_runs",Integer.class)).isZero();
@@ -306,7 +309,10 @@ class PreparationHttpIntegrationTest {
         assertThat(restored.path("view").toString().equals(persistedView)).as("accepted view survived restart").isTrue();
         assertThat(restored.path("source").path("gameFingerprint").asString()).isEqualTo(persistedFingerprint);
         assertThat(BLUEPRINT_CALLS.get()).isEqualTo(callsBeforeRestart);
-        assertThat(SessionJson.tree(request("GET","/api/game/capabilities",null).body()).path("dynamicStartEnabled").asBoolean()).isFalse();
+        var capabilities=SessionJson.tree(request("GET","/api/game/capabilities",null).body());
+        assertThat(capabilities.path("packStartEnabled").asBoolean()).isTrue();
+        assertThat(capabilities.path("dynamicStartEnabled").asBoolean()).isFalse();
+        assertThat(capabilities.path("packGenerationEnabled").asBoolean()).isFalse();
         String option=restored.path("view").path("options").get(0).path("id").asString();
         String command=UUID.randomUUID().toString();
         assertThat(request("POST","/api/game/runs/"+persistedRun+"/commands",Map.of("id",command,"expectedRevision",persistedRevision,"command",Map.of("type","CHOOSE","optionId",option))).statusCode()).isIn(200,202);
