@@ -233,7 +233,7 @@ it('keeps the legacy text layout, status, actions and focus for a run without pr
  expect(game.textContent).toContain(adventureCopy.en.ready);
  expect(game.querySelector('.game-map-sheet,.game-scene-menu')).toBeNull();
  expect(game.querySelector('.game-encounter svg')).toBeNull();
- expect(game.querySelector('.game-actions legend')?.textContent).toBe('Adventure');
+ expect(game.querySelector('.game-actions legend')?.textContent).toBe('What do you want to do?');
  expect([...game.querySelectorAll('button')].some(button=>button.textContent==='Go to: Rzeka'&&!button.disabled)).toBe(true);
 });
 it('renders escaped ordered prose and resolves only discovered speakers',async()=>{

@@ -49,18 +49,25 @@
 .game-scene-first .game-encounter-stage > svg { width: auto; height: 87%; max-width: 48%; }
 .game-scene-first .game-block p { line-height: 1.45; margin: .2rem 0 .65rem; }
 .game-scene-first .game-block strong { font-size: .9rem; color: #624720; }
-.game-scene-first .game-actions legend, .game-visually-hidden {
+.game-visually-hidden {
  position: absolute; inline-size: 1px; block-size: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
 }
+.game-actions .game-action-prompt { padding: 0; margin-block-end: .4rem; font-size: 1.125rem; font-weight: 700; }
+.game-actions button { font-size: 1.2rem; line-height: 1.25; overflow-wrap: anywhere; }
 .game-scene-first .game-actions button, .game-episode-exit {
  width: 100%; color: #fffdf7; background: #285745; border: 2px solid #285745; font-weight: 700;
 }
+.game-scene-first .game-actions button { background: #35735e; border-color: #35735e; }
 .game-scene-first button:hover { transform: none; }
-.game-scene-first .game-actions button:hover:not(:disabled), .game-episode-exit:hover { background: #204638; }
+.game-scene-first .game-actions button:hover:not(:disabled) { background: #2b614e; }
+.game-episode-exit:hover { background: #204638; }
+.game-scene-first .game-actions button[data-visited] { background: #f4dfac; border-color: #947846; color: #3e2d15; }
+.game-scene-first .game-actions button[data-visited]:hover:not(:disabled) { background: #ebd199; }
+.game-visited-mark { margin-inline-start: .45em; }
 .game-episode .game-run-status { min-block-size: 1.6em; margin-block: .25rem; }
 .game-episode .game-encounter-content h4 { margin-block: 0 .55rem; font-size: 1.25rem; }
 @media (forced-colors: active) {
- .game-scene-first .game-actions button, .game-episode-exit { color: ButtonText; background: ButtonFace; border-color: ButtonText; }
+ .game-scene-first .game-actions button, .game-scene-first .game-actions button[data-visited], .game-episode-exit { color: ButtonText; background: ButtonFace; border-color: ButtonText; }
 }
 
 body:has(.adventure-overlay .game-expedition) { min-width: 0; }

@@ -20,6 +20,11 @@
  box-sizing: border-box; height: clamp(6rem, 20dvh, 10rem); aspect-ratio: auto;
  border: 1px solid #bca67c; border-radius: 16px; background: var(--game-cream);
 }
+@media (max-width: 30rem) and (max-height: 42rem) {
+ .game-expedition:has(.game-scene-footer .game-action-prompt) .game-encounter .game-encounter-backdrop {
+  height: max(6rem, 15dvh);
+ }
+}
 .game-expedition .game-encounter .game-encounter-backdrop > svg { scale: none; }
 .game-expedition .game-expedition-location { margin: 0 0 .4rem; }
 .game-expedition .game-encounter-backdrop .game-expedition-location {

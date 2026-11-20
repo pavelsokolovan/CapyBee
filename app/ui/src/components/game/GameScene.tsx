@@ -1,4 +1,4 @@
-import {useEffect,useLayoutEffect,useRef,useState} from 'react';
+import {useEffect,useId,useLayoutEffect,useRef,useState} from 'react';
 import type {GameView,GameCommand} from '../../game/gameApi';
 import {runCopy} from './runCopy';
 import {GamePlaces} from './GamePlaces';
@@ -36,14 +36,30 @@ export function SceneBlocks({view,locale,progressive=false}:{view:GameView;local
  }}>{readMore[locale]}</button>:null}
  </div>;
 }
-export function SceneActions({view,locale,locked,selection,submit}:Props){
+export function SceneActions({view,locale,locked,selection,submit,visitedChoices=[]}:Props & {visitedChoices?:string[]}){
+ const visitedDescription=useId();
  const [online,setOnline]=useState(navigator.onLine);
  useEffect(()=>{const update=()=>setOnline(navigator.onLine);window.addEventListener('online',update);window.addEventListener('offline',update);return()=>{window.removeEventListener('online',update);window.removeEventListener('offline',update);};},[]);
  const copy=runCopy[locale], [draft,setDraft]=useState(''),[error,setError]=useState(false);
  const textAllowed=hasTextInput(view);
  const bound=Math.min(view.input?.maxChars??0,1000);
- return <div className="game-actions"><fieldset disabled={locked}><legend>{copy.scene}</legend>
- {view.options.map(o=><div key={o.id}><button type="button" disabled={!o.enabled} aria-describedby={o.hint?`hint-${o.id}`:undefined} onClick={()=>submit({type:'CHOOSE',optionId:o.id})}>{o.label}{selection===o.id?` — ${copy.checking}`:''}</button>{o.hint?<p id={`hint-${o.id}`}>{o.hint}</p>:null}</div>)}
+ return <div className="game-actions"><fieldset disabled={locked}><legend className={view.options.length?'game-action-prompt':'game-visually-hidden'} lang={locale}>
+  {view.options.length?copy.chooseAction:copy.scene}
+ </legend>
+ {visitedChoices.length?<span id={visitedDescription} lang={locale} hidden>{copy.visited}</span>:null}
+ {view.options.map(o=>{
+  const visited=visitedChoices.includes(o.id);
+  const hint=o.hint?`hint-${o.id}`:undefined;
+  const description=[hint,visited?visitedDescription:undefined].filter(Boolean).join(' ');
+  return <div key={o.id}>
+   <button type="button" disabled={!o.enabled} data-visited={visited||undefined} aria-describedby={description||undefined}
+    onClick={()=>submit({type:'CHOOSE',optionId:o.id})}>
+    {o.label}{selection===o.id?` — ${copy.checking}`:''}
+    {visited?<span className="game-visited-mark" aria-hidden="true">✓</span>:null}
+   </button>
+   {hint?<p id={hint}>{o.hint}</p>:null}
+  </div>;
+ })}
  {textAllowed?<form onSubmit={e=>{e.preventDefault();if(!online||!draft.trim())return;if(Array.from(draft).length>bound){setError(true);return;}const text=draft;setDraft('');setError(false);submit({type:'SUBMIT_TEXT',text});}}>
  <label htmlFor="game-response">{view.input?.prompt??copy.input}</label><textarea disabled={!online} id="game-response" value={draft} onChange={e=>{setDraft(e.target.value);setError(false);}} aria-describedby="game-privacy game-length" onKeyDown={e=>{if(e.nativeEvent.isComposing&&e.key==='Enter')e.stopPropagation();}}/>
  {!online?<p>{copy.offline}</p>:null}<p id="game-privacy">{copy.privacy}</p><p id="game-length" role={error?'alert':undefined}>{error?copy.length:`${Array.from(draft).length} / ${bound}`}</p><button type="submit" disabled={!online||!draft.trim()}>{copy.send}</button></form>:null}

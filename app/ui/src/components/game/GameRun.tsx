@@ -7,6 +7,7 @@ import {SceneBlocks,SceneActions,ScenePanels,SceneResult,hasTextInput} from './G
 import {adventureCopy} from '../../game/adventureCopy';
 import {adventureLocation,adventureTitle} from '../../game/savedAdventure';
 import {hiveCapyExpression} from '../../game/hiveCapyExpression';
+import {visitedHiveChoices} from '../../game/hiveExpedition';
 import {completedHivePlaces} from '../../game/hiveCompletion';
 import {sceneFirstKind} from '../../game/sceneFirst';
 import {focusScene,resetSceneScroll} from '../../game/sceneScroll';
@@ -135,7 +136,7 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
  const status=<p className={quietSave?'game-run-status game-visually-hidden':'game-run-status'} role="status" aria-live="polite" lang={controlsLocale}>{initialized
   ? (!episode||state.message!=='saved'||saveVisible ? c[state.message] : '') : c.checking}</p>;
  const actions=view&&initialized&&(!locked||state.pending)?<SceneActions key={state.run.revision} view={view}
-  locale={controlsLocale} locked={locked} selection={state.selection} submit={submit}/>:null;
+  locale={controlsLocale} locked={locked} selection={state.selection} visitedChoices={visitedHiveChoices(state.run)} submit={submit}/>:null;
  const party=view?<GameParty view={view} locale={locale} runId={state.run.runId} revision={state.run.revision}
   ready={initialized} announce={initialized&&!locked&&state.message==='saved'} hideEmpty={expedition}/>:null;
  const runClass=episode?'game-run game-scene-first game-episode':expedition?'game-run game-scene-first game-expedition':'game-run';

@@ -125,12 +125,20 @@ export async function checkPolishPack({page,context,base,requests}) {
  await choose('Odpoczywam na dziś');await ending('rest-here');
  await checkProgressiveText({page,game,requests,locale:'en'});
  await start();await choose('Continue');
+ const lanternChoice=game.getByRole('button',{name:'Odwiedzam Latarnię Wspomnień',exact:true});
+ assert.equal(await lanternChoice.getAttribute('data-visited'),null);
  await travelTo(game,'old-lantern');await travelTo(game,'hive-square');
+ assert.equal(await lanternChoice.getAttribute('data-visited'),'true');
+ assert.equal(await lanternChoice.locator('.game-visited-mark').innerText(),'✓');
+ assert.equal(await lanternChoice.evaluate(button=>
+  document.getElementById(button.getAttribute('aria-describedby')).textContent),'Visited');
+ assert.equal(await game.getByRole('button',{name:'Odwiedzam Melę',exact:true}).getAttribute('data-visited'),null);
  const current=await (await context.request.get(base+'/api/game/runs/current')).json(),posts=requests.length;
  assertPublic(current);assert.deepEqual(current.view.presentation.characters.map(c=>c.id),['actor:hive-guide'],'map movement disclosed a future hero');
  await page.reload();await page.getByRole('button',{name:'Play',exact:true}).click();await page.getByRole('button',{name:/Adventures/}).click();
  await page.getByRole('button',{name:'Continue',exact:true}).click();await saved();
  const resumed=await (await context.request.get(`${base}/api/game/runs/${current.runId}`)).json();
+ assert.equal(await lanternChoice.getAttribute('data-visited'),'true');
  assert.equal(resumed.revision,current.revision);assert.deepEqual(resumed.view,current.view);assert.equal(requests.length,posts,'reload created another start/action');
  for(const label of ['Idę do Warsztatu','Wiążę poręcz','Zapalam nowe światło'])await choose(label);
  await ending('new-path');

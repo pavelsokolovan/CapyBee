@@ -121,6 +121,13 @@ export async function captureExpeditionHub({page,game}){
 export async function captureExpeditionLantern({page,game}){
  await atMobile(page,game,async()=>{
   const frame=await checkFooter(page,game,3);
+  const actions=game.locator(footer);
+  const prompt=actions.getByText(/^(Co chcesz zrobić\?|What do you want to do\?)$/);
+  assert.ok(await prompt.isVisible(),'the choices have no visible prompt');
+  assert.ok(await actions.locator('fieldset button').evaluateAll(buttons=>buttons.every(button=>
+   parseFloat(getComputedStyle(button).fontSize)>=1.19*parseFloat(getComputedStyle(document.documentElement).fontSize)
+   &&button.getBoundingClientRect().bottom<=button.closest('.game-scene-footer').getBoundingClientRect().bottom+1
+  )),'the larger choices must all fit inside the mobile footer');
   await checkBackdrop(game);
   await screenshot(page,'lantern-mobile');
   await game.locator(body).evaluate(node=>{node.scrollTop=node.scrollHeight;});
