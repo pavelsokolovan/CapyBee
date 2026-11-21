@@ -49,6 +49,7 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
 
  const ended=!!view?.ended||state.run.status==='ENDED';
  const episodeCompleted=episode&&state.run.status==='ENDED'&&view?.endReason==='COMPLETED';
+ const focusEnding=episodeCompleted||detective&&ended&&!!view;
  const endingHeading=useRef<HTMLHeadingElement>(null);
  const unsupported=!view||typeof view.canAdvance!=='boolean'||!!(view.input?.mode==='TEXT'&&view.options.some(o=>o.enabled))||!!(view.places?.availableMoves.some(id=>!view.places?.places.some(p=>p.id===id)));
  const locked=!initialized||state.pending||state.run.status!=='ACTIVE'||!!view?.ended||unsupported;
@@ -68,13 +69,18 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
  useLayoutEffect(()=>{
   const overlay=section.current?.closest<HTMLElement>('.adventure-overlay')??null;
   const scroller=expedition?sceneBody.current:overlay;
+  const focusResult=()=>{
+   if(detective)endingHeading.current?.focus();
+   else focusScene(endingHeading.current,scroller);
+  };
   if(focusBaseline.current!==state.run.runId){
    focusBaseline.current=state.run.runId;
    intention.current=null;
    pendingFills.current.clear();
    setAnimatedFills([]);
    if(expedition)resetSceneScroll(overlay);
-   focusScene((episodeCompleted?endingHeading:hasSceneHeading?runHeading:heading).current,scroller);
+   if(focusEnding)focusResult();
+   else focusScene((hasSceneHeading?runHeading:heading).current,scroller);
    return;
   }
   const requested=intention.current;
@@ -108,13 +114,13 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
   if(state.message!=='saved'||requested.runId!==state.run.runId)return;
   if(expedition)feedback();
   if(episode&&episodeMap.current)episodeMap.current.open=false;
-  if(episodeCompleted)focusScene(endingHeading.current,scroller);
+  if(focusEnding)focusResult();
   else if(episode||expedition||requested.command.type!=='MOVE'||requested.entry||ended)focusScene(heading.current,scroller);
   else {
    const cell=[...document.querySelectorAll<HTMLElement>('.game-run [data-place-id]')].find(n=>n.dataset.placeId===view?.places?.currentPlaceId);
    cell?.querySelector<HTMLButtonElement>('button')?.focus();
   }
- },[state.run,state.pending,state.message,ended,episode,episodeCompleted,expedition,hasSceneHeading,places?.currentPlaceId]);
+ },[state.run,state.pending,state.message,ended,episode,detective,focusEnding,expedition,hasSceneHeading,places?.currentPlaceId]);
  const closeMenu=()=>{if(menu.current)menu.current.open=false;menuSummary.current?.focus();};
  const openMap=()=>{
   if(!mapDialog.current)return;
@@ -151,7 +157,7 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
   {state.pending?<button type="button" onClick={()=>void controller.check()}>{c.check}</button>:null}
  </>:null;
  const completion=!episode&&ended?<>{view?.endReason==='COMPLETED'?<GameCompletion key={`${owner}:${state.run.runId}`} owner={owner} runId={state.run.runId} revision={state.run.revision} locale={locale}/>:null}
-  <button type="button" onClick={onAnother}>{c.newGame}</button></>:null;
+  <button type="button" onClick={onAnother} lang={locale}>{detective?c.backToAdventures:c.newGame}</button></>:null;
  const exit=<>
   {!expedition&&state.run.status==='ACTIVE'?<button type="button" ref={abandon} disabled={locked} onClick={()=>dialog.current?.showModal()}>{c.abandon}</button>:null}
   <dialog onKeyDown={e=>e.stopPropagation()} ref={dialog} aria-labelledby="game-abandon-title" onCancel={e=>{e.preventDefault();cancel();}}><h4 id="game-abandon-title">{c.confirm}</h4><button type="button" onClick={cancel}>{c.cancel}</button><button type="button" disabled={locked} onClick={()=>{cancel();void submit({type:'ABANDON'});}}>{c.abandon}</button></dialog>
@@ -218,9 +224,10 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
    <GameEncounter view={view} stage={detective} textMode={detective&&textMode}>
     {!detective?<GameCurrentCharacters view={view} locale={locale}/>:null}
     <SceneBlocks view={view} locale={locale}/>{actions}
+    {detective&&ended?<SceneResult view={view} locale={locale} detective headingRef={endingHeading}/>:null}
    </GameEncounter>
    {detective?<GameCurrentCharacters view={view} locale={locale} collapsible/>:null}
-   <ScenePanels view={view} locale={locale} locked={locked} submit={submit} caseNotes={detective}/>{ended?<SceneResult view={view} locale={locale}/>:null}
+   <ScenePanels view={view} locale={locale} locked={locked} submit={submit} caseNotes={detective}/>{ended&&!detective?<SceneResult view={view} locale={locale}/>:null}
   </>:episode?status:null}
   {recovery}{completion}{exit}
  </section>;

@@ -1,3 +1,4 @@
+import {detectiveProfileId} from '../../game/detective';
 import {ownerAllowed,watchGameOwner} from '../../game/gameOwner';
 import {useEffect,useLayoutEffect,useRef,useState,useSyncExternalStore} from 'react';
 import type {GameRunSummaryDto,SetupInput} from '../../game/gameApi';
@@ -110,7 +111,7 @@ export function AdventurePreparation({owner,locale,onClose,resumeRunId,onRunRead
     {state.games.map(game=>{
      const supported=compatible(game),pack=game.kind==='PACK'?game.pack:null;
      const description=!supported?copy.unsupported:game.kind==='DYNAMIC'
-      ?game.profile.id==='classic-detective'?game.profile.description:copy.dynamic
+      ?game.profile.id===detectiveProfileId?game.profile.description:copy.dynamic
       :pack?.id===anonymousNotePackId?copy.mysteryDescription:pack?.id===hiveExpeditionPackId?copy.hiveDescription:copy.authored;
      return <button type="button" className="play-game-row adventure-catalog-row"
       key={game.kind==='PACK'?`PACK:${game.pack.id}`:`DYNAMIC:${game.profile.id}`}
@@ -163,7 +164,8 @@ export function AdventurePreparation({owner,locale,onClose,resumeRunId,onRunRead
     {flow.canCancel()?<><p>{copy.cancelHint}</p><button type="button" onClick={()=>void flow.cancel()}>{copy.cancel}</button></>:null}</>:null}
    {['unknown','failed','needsInput','fallback','cancelled'].includes(state.phase)?<>
     {selected?<button type="button" onClick={()=>{setWish('');flow.step(0);}}>{copy.edit}</button>:null}
-    <button type="button" onClick={()=>void flow.check()}>{copy.retry}</button>
+    {flow.canCheck()?<button type="button" onClick={()=>void flow.check()}>{copy.retry}</button>:null}
+    {flow.canReviewRetry()?<button type="button" className="primary-button" onClick={()=>flow.reviewRetry()}>{copy.reviewRetry}</button>:null}
     {activeCurrent?<button type="button" onClick={()=>void flow.resume()}>{copy.continue}</button>:null}
     <button type="button" onClick={()=>{setWish('');flow.catalog();void flow.load(false);}}>{copy.newGame}</button>
    </>:null}

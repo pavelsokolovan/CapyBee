@@ -1,3 +1,4 @@
+import {detectiveProfileId} from './detective';
 import {anonymousNotePackId} from './anonymousNote';
 import type { GameCapabilities, GamePackInfoDto, GameRunSummaryDto, GeneratorProfile } from './gameApi';
 import { decodeCapabilities, decodePack, decodeProfile, decodeSummary, object } from './gameDecoders';
@@ -173,8 +174,10 @@ export class AdventureStart {
   }catch(error){if(epoch===this.generation){if(message(error)==='signin')this.signIn();else this.update({message:message(error),phase:'setup',clearIdea:this.value.clearIdea+1});}}
   finally {if(epoch===this.generation){this.sending=false;this.update({loading:false});}}
  }
- private handoff(value:unknown) {
-  const run=decodeSummary(value);this.forget();this.pollAbort?.abort();
+ private handoff(value:unknown, keepAttempt=false) {
+  const run=decodeSummary(value);
+  if(!keepAttempt)this.forget();
+  this.pollAbort?.abort();
   this.update({phase:'ready',loading:false,ready:run,current:run,clearIdea:this.value.clearIdea+1});this.ready(run);
  }
  private async accept(reply:GameReply) {
@@ -205,7 +208,24 @@ export class AdventureStart {
    this.forget();await this.refreshCurrent();if(epoch!==this.generation)return;this.update({phase:'failed',message:message(new Error(code)),clearIdea:this.value.clearIdea+1});return;}
   this.update({phase:'unknown',message:'unknown'});
  }
- private async refreshCurrent() {const epoch=this.generation;try{const reply=await this.transport.read('/api/game/runs/current');if(epoch===this.generation&&reply.status===200)this.update({current:decodeSummary(reply.body)});}catch{/* Preserve the last accepted run. */}}
+ private async refreshCurrent() {
+  const epoch=this.generation;
+  try {
+   const reply=await this.transport.read('/api/game/runs/current');
+   if(epoch!==this.generation)return;
+   if(reply.status===200)this.update({current:decodeSummary(reply.body)});
+   else if(reply.status===404)this.update({current:null});
+  }catch{/* Preserve the last accepted run. */}
+ }
+ canCheck(){return this.marker!==undefined;}
+ canReviewRetry(){
+  const {phase,selected}=this.value;
+  return phase==='failed' && !this.marker && selected?.kind==='DYNAMIC' && selected.profile.id===detectiveProfileId;
+ }
+ reviewRetry(){
+  if(!this.canReviewRetry())return;
+  this.update({phase:'review',message:undefined,replacement:false,clearIdea:this.value.clearIdea+1});
+ }
  async check() {
   const marker=this.marker;if(!marker)return;
   const epoch=this.generation;
@@ -227,9 +247,30 @@ export class AdventureStart {
   this.pollAbort?.abort();const epoch=this.generation;
   try{const reply=await this.transport.cancel(marker);if(epoch===this.generation)await this.accept(reply);}catch{await this.check();}}
  canCancel(){return !!this.marker&&['/api/game/dynamic-starts','/api/game/pack-starts'].includes(this.marker.path);}
- async resume() {const epoch=this.generation,current=this.value.current;if(!current)return;
-  try{const reply=await this.transport.read(`/api/game/runs/${current.runId}`);if(epoch!==this.generation)return;if(reply.status===200){const run=decodeSummary(reply.body);if(run.status==='PREPARING'){
-    this.remember({owner:this.owner,id:run.runId,runId:run.runId,path:'/api/game/runs',createdAt:Date.now()});await this.check();
-   }else this.handoff(run);}else if(reply.status===401)this.signIn();else this.update({message:'unknown'});}catch(error){if(epoch===this.generation){if(message(error)==='signin')this.signIn();else this.update({message:message(error)});}}}
+ async resume() {
+  const current=this.value.current;
+  if(!current)return;
+  const epoch=++this.generation;
+  this.pollAbort?.abort();
+  try {
+   const reply=await this.transport.read(`/api/game/runs/${current.runId}`);
+   if(epoch!==this.generation)return;
+   if(reply.status===401){this.signIn();return;}
+   if(reply.status!==200){this.update({message:'unknown'});return;}
+   const run=decodeSummary(reply.body);
+   if(run.status==='PREPARING'){
+    this.remember({owner:this.owner,id:run.runId,runId:run.runId,path:'/api/game/runs',createdAt:Date.now()});
+    await this.check();
+   }else{
+    // The saved run may coexist with an unresolved replacement request.
+    this.handoff(run,this.marker?.path==='/api/game/dynamic-starts');
+   }
+  }catch(error){
+   if(epoch===this.generation){
+    if(message(error)==='signin')this.signIn();
+    else this.update({message:message(error)});
+   }
+  }
+ }
  dispose(){this.generation++;this.pollAbort?.abort();this.transport.detach();this.sending=false;}
 }

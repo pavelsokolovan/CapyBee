@@ -115,3 +115,10 @@
  }
  .game-detective .game-case-notes > div { border-color: CanvasText; }
 }
+.game-case-result {
+ margin-block-start: .8rem;
+ padding-block-start: .65rem;
+ border-block-start: 1px solid #bca67c;
+}
+.game-case-result h4 { margin-block: 0 .4rem; font-size: 1.25rem; scroll-margin-block-start: 4rem; }
+.game-case-result h5 { margin-block: .65rem 0; font-size: 1rem; }

@@ -1,4 +1,4 @@
-import {useEffect,useId,useLayoutEffect,useRef,useState} from 'react';
+import {useEffect,useId,useLayoutEffect,useRef,useState,type Ref} from 'react';
 import type {GameView,GameCommand} from '../../game/gameApi';
 import {runCopy} from './runCopy';
 import {GamePlaces} from './GamePlaces';
@@ -10,6 +10,12 @@ export function hasTextInput(view:GameView) {
 const caseCopy = {
  en:{title:'Case notes',done:'Found',active:'To investigate'},
  pl:{title:'Notatki ze śledztwa',done:'Odkryto',active:'Do zbadania'},
+} as const;
+const caseResultCopy = {
+ en:{solved:'Case solved',partial:'Case unresolved',failed:'Case closed without a solution',completed:'Case complete',
+  abandoned:'Case abandoned',reconstruction:'How the case was solved'},
+ pl:{solved:'Sprawa rozwiązana',partial:'Sprawa pozostaje otwarta',failed:'Sprawa zamknięta bez rozwiązania',completed:'Sprawa zakończona',
+  abandoned:'Sprawa porzucona',reconstruction:'Jak rozwiązano sprawę'},
 } as const;
 const readMore = {en:'Read more',pl:'Czytaj dalej'} as const;
 export function SceneBlocks({view,locale,progressive=false}:{view:GameView;locale:'en'|'pl';progressive?:boolean}) {
@@ -81,7 +87,21 @@ export function ScenePanels({view,locale,locked,submit,hidePlaces=false,caseNote
  {view.status.length?<details><summary>{c.status}</summary><dl>{view.status.map(s=><div key={s.id}><dt>{s.label}</dt><dd>{s.value}</dd></div>)}</dl></details>:null}
  {!hidePlaces&&p?.places.length?<GamePlaces places={p} locale={locale} locked={locked} submit={submit}/>:null}</aside>;
 }
-export function SceneResult({view,locale}:{view:GameView;locale:'en'|'pl'}) {
+export function SceneResult({view,locale,detective=false,headingRef}:{view:GameView;locale:'en'|'pl';detective?:boolean;headingRef?:Ref<HTMLHeadingElement>}) {
  const result='result' in view?view.result:null,c=runCopy[locale];
+ if(detective){
+  const copy=caseResultCopy[locale];
+  const abandoned=view.endReason==='ABANDONED';
+  const report=abandoned?null:result;
+  const solved=report?.resultClass==='SUCCESS';
+  const heading=abandoned?copy.abandoned:solved?copy.solved:
+   report?.resultClass==='PARTIAL_SUCCESS'?copy.partial:report?.resultClass==='FAILURE'?copy.failed:copy.completed;
+  return <section className="game-case-result">
+   <h4 ref={headingRef} tabIndex={-1} lang={locale}>{heading}</h4>
+   {report?.headline&&report.headline!==heading?<p><strong>{report.headline}</strong></p>:null}
+   {report?.summary?<>{solved?<h5 lang={locale}>{copy.reconstruction}</h5>:null}<p>{report.summary}</p></>:null}
+   {report?.reflection?<p>{report.reflection}</p>:null}
+  </section>;
+ }
  return <section><h4>{result?.headline??(view.endReason==='ABANDONED'?c.abandoned:c.completed)}</h4>{result?<><p>{result.summary}</p><p>{result.label}</p>{result.objectives.map(o=><div key={o.id}><strong>{o.label}</strong><p>{o.description}</p><p>{o.state}</p><p>{o.note}</p></div>)}{result.facts.map(f=><p key={f.id}>{f.label}</p>)}<p>{result.reflection}</p></>:null}</section>;
 }

@@ -10,7 +10,7 @@ import fixtures from '../../game/fixtures/contracts.json';
 import {illustratedRun} from '../../game/fixtures/illustratedRun';
 import {adventureCopy} from '../../game/adventureCopy';
 import {anonymousNotePackId} from '../../game/anonymousNote';
-import type {GameRunSummaryDto} from '../../game/gameApi';
+import type {GameRunSummaryDto,GameViewV2} from '../../game/gameApi';
 import {RunController,type RunState} from '../../game/runController';
 import {GameTransport} from '../../game/gameTransport';
 (globalThis as typeof globalThis & {IS_REACT_ACT_ENVIRONMENT:boolean}).IS_REACT_ACT_ENVIRONMENT=true;
@@ -399,18 +399,21 @@ it('projects CapyBee’s reaction from the accepted Hive beat on stage and in th
 });
 
 
+function detectiveRun(locale:'en'|'pl') {
+ const fixture=illustratedRun();
+ fixture.view.places=null;
+ fixture.view.presentation!.backdropAssetId='backdrop.case-study';
+ fixture.view.presentation!.characters[0].assetId='character.capy';
+ return {...fixture,source:{kind:'DYNAMIC',profileId:'classic-detective',profileVersion:'1.3.0',gameFingerprint:'fixture'} as const,
+  packId:null,packVersion:null,locale};
+}
+
 it.each([
  {locale:'en',toggle:'Text mode',notes:'Case notes',task:'Inspect the seal.',observation:'The wax has two impressions.',found:'Found'},
  {locale:'pl',toggle:'Tryb tekstowy',notes:'Notatki ze śledztwa',task:'Zbadaj pieczęć.',observation:'Wosk ma dwa odciski.',found:'Odkryto'},
 ] as const)('shows the accepted case and choice in both reading modes ($locale)',async test=>{
- const fixture=illustratedRun();
- const view=fixture.view;
- view.places=null;
+ const run=detectiveRun(test.locale),view=run.view;
  view.objectives=[{id:'objective-001',label:test.task,description:test.task,state:'ACTIVE'}];
- view.presentation!.backdropAssetId='backdrop.case-study';
- view.presentation!.characters[0].assetId='character.capy';
- const run={...fixture,source:{kind:'DYNAMIC',profileId:'classic-detective',profileVersion:'1.3.0',gameFingerprint:'fixture'} as const,
-  packId:null,packVersion:null,locale:test.locale};
  const {accept,submit}=await renderRun(run,test.locale);
  const game=host.querySelector('.game-detective')!;
  const notes=game.querySelector('details.game-case-notes')!;
@@ -434,4 +437,45 @@ it.each([
  expect(notes.textContent).toContain(test.observation);
  expect(notes.textContent).toContain(test.found);
  expect(submit).not.toHaveBeenCalled();
+});
+
+function finishCase(run:ReturnType<typeof detectiveRun>,outcome:GameViewV2['result'],endReason:'COMPLETED'|'ABANDONED'='COMPLETED') {
+ return {...run,status:'ENDED' as const,revision:run.revision+1,endReason,
+  view:{...run.view,ended:true,endReason,options:[],result:outcome}};
+}
+const caseReport={outcomeId:'solved',label:'The missing letter',headline:'The opened envelope',
+ summary:'Nora opened the seal at dusk to recover the letter. The wax held two impressions.',
+ objectives:[],facts:[]};
+
+it('focuses the saved detective ending and shows the accepted reconstruction in text mode',async()=>{
+ const run=detectiveRun('en');
+ run.view.objectives=[{id:'clue',label:'Examine the seal',state:'DONE',description:'The wax held two impressions.'}];
+ const {accept,submit}=await renderRun(run);
+ await act(async()=>host.querySelector<HTMLButtonElement>('.game-detective-tools button')!.click());
+ await act(async()=>host.querySelector<HTMLButtonElement>('.game-actions button')!.click());
+ expect(submit).toHaveBeenCalledExactlyOnceWith({type:'CHOOSE',optionId:run.view.options[0].id});
+ await accept(finishCase(run,{...caseReport,resultClass:'SUCCESS'}));
+ const result=host.querySelector('.game-case-result')!;
+ expect(document.activeElement).toBe(result.querySelector('h4'));
+ expect(result.textContent).toContain('Case solved');
+ expect(result.textContent).toContain('How the case was solved');
+ expect(result.textContent).toContain(caseReport.summary);
+ expect(host.querySelector('.game-encounter-backdrop')).toBeNull();
+ expect(host.querySelector('.game-case-notes')?.textContent).toContain('The wax held two impressions.');
+ expect([...host.querySelectorAll('button')].map(button=>button.textContent)).toContain('Back to Adventures');
+});
+
+it.each([
+ ['PARTIAL_SUCCESS','COMPLETED','Sprawa pozostaje otwarta'],
+ ['FAILURE','COMPLETED','Sprawa zamknięta bez rozwiązania'],
+ [null,'ABANDONED','Sprawa porzucona'],
+] as const)('focuses the localized detective result when opened (%s)',async (result,endReason,title)=>{
+ const summary='Pozostał jeszcze jeden trop.';
+ const run=finishCase(detectiveRun('pl'),result?{...caseReport,resultClass:result,summary}:null,endReason);
+ await renderRun(run,'pl');
+ const report=host.querySelector('.game-case-result')!;
+ expect(report.querySelector('h4')?.textContent).toBe(title);
+ expect(document.activeElement).toBe(report.querySelector('h4'));
+ expect(report.textContent?.includes(summary)).toBe(result!==null);
+ expect(report.querySelector('h5')).toBeNull();
 });

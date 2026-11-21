@@ -109,6 +109,34 @@ describe('resume from Play',()=>{
   expect(handoff).not.toHaveBeenCalled();
   expect(transport.transient).not.toHaveBeenCalled();
  });
+ it('keeps the uncertain request available for status checks while resuming the existing detective case',async()=>{
+  const old={...contracts.dynamic,source:{...contracts.dynamic.source,profileId:'classic-detective'}};
+  const marker={owner:'owner',id:'original-attempt',path:'/api/game/dynamic-starts',createdAt:1};
+  const operation=marker.path+'/'+marker.id;
+  sessionStorage.setItem('game-operation:owner:'+marker.id,JSON.stringify(marker));
+  const {flow,transport}=harness();
+  vi.mocked(transport.read).mockImplementation(async path=>{
+   if(path===operation)return {status:404,body:{}};
+   if(path.endsWith('/capabilities'))return {status:200,body:caps};
+   if(path.endsWith('/current')||path.endsWith(old.runId))return {status:200,body:old};
+   return {status:200,body:[]};
+  });
+  await flow.load();
+  expect(flow.getSnapshot().phase).toBe('unknown');
+  expect(flow.canCheck()).toBe(true);
+  expect(flow.canReviewRetry()).toBe(false);
+  await flow.check();
+  expect(transport.read).toHaveBeenCalledWith(operation);
+  let finish!: (value:{status:number;body:unknown})=>void;
+  vi.mocked(transport.read).mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));
+  const lateStatus=flow.check();
+  await flow.resume();
+  finish({status:200,body:contracts.started});
+  await lateStatus;
+  expect(flow.getSnapshot().ready?.runId).toBe(old.runId);
+  expect(storedStart('owner')).toEqual(marker);
+  expect(transport.transient).not.toHaveBeenCalled();
+ });
  it('recovers an unresolved start before considering the saved preview',async()=>{
   sessionStorage.setItem('game-operation:owner:request',JSON.stringify({owner:'owner',id:'request',path:'/api/game/dynamic-starts',createdAt:1}));
   const {flow,transport,handoff}=harness();

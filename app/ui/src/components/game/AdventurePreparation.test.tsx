@@ -146,3 +146,35 @@ it('shows the localized detective card and confirms Quick Start as a dynamic cas
   expect.objectContaining({profileId:detective.id,locale:'pl',confirmed:true}),
  );
 });
+
+it('offers a confirmed detective retry and asks again before replacing the saved case',async()=>{
+ const h=harness(),copy=adventureCopy.en;
+ const detective={...contracts.profile,id:'classic-detective',title:'Classic detective mystery'};
+ const saved={...contracts.dynamic,source:{...contracts.dynamic.source,profileId:detective.id}};
+ vi.mocked(h.transport.read).mockImplementation(async path=>({status:200,body:
+  path.endsWith('/capabilities')?caps:path.endsWith('/current')?saved:path.endsWith('/packs')?[]:
+  path.endsWith('/generator-profiles')?[detective]:detective}));
+ const writes=vi.mocked(h.transport.transient);
+ writes.mockResolvedValue({status:503,body:contracts.failed});
+ await act(async()=>root.render(<AdventurePreparation owner="owner" locale="en" onClose={h.close} flow={h.flow}/>));
+ await click(detective.title);
+ await click(copy.quickStart);
+ const answers=h.flow.getSnapshot().answers;
+ await act(async()=>h.flow.replacement(true));
+ await click(copy.start);
+ expect(h.flow.getSnapshot()).toMatchObject({phase:'failed',current:{runId:saved.runId}});
+ expect([...host.querySelectorAll('button')].map(button=>button.textContent)).toContain(copy.continue);
+ expect([...host.querySelectorAll('button')].map(button=>button.textContent)).not.toContain(copy.retry);
+ await click(copy.reviewRetry);
+ expect(h.flow.getSnapshot()).toMatchObject({phase:'review',answers,replacement:false});
+ expect(host.textContent).toContain(copy.ideaNone);
+ const start=[...host.querySelectorAll('button')].find(button=>button.textContent===copy.start)!;
+ expect(start.disabled).toBe(true);
+ expect(writes).toHaveBeenCalledTimes(1);
+ await act(async()=>h.flow.replacement(true));
+ await click(copy.start);
+ expect(writes).toHaveBeenCalledTimes(2);
+ expect(writes.mock.calls[1][0].id).not.toBe(writes.mock.calls[0][0].id);
+ expect(writes.mock.calls[1][2]).toMatchObject({expectedCurrentRunId:saved.runId,confirmed:true});
+ expect(writes.mock.calls[1][2]).not.toHaveProperty('suggestion');
+});
