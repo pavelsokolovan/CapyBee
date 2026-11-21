@@ -90,3 +90,28 @@
   margin-block-start: .3rem;
  }
 }
+
+.game-detective-tools { align-items: center; }
+.game-detective-tools .game-run-status { margin: 0 .25rem; }
+.game-detective .game-encounter-stage > svg {
+ min-width: 0;
+ max-width: 27%;
+}
+.game-detective .game-encounter-content .game-actions button:disabled {
+ color: #493f33;
+ background: #eee7d7;
+ border-color: #a39680;
+}
+.game-detective .game-case-notes > div {
+ padding: .65rem .85rem;
+ border-inline-start: 3px solid #a58b64;
+}
+.game-detective .game-case-notes p { margin: .35rem 0; }
+@media (forced-colors: active) {
+ .game-detective .game-encounter-content .game-actions button:disabled {
+  color: GrayText;
+  background: Canvas;
+  border-color: GrayText;
+ }
+ .game-detective .game-case-notes > div { border-color: CanvasText; }
+}

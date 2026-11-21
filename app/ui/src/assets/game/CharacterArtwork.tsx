@@ -28,11 +28,20 @@ function Face({expression, muzzle = false}: {expression: Expression; muzzle?: bo
   </g>;
 }
 
+const caseClothes: Partial<Record<CharacterId, {coat: string; skin: string; hair: string}>> = {
+  'character.case-detective': {coat: '#435C60', skin: '#D7A477', hair: '#463438'},
+  'character.case-client': {coat: '#926878', skin: '#D8AA89', hair: '#674B37'},
+  'character.case-copper': {coat: '#99624F', skin: '#AF7A58', hair: '#3E2D32'},
+  'character.case-indigo': {coat: '#66658C', skin: '#E0BB98', hair: '#926345'},
+  'character.case-olive': {coat: '#66734D', skin: '#C89370', hair: '#554649'},
+};
+
 /** Fixed SVG geometry: no paths, colors or styling accepted from narrative content. */
 export function CharacterArtwork({id, variant, expression}: {id: CharacterId; variant: CharacterVariant; expression: CharacterExpression}) {
   const portrait = variant === 'portrait', marker = variant === 'marker';
   const effectiveExpression = marker ? 'neutral' : expression;
   const companionExpression = effectiveExpression === 'playful' ? 'neutral' : effectiveExpression;
+  const clothes = caseClothes[id];
   return <g stroke={p.ink} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round">
     {portrait && <circle cx="80" cy="78" r="67" fill={p.cream} stroke="none"/>}
     {id === 'character.capy' && <>
@@ -74,6 +83,16 @@ export function CharacterArtwork({id, variant, expression}: {id: CharacterId; va
       {!portrait && <ellipse cx="78" cy="122" rx="17" ry="33" fill="#D6C697"/>}
       <path d="m65 43-8-18m34 18 8-18" fill="none"/><ellipse cx="77" cy="72" rx="30" ry="29" fill="#E3D4AC"/>
       <Face expression={companionExpression}/>
+    </>}
+    {clothes && <>
+      <path d="M36 153q-2-35 31-49h25q36 14 37 49Z" fill={clothes.coat}/>
+      <path d="m62 109 17 28 19-28" fill={p.paper}/>
+      <path d="m79 121-7 8 7 9 7-9Z" fill={p.honey}/>
+      <ellipse cx="77" cy="74" rx="35" ry="33" fill={clothes.skin}/>
+      <path d="M43 68q-3-38 35-36 32 0 36 30-18-3-35-15-11 15-36 21Z" fill={clothes.hair}/>
+      <Face expression={companionExpression}/>
+      {id === 'character.case-detective' && <path d="M39 48q8-7 13-10l8-18q24-10 43 7l5 13 16 8q-36 11-85 0Z" fill={clothes.coat}/>}
+      {id === 'character.case-client' && <path d="M46 69h27m8 0h24m-32 4q4-4 8 0M49 69q-5 18 9 18t14-18m10 0q-3 18 10 18t12-18" fill="none" strokeWidth="2"/>}
     </>}
     {id === 'character.abstract-guide' && <>
       <path d={portrait ? 'M35 94Q20 44 60 40q12-22 32 0 42 0 30 54-35 26-87 0Z' : 'M31 132Q18 63 58 51q14-22 34 0 47 7 34 81-15 33-48 23-31 9-47-23Z'} fill={p.sage}/>

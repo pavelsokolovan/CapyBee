@@ -83,7 +83,7 @@ export default function GameArtGallery() {
     <section aria-labelledby="art-settings-heading"><h2 id="art-settings-heading">{c.settings}</h2>
       <div className="art-settings">{(Object.keys(catalog) as AssetId[]).filter(id => catalog[id].kind === 'backdrop').map((id, i) =>
         <figure key={id} data-testid={id}><GameBackdrop assetId={id as Parameters<typeof GameBackdrop>[0]['assetId']} decorative/>
-          <figcaption>{c.places[i] ?? c.neutralSetting}<code aria-hidden="true">{id}</code></figcaption></figure>)}</div>
+          <figcaption>{id==='backdrop.case-study'?c.caseStudy:(c.places[i] ?? c.neutralSetting)}<code aria-hidden="true">{id}</code></figcaption></figure>)}</div>
     </section>
     <section aria-labelledby="art-terrain-heading"><h2 id="art-terrain-heading">{c.terrain}</h2>
       <div className="art-terrain-list">{(Object.keys(catalog) as AssetId[]).filter(id => catalog[id].kind === 'terrain').map((id, i) =>

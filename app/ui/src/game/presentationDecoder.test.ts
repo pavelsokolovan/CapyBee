@@ -87,7 +87,17 @@ it('keeps shipped presentation assets aligned with the canonical SVG catalog', (
     }
   }
   expect(shippedAssets).toEqual(new Map(Object.entries(catalog)
-    .filter(([,entry]) => entry.kind !== 'motif').map(([id,entry]) => [id,entry.kind.toUpperCase()])));
+    .filter(([id,entry]) => entry.kind !== 'motif' && !/^(character|backdrop)\.case-/.test(id))
+    .map(([id,entry]) => [id,entry.kind.toUpperCase()])));
+});
+
+it('decodes the detective study and its local portraits in the same public contract', () => {
+  for (const [id, entry] of Object.entries(catalog)) {
+    if (entry.kind !== 'character' || !id.startsWith('character.case-')) continue;
+    const presentation = {...art(), backdropAssetId: 'backdrop.case-study',
+      characters: [{...art().characters[0], assetId: id, recruited: false}], party: []};
+    expect(decodeView(wire(presentation), 2).presentation).toEqual(presentation);
+  }
 });
 
 it('reads the same public JSON golden that the Java session wire round-trips', () => {

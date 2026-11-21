@@ -3,10 +3,14 @@ import type {GameView,GameCommand} from '../../game/gameApi';
 import {runCopy} from './runCopy';
 import {GamePlaces} from './GamePlaces';
 import {GameCharacterHistory} from './GameCharacters';
-type Props={hidePlaces?:boolean;view:GameView;locale:'en'|'pl';locked:boolean;selection?:string;submit:(command:GameCommand)=>void};
+type Props={hidePlaces?:boolean;caseNotes?:boolean;view:GameView;locale:'en'|'pl';locked:boolean;selection?:string;submit:(command:GameCommand)=>void};
 export function hasTextInput(view:GameView) {
  return view.input?.mode==='TEXT'||view.input?.mode==='CHOICE_OR_TEXT';
 }
+const caseCopy = {
+ en:{title:'Case notes',done:'Found',active:'To investigate'},
+ pl:{title:'Notatki ze śledztwa',done:'Odkryto',active:'Do zbadania'},
+} as const;
 const readMore = {en:'Read more',pl:'Czytaj dalej'} as const;
 export function SceneBlocks({view,locale,progressive=false}:{view:GameView;locale:'en'|'pl';progressive?:boolean}) {
  const [index,setIndex]=useState(0);
@@ -66,9 +70,13 @@ export function SceneActions({view,locale,locked,selection,submit,visitedChoices
  {view.canAdvance===true?<button type="button" onClick={()=>submit({type:'ADVANCE'})}>{copy.continue}</button>:null}
  </fieldset></div>;
 }
-export function ScenePanels({view,locale,locked,submit,hidePlaces=false}:Props){
- const c=runCopy[locale],p=view.places;
- return <aside>{view.objectives.length?<details><summary>{c.objectives}</summary>{view.objectives.map(o=><div key={o.id}><strong>{o.label}</strong><p>{'description' in o?o.description:null}</p><p>{o.state}</p></div>)}</details>:null}
+export function ScenePanels({view,locale,locked,submit,hidePlaces=false,caseNotes=false}:Props){
+ const c=runCopy[locale],p=view.places,notes=caseCopy[locale];
+ return <aside>{view.objectives.length?<details className={caseNotes?'game-case-notes':undefined}>
+  <summary lang={caseNotes?locale:undefined}>{caseNotes?notes.title:c.objectives}</summary>
+  {view.objectives.map(o=><div key={o.id}><strong>{o.label}</strong><p>{'description' in o?o.description:null}</p>
+   <p lang={caseNotes?locale:undefined}>{caseNotes?(o.state==='DONE'?notes.done:notes.active):o.state}</p></div>)}
+ </details>:null}
  <GameCharacterHistory view={view} locale={locale}/>
  {view.status.length?<details><summary>{c.status}</summary><dl>{view.status.map(s=><div key={s.id}><dt>{s.label}</dt><dd>{s.value}</dd></div>)}</dl></details>:null}
  {!hidePlaces&&p?.places.length?<GamePlaces places={p} locale={locale} locked={locked} submit={submit}/>:null}</aside>;

@@ -125,6 +125,7 @@ the implemented 30.2 contracts for the board, encounters and recruited party.
 
 - [45.1](45.1-capybee-detective-catalog-and-case-setup-instruction.md) — Localized detective catalog entry, eligibility, and AI case setup.
 - [45.2](45.2-capybee-detective-ai-case-generation-and-validation-instruction.md) — AI case generation, evidence gates, and preserved detective narration.
+- [45.3](45.3-capybee-detective-character-art-and-investigation-screens-instruction.md) — Illustrated detective scenes, cast portraits, and discovered case notes.
 
 ### Roadmap reconciliation
 

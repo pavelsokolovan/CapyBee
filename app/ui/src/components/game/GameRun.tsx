@@ -26,7 +26,7 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
  const [controller]=useState(()=>provided??new RunController(run,new GameTransport(()=>owner,()=>restoreGameSession(owner)),owner));
  const state=useSyncExternalStore(controller.subscribe,controller.getSnapshot),view=state.run.view;
  const sceneKind=sceneFirstKind(state.run);
- const episode=sceneKind==='episode',expedition=sceneKind==='expedition';
+ const episode=sceneKind==='episode',expedition=sceneKind==='expedition',detective=sceneKind==='detective';
  const controlsLocale=episode?'pl':locale,c=runCopy[controlsLocale];
  const episodeMap=useRef<HTMLDetailsElement>(null);
  const [saveVisible,setSaveVisible]=useState(false);
@@ -137,9 +137,9 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
   ? (!episode||state.message!=='saved'||saveVisible ? c[state.message] : '') : c.checking}</p>;
  const actions=view&&initialized&&(!locked||state.pending)?<SceneActions key={state.run.revision} view={view}
   locale={controlsLocale} locked={locked} selection={state.selection} visitedChoices={visitedHiveChoices(state.run)} submit={submit}/>:null;
- const party=view?<GameParty view={view} locale={locale} runId={state.run.runId} revision={state.run.revision}
+ const party=view&&!detective?<GameParty view={view} locale={locale} runId={state.run.runId} revision={state.run.revision}
   ready={initialized} announce={initialized&&!locked&&state.message==='saved'} hideEmpty={expedition}/>:null;
- const runClass=episode?'game-run game-scene-first game-episode':expedition?'game-run game-scene-first game-expedition':'game-run';
+ const runClass=episode?'game-run game-scene-first game-episode':expedition?'game-run game-scene-first game-expedition':detective?'game-run game-scene-first game-detective':'game-run';
  const titleHeading=<h3 tabIndex={-1} ref={hasSceneHeading?runHeading:heading}
   className={expedition&&title===null?'game-visually-hidden':undefined}
   lang={expedition&&title===null?controlsLocale:undefined}>{title??c.scene}</h3>;
@@ -201,9 +201,10 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
 
  return <section ref={section} className={runClass} data-text-mode={textMode} lang={state.run.locale}>
   {titleHeading}
-  {!episode?<><p>{adventureCopy[locale].locale}: {new Intl.DisplayNames([locale],{type:'language'}).of(state.run.locale)}</p>
-   {initialized&&state.message==='saved'?<p>{adventureCopy[locale].ready}</p>:null}{status}</>:null}
+  {!episode&&(!detective||state.run.locale!==locale)?<p>{adventureCopy[locale].locale}: {new Intl.DisplayNames([locale],{type:'language'}).of(state.run.locale)}</p>:null}
+  {!episode&&!detective?<>{initialized&&state.message==='saved'?<p>{adventureCopy[locale].ready}</p>:null}{status}</>:null}
   {notices}
+  {detective?<div className="game-scene-tools game-detective-tools">{textToggle}{status}</div>:null}
   {view?episode?<><div className="game-scene-tools">
    {view.places?.places.length&&!ended?<EpisodeMap places={view.places} locked={locked} submit={submit} details={episodeMap}/>:null}
    {textToggle}</div>
@@ -214,11 +215,12 @@ export function GameRun({run,owner,locale,onAnother,onClose,controller:provided}
     {ended?<button type="button" className={episodeCompleted?'game-episode-return':'game-episode-exit'} onClick={onClose??onAnother}>{c.back}</button>:null}
    </GameEncounter>{status}</>:<>
    {party}
-   <GameEncounter view={view}>
-    <GameCurrentCharacters view={view} locale={locale}/>
+   <GameEncounter view={view} stage={detective} textMode={detective&&textMode}>
+    {!detective?<GameCurrentCharacters view={view} locale={locale}/>:null}
     <SceneBlocks view={view} locale={locale}/>{actions}
    </GameEncounter>
-   <ScenePanels view={view} locale={locale} locked={locked} submit={submit}/>{ended?<SceneResult view={view} locale={locale}/>:null}
+   {detective?<GameCurrentCharacters view={view} locale={locale} collapsible/>:null}
+   <ScenePanels view={view} locale={locale} locked={locked} submit={submit} caseNotes={detective}/>{ended?<SceneResult view={view} locale={locale}/>:null}
   </>:episode?status:null}
   {recovery}{completion}{exit}
  </section>;

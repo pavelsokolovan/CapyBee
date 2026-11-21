@@ -637,10 +637,12 @@ final class RunImpl implements Run {
         if (generationPipeline != null) generationPipeline.quests().forEach(quest -> quests.put(quest.objectiveId(), quest));
         for (ObjectiveDef def : rules.objectives()) {
             GenerationArtifact.Quest quest = quests.get(def.id());
-            String dynamicDescription = dynamicPresentation == null ? null : dynamicPresentation.objectiveDescription(def.id());
+            var state = objectives.getOrDefault(def.id(), ObjectiveState.ACTIVE);
+            String dynamicDescription = dynamicPresentation == null ? null
+                    : dynamicPresentation.objectiveDescription(def.id(), state == ObjectiveState.DONE);
             objectiveItems.add(new ObjectiveItem(def.id(), quest == null ? resolve(def.labelKey()) : quest.title(),
                     quest == null ? dynamicDescription : quest.description(),
-                    objectives.getOrDefault(def.id(), ObjectiveState.ACTIVE)));
+                    state));
         }
         List<Option> options = new ArrayList<>();
         if (!ended) {
@@ -656,6 +658,10 @@ final class RunImpl implements Run {
         }
         View base = ViewBuilder.build(scene, ended, endReason, options, status, objectiveItems, outcome,
                 buildPlacesView(ended), storyInfo(), discoveredCharacters(), buildRunResult(objectiveItems));
+        if (dynamicPresentation != null) {
+            var artwork = dynamicPresentation.publicPresentation(base.characters());
+            if (artwork != null) return base.withPresentation(artwork, base.characters());
+        }
         var publicPlaces = base.places() == null ? Set.<String>of() : base.places().places().stream()
                 .map(PlaceView::id).collect(java.util.stream.Collectors.toSet());
         var projection = PresentationProjector.project(presentationDefinition, sceneId, visited, flags, strings,

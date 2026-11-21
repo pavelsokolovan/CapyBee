@@ -16,8 +16,8 @@ describe('fixed catalog boundary', () => {
   it('publishes complete, serializable metadata with local sources and bounded artwork', () => {
     expect(catalogVersion).toBe(1);
     const entries = Object.entries(catalog);
-    expect(entries).toHaveLength(25);
-    expect(new Set(entries.map(([id]) => id)).size).toBe(25);
+    expect(entries).toHaveLength(31);
+    expect(new Set(entries.map(([id]) => id)).size).toBe(31);
     const counts: Record<AssetKind, number> = {character: 0, terrain: 0, backdrop: 0, motif: 0};
     for (const [id, entry] of entries) {
       counts[entry.kind]++;
@@ -30,7 +30,7 @@ describe('fixed catalog boundary', () => {
         expect(entry.expressions).toEqual(id==='character.capy'?[...expressions,'playful']:expressions);
       }
     }
-    expect(counts).toEqual({character: 5, terrain: 7, backdrop: 10, motif: 3});
+    expect(counts).toEqual({character: 10, terrain: 7, backdrop: 11, motif: 3});
     expect(JSON.parse(JSON.stringify(catalog))).toEqual(catalog);
     const bytes = readdirSync(artworkPath).reduce((sum, file) => sum + statSync(resolve(artworkPath, file)).size, 0);
     expect(bytes).toBeLessThan(500 * 1024);
@@ -137,7 +137,7 @@ it('keeps fixture content and controls when switching to Polish and text mode', 
   const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
   try {
     await act(async () => root.render(<GameArtGallery/>));
-    expect(host.querySelectorAll('.art-character-variants figure')).toHaveLength(33);
+    expect(host.querySelectorAll('.art-character-variants figure')).toHaveLength(63);
     expect(host.querySelectorAll('.art-states button')).toHaveLength(11);
     const select = host.querySelector('select')!;
     await act(async () => {select.value = 'pl'; select.dispatchEvent(new Event('change', {bubbles: true}));});

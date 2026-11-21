@@ -1,6 +1,7 @@
 package com.capybee.engine.generation.blueprint;
 
 import com.capybee.engine.api.CharacterItem;
+import com.capybee.engine.api.PresentationView;
 import com.capybee.engine.api.StoryInfo;
 import com.capybee.engine.content.Block;
 import com.capybee.engine.content.BlockKind;
@@ -57,6 +58,8 @@ public final class DynamicPresentationPipeline {
     private final SceneWordLimits wordLimits;
     private final DynamicPresentationContinuation continuation;
     private final Map<String, CasePresentation> detectivePresentation;
+    private final Map<String, String> clueScenes;
+    private final Map<String, String> detectiveAssets;
     private final Map<String, GenerationArtifact.PlannedScenePayload> fallbacks = new LinkedHashMap<>();
     private final Map<String, DynamicPresentationArtifact> cache = new LinkedHashMap<>();
     private final List<GenerationExecutionSummary.StageExecution> executions = new ArrayList<>();
@@ -77,6 +80,8 @@ public final class DynamicPresentationPipeline {
         this.continuation = new DynamicPresentationContinuation(DynamicPresentationContinuation.FORMAT_VERSION,
                 definition.profileIdentity(), definition.locale(), POLICY_VERSION, constraints,
                 Math.min(2, profile.profile().generationBudget().sceneMaxAttempts()), qualityResource, blueprintCalls);
+        this.clueScenes = discoverClueScenes();
+        this.detectiveAssets = detectiveAssets();
         this.detectivePresentation = detectivePresentation();
         definition.scenePlans().forEach(plan -> fallbacks.put(plan.id(), validateFallback(plan)));
     }
@@ -97,6 +102,8 @@ public final class DynamicPresentationPipeline {
         var policy = readQualityPolicy(definition, continuation.qualityResource());
         this.qualityProfile = policy.fullProfile();
         this.wordLimits = policy.wordLimits();
+        this.clueScenes = discoverClueScenes();
+        this.detectiveAssets = detectiveAssets();
         this.detectivePresentation = detectivePresentation();
         definition.scenePlans().forEach(plan -> fallbacks.put(plan.id(), validateFallback(plan)));
         int artifactCalls = 0;
@@ -114,19 +121,42 @@ public final class DynamicPresentationPipeline {
     public synchronized DynamicPresentationContinuation continuation() { return continuation; }
     public synchronized int totalCalls() { return totalCalls; }
 
+    private Map<String, String> discoverClueScenes() {
+        if (!DetectiveCaseContract.applies(definition.profileIdentity())) return Map.of();
+        Set<String> clueObjectives = new LinkedHashSet<>();
+        definition.idBindings().objectives().forEach((source, runtime) -> {
+            if (source.startsWith(DetectiveCaseContract.CLUE_PREFIX)) clueObjectives.add(runtime);
+        });
+        Map<String, String> scenes = new LinkedHashMap<>();
+        for (var objective : definition.runtimeRules().objectives()) {
+            if (clueObjectives.contains(objective.id()) && objective.completeWhen() instanceof Condition.VisitedScene visit) {
+                scenes.put(objective.id(), visit.scene());
+            }
+        }
+        return Map.copyOf(scenes);
+    }
+
+    private Map<String, String> detectiveAssets() {
+        if (!DetectiveCaseContract.isDetectiveProfile(definition.profileIdentity())) return Map.of();
+        List<String> portraits = List.of("character.case-copper", "character.case-indigo", "character.case-olive");
+        Map<String, String> assets = new LinkedHashMap<>();
+        int visitor = 0;
+        for (var entry : definition.idBindings().actors().entrySet()) {
+            String asset = switch (entry.getKey()) {
+                case DetectiveCaseContract.COMPANION_ID -> "character.capy";
+                case DetectiveCaseContract.DETECTIVE_ID -> "character.case-detective";
+                case DetectiveCaseContract.CLIENT_ID -> "character.case-client";
+                default -> portraits.get(visitor++ % portraits.size());
+            };
+            assets.put(entry.getValue(), asset);
+        }
+        return Map.copyOf(assets);
+    }
+
     private Map<String, CasePresentation> detectivePresentation() {
         if (!DetectiveCaseContract.applies(definition.profileIdentity())) return Map.of();
         var bindings = definition.idBindings();
-        Set<String> clueObjectives = new LinkedHashSet<>();
-        bindings.objectives().forEach((source, runtime) -> {
-            if (source.startsWith(DetectiveCaseContract.CLUE_PREFIX)) clueObjectives.add(runtime);
-        });
-        Set<String> clueScenes = new LinkedHashSet<>();
-        for (var objective : definition.runtimeRules().objectives()) {
-            if (clueObjectives.contains(objective.id()) && objective.completeWhen() instanceof Condition.VisitedScene visit) {
-                clueScenes.add(visit.scene());
-            }
-        }
+        Set<String> clueSceneIds = Set.copyOf(clueScenes.values());
         Set<String> accusations = new LinkedHashSet<>();
         bindings.choices().values().forEach(choices -> choices.forEach((source, runtime) -> {
             if (source.startsWith(DetectiveCaseContract.ACCUSE_PREFIX)) accusations.add(runtime);
@@ -136,7 +166,7 @@ public final class DynamicPresentationPipeline {
         Map<String, CasePresentation> required = new LinkedHashMap<>();
         for (var plan : definition.scenePlans()) {
             boolean solved = solvedOutcome.equals(canonical(plan.id()).outcome());
-            String narration = solved || clueScenes.contains(plan.id()) ? plan.intent() : null;
+            String narration = solved || clueSceneIds.contains(plan.id()) ? plan.intent() : null;
             String reconstruction = solved ? outcomeText(solvedOutcome, "description") : null;
             Map<String, String> labels = new LinkedHashMap<>();
             for (var choice : plan.choices()) {
@@ -266,7 +296,20 @@ public final class DynamicPresentationPipeline {
         return found.stream().map(actors::get).filter(Objects::nonNull)
                 .map(v -> new CharacterItem(v.id(),v.id(),v.name(),v.description(),here.contains(v.id()))).toList();
     }
-    public String objectiveDescription(String id) { return objectiveText(id,"description"); }
+    public String objectiveDescription(String id, boolean complete) {
+        String scene = complete ? clueScenes.get(id) : null;
+        return scene == null ? objectiveText(id, "description") : plan(scene).intent();
+    }
+
+    public PresentationView publicPresentation(List<CharacterItem> discovered) {
+        if (detectiveAssets.isEmpty()) return null;
+        var portraits = discovered.stream()
+                .filter(character -> detectiveAssets.containsKey(character.id()))
+                .map(character -> new PresentationView.CharacterArt(character.id(),
+                        detectiveAssets.get(character.id()), null, null, "neutral", false))
+                .toList();
+        return new PresentationView(1, 1, null, "backdrop.case-study", List.of(), portraits, List.of());
+    }
     public synchronized GenerationExecutionSummary summary() { return new GenerationExecutionSummary(executions, totalCalls); }
 
     private DynamicPresentationArtifact resolve(String sceneId, List<String> visited) {

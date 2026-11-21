@@ -18,13 +18,13 @@ let host:HTMLDivElement,root:Root;
 beforeEach(()=>{sessionStorage.clear();host=document.createElement('div');document.body.append(host);root=createRoot(host);});
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.restoreAllMocks();});
 const run=()=>decodeSummary(structuredClone(fixtures.dynamic));
-async function renderRun(run:GameRunSummaryDto) {
+async function renderRun(run:GameRunSummaryDto, locale:'en'|'pl'='en') {
  let state:RunState={run,pending:false,message:'saved'};
  const listeners=new Set<()=>void>();
  const controller={getSnapshot:()=>state,subscribe:(listener:()=>void)=>{
   listeners.add(listener);return()=>{listeners.delete(listener);};
  },initialize:vi.fn(async()=>{}),detach:vi.fn(),submit:vi.fn()};
- await act(async()=>root.render(<GameRun run={run} owner="owner" locale="en" onAnother={vi.fn()}
+ await act(async()=>root.render(<GameRun run={run} owner="owner" locale={locale} onAnother={vi.fn()}
   controller={controller as unknown as RunController}/>));
  const update=async(patch:Partial<RunState>)=>act(async()=>{
   state={...state,...patch};listeners.forEach(listener=>listener());
@@ -396,4 +396,42 @@ it('projects CapyBee’s reaction from the accepted Hive beat on stage and in th
  expect(expression(stage)).toBe('neutral');
  await accept({...run,packId:'fixture-art'});
  expect(expression(stage)).toBe(guide.expression);
+});
+
+
+it.each([
+ {locale:'en',toggle:'Text mode',notes:'Case notes',task:'Inspect the seal.',observation:'The wax has two impressions.',found:'Found'},
+ {locale:'pl',toggle:'Tryb tekstowy',notes:'Notatki ze śledztwa',task:'Zbadaj pieczęć.',observation:'Wosk ma dwa odciski.',found:'Odkryto'},
+] as const)('shows the accepted case and choice in both reading modes ($locale)',async test=>{
+ const fixture=illustratedRun();
+ const view=fixture.view;
+ view.places=null;
+ view.objectives=[{id:'objective-001',label:test.task,description:test.task,state:'ACTIVE'}];
+ view.presentation!.backdropAssetId='backdrop.case-study';
+ view.presentation!.characters[0].assetId='character.capy';
+ const run={...fixture,source:{kind:'DYNAMIC',profileId:'classic-detective',profileVersion:'1.3.0',gameFingerprint:'fixture'} as const,
+  packId:null,packVersion:null,locale:test.locale};
+ const {accept,submit}=await renderRun(run,test.locale);
+ const game=host.querySelector('.game-detective')!;
+ const notes=game.querySelector('details.game-case-notes')!;
+ expect(notes.querySelector('summary')?.textContent).toBe(test.notes);
+ expect(notes.textContent).not.toContain(test.observation);
+ expect(game.querySelector('.game-encounter-stage [data-capy-expression]')).not.toBeNull();
+ const toggle=game.querySelector<HTMLButtonElement>('.game-scene-tools [aria-pressed]')!;
+ expect(toggle.textContent).toBe(test.toggle);
+ const choice=game.querySelector<HTMLButtonElement>('.game-actions button')!;
+ toggle.focus();
+ await act(async()=>toggle.click());
+ expect(document.activeElement).toBe(toggle);
+ expect(toggle.getAttribute('aria-pressed')).toBe('true');
+ expect(game.querySelector('.game-encounter-backdrop')).toBeNull();
+ expect(game.querySelector('.game-actions button')).toBe(choice);
+ expect(choice.disabled).toBe(false);
+ const accepted=structuredClone(run);
+ accepted.revision++;
+ accepted.view.objectives[0]={...view.objectives[0],description:test.observation,state:'DONE'};
+ await accept(accepted);
+ expect(notes.textContent).toContain(test.observation);
+ expect(notes.textContent).toContain(test.found);
+ expect(submit).not.toHaveBeenCalled();
 });

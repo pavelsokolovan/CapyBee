@@ -63,6 +63,13 @@ class DetectiveCaseIntegrationTest {
                 .contains("BLUEPRINT_DETECTIVE_ACCUSATION_BEFORE_CLUES", "/scenes/9/choices/0/requires")
                 .doesNotContain(text.seal());
         var bindings = started.definition().idBindings();
+        var opening = started.run().view();
+        assertThat(opening.characters()).extracting(com.capybee.engine.api.CharacterItem::name)
+                .containsExactly("Iga", "CapyBee", "Ada");
+        assertThat(opening.presentation().backdropAssetId()).isEqualTo("backdrop.case-study");
+        assertThat(opening.presentation().characters()).extracting(com.capybee.engine.api.PresentationView.CharacterArt::assetId)
+                .containsExactly("character.case-detective", "character.capy", "character.case-client");
+        assertThat(opening.objectives()).noneSatisfy(note -> assertThat(note.description()).isIn(text.seal(), text.clock()));
         Engine offline = engine().build();
         Run incomplete = offline.resume(started.run().snapshot()).run();
         choose(incomplete, bindings.choices().get("opening").get("skip-seal"));
@@ -81,6 +88,16 @@ class DetectiveCaseIntegrationTest {
                 && call.untrustedDataJson().contains(text.seal())).hasSize(2);
         assertThat(sceneCalls.getLast().untrustedDataJson()).contains("DYNAMIC_DETECTIVE_EVIDENCE_CHANGED");
         var clueView = solved.view();
+        assertThat(clueView.objectives()).anySatisfy(note -> {
+            assertThat(note.id()).isEqualTo(bindings.objectives().get("clue-seal"));
+            assertThat(note.description()).isEqualTo(text.seal());
+            assertThat(note.state()).isEqualTo(com.capybee.engine.api.ObjectiveState.DONE);
+        }).noneSatisfy(note -> assertThat(note.description()).isEqualTo(text.clock()));
+        assertThat(clueView.characters()).extracting(com.capybee.engine.api.CharacterItem::name)
+                .containsExactly("Iga", "CapyBee", "Ada", "Nora");
+        assertThat(clueView.presentation().characters())
+                .extracting(com.capybee.engine.api.PresentationView.CharacterArt::assetId)
+                .containsExactly("character.case-detective", "character.capy", "character.case-client", "character.case-copper");
         var saved = SnapshotCodec.fromJson(SnapshotCodec.toJson(solved.snapshot()));
         assertThat(saved.issues()).isEmpty();
         assertThat(offline.resume(saved.snapshot()).run().view()).isEqualTo(clueView);
@@ -133,6 +150,7 @@ class DetectiveCaseIntegrationTest {
 
     private static String blueprint(String locale, CaseText text, Condition gate) {
         var actors = List.of(new Actor("detective", "Iga", text.phrase("Investigator", "Śledcza"), text.next()),
+                new Actor("capybee", "CapyBee", text.phrase("Companion", "Towarzysz"), text.next()),
                 new Actor("client", "Ada", text.phrase("Client", "Klientka"), text.next()),
                 new Actor("suspect-nora", "Nora", text.phrase("Archivist", "Archiwistka"), text.next()),
                 new Actor("suspect-leon", "Leon", text.phrase("Clockmaker", "Zegarmistrz"), text.next()));
@@ -145,10 +163,13 @@ class DetectiveCaseIntegrationTest {
         var phases = java.util.Arrays.stream(PhaseKind.values())
                 .map(phase -> new Phase(phase, text.next(), text.next(), text.next(), cast, objectiveIds)).toList();
         var scenes = List.<Scene>of(
-                new DecisionScene("opening", PhaseKind.OPENING, text.title(), text.next(), cast, List.of(),
+                new DecisionScene("opening", PhaseKind.OPENING, text.title(), text.next(),
+                        List.of("detective", "capybee", "client"), List.of(),
                         List.of(new Choice("inspect-seal", text.phrase("Inspect the envelope", "Zbadaj kopertę"), "seal", null, List.of()),
                                 new Choice("skip-seal", text.phrase("Question the client", "Zapytaj klientkę"), "interview", null, List.of()))),
-                scene("seal", PhaseKind.DEVELOPMENT, text, text.seal(), "hall", List.of("clue-seal")),
+                new DecisionScene("seal", PhaseKind.DEVELOPMENT, text.title(), text.seal(),
+                        List.of("detective", "capybee", "suspect-nora"), List.of("clue-seal"),
+                        List.of(new Choice("continue", text.phrase("Keep investigating", "Badaj dalej"), "hall", null, List.of()))),
                 scene("interview", PhaseKind.DEVELOPMENT, text, text.next(), "hall", List.of()),
                 scene("hall", PhaseKind.DEVELOPMENT, text, text.next(), "clock", List.of()),
                 scene("clock", PhaseKind.CHALLENGE, text, text.clock(), "alibi", List.of("clue-clock")),

@@ -90,6 +90,7 @@ public final class DefaultBlueprintSemanticValidator implements BlueprintSemanti
         }
 
         private void validateDetectiveCase() {
+            if (DetectiveCaseContract.requiresRecurringCast(validatedProfile.identity())) validateDetectiveCast();
             List<String> suspectNames = actors.values().stream()
                     .filter(actor -> actor.id().startsWith(DetectiveCaseContract.SUSPECT_PREFIX))
                     .map(actor -> actor.name().toLowerCase(Locale.ROOT)).toList();
@@ -132,6 +133,20 @@ public final class DefaultBlueprintSemanticValidator implements BlueprintSemanti
                     || decisiveScenes.stream().map(scenes::get).map(DecisionScene.class::cast)
                             .map(DecisionScene::intent).anyMatch(observation -> !reconstruction.contains(observation))) {
                 issues.add("BLUEPRINT_DETECTIVE_RECONSTRUCTION_INVALID", "/outcomes/" + blueprint.outcomes().indexOf(solution) + "/description");
+            }
+        }
+
+        private void validateDetectiveCast() {
+            Actor companion = actors.get(DetectiveCaseContract.COMPANION_ID);
+            if (companion == null || !"CapyBee".equals(companion.name())
+                    || !actors.containsKey(DetectiveCaseContract.DETECTIVE_ID)
+                    || !actors.containsKey(DetectiveCaseContract.CLIENT_ID)) {
+                issues.add("BLUEPRINT_DETECTIVE_CAST_REQUIRED", "/actors");
+            }
+            Scene opening = scenes.get(blueprint.startSceneId());
+            if (!(opening instanceof DecisionScene scene) || !scene.actorIds().containsAll(List.of(
+                    DetectiveCaseContract.DETECTIVE_ID, DetectiveCaseContract.COMPANION_ID))) {
+                issues.add("BLUEPRINT_DETECTIVE_OPENING_CAST_REQUIRED", "/startSceneId");
             }
         }
 

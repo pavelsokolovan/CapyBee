@@ -198,8 +198,11 @@ For a substantial, fair-play classic detective mystery, use the bilingual
 `classic-detective` profile. Its medium preset uses 8–12 story transitions and
 12–20 scenes, with standard or expert deduction difficulty. Version 1.2.0
 checks that players see the decisive clues before they can accuse a suspect
-and preserves those observations during scene generation. See
-[Spec 45.2](../../docs/specifications/45.2-capybee-detective-ai-case-generation-and-validation-instruction.md).
+and preserves those observations during scene generation. Version 1.3.0 adds
+CapyBee as the investigator’s companion and projects portraits and discovered
+clues for the investigation screen. See
+[Spec 45.2](../../docs/specifications/45.2-capybee-detective-ai-case-generation-and-validation-instruction.md)
+and [Spec 45.3](../../docs/specifications/45.3-capybee-detective-character-art-and-investigation-screens-instruction.md).
 
 ```powershell
 ./dev.ps1 game `

@@ -48,6 +48,26 @@ export function TerrainArtwork({id}: {id: TerrainId}) {
 }
 
 export function BackdropArtwork({id}: {id: BackdropId}) {
+  if (id === 'backdrop.case-study') {
+    return <>
+      <path d="M0 0h640v360H0Z" fill="#3D5354"/>
+      <path d="M0 269h640v91H0Z" fill="#99765E"/>
+      <path d="M0 263h640v11H0Z" fill="#57403A"/>
+      <g stroke="#293C40" strokeWidth="7" strokeLinejoin="round">
+        <path d="M46 241V96q0-50 52-50t52 50v145Z" fill="#B3C4BE"/>
+        <path d="M98 49v192M47 128h103" fill="none"/>
+        <path d="M489 61h108v184H489Z" fill="#815F50"/>
+        <path d="M492 132h102m-102 61h102" fill="none"/>
+      </g>
+      <g fill="#D3A76F">
+        <path d="M501 97h14v30h-14Zm21-12h15v42h-15Zm24 16h14v26h-14Zm22-6 16 3-5 29-16-3Z"/>
+        <path d="M504 150h17v36h-17Zm25 9h18v27h-18Zm26-19h17v46h-17Z"/>
+      </g>
+      <path d="M153 273h326v20H153Zm24 20h18v45h-18Zm265 0h18v45h-18Z" fill="#655045"/>
+      <g transform="translate(365 163) scale(1.05)"><MotifArtwork id="motif.lantern"/></g>
+      <path d="M233 256q37-14 81-2v17q-40-9-81 0Z" fill="#E5CFA5"/>
+    </>;
+  }
   if (id === 'backdrop.note-clearing') {
     return <>
       <path d="M0 0H640V360H0Z" fill="#f8d18b"/>

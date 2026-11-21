@@ -19,9 +19,9 @@ export const galleryCopy = {
       selected: 'Selected', pending: 'Waiting for accepted state', focus: 'Keyboard focus'},
     expression: {neutral: 'Neutral', attentive: 'Attentive', pleased: 'Pleased', playful: 'Playful'},
     variant: {portrait: 'Portrait', figure: 'Figure', marker: 'Map marker'},
-    names: ['Capy', 'Mela', 'Borys', 'Luna', 'Pebble guide'], long: 'A very quiet clearing beyond the gently swaying willow branches',
+    names: ['Capy', 'Mela', 'Borys', 'Luna', 'Pebble guide', 'Detective', 'Client', 'Visitor in copper', 'Visitor in indigo', 'Visitor in olive'], long: 'A very quiet clearing beyond the gently swaying willow branches',
     terrainNames: ['Meadow', 'Water', 'Willow', 'Workshop', 'Lantern', 'Crossing', 'Neutral ground'],
-    motifNames: ['Lantern', 'Reeds', 'Rest leaf'], neutralSetting: 'A calm clearing',
+    motifNames: ['Lantern', 'Reeds', 'Rest leaf'], neutralSetting: 'A calm clearing', caseStudy: 'Detective study',
   },
   pl: {
     eyebrow: 'CapyBee · Katalog ilustracji 01', title: 'Mały świat czeka na odkrycie.',
@@ -43,8 +43,8 @@ export const galleryCopy = {
       selected: 'Wybrane', pending: 'Oczekiwanie na przyjęty stan', focus: 'Fokus klawiatury'},
     expression: {neutral: 'Spokojna', attentive: 'Uważna', pleased: 'Zadowolona', playful: 'Figlarna'},
     variant: {portrait: 'Portret', figure: 'Postać', marker: 'Znacznik mapy'},
-    names: ['Capy', 'Mela', 'Borys', 'Luna', 'Kamienny przewodnik'], long: 'Bardzo spokojna polana za łagodnie kołyszącymi się gałęziami wierzby',
+    names: ['Capy', 'Mela', 'Borys', 'Luna', 'Kamienny przewodnik', 'Detektyw', 'Klient', 'Gość w miedzianym stroju', 'Gość w granatowym stroju', 'Gość w oliwkowym stroju'], long: 'Bardzo spokojna polana za łagodnie kołyszącymi się gałęziami wierzby',
     terrainNames: ['Łąka', 'Woda', 'Wierzba', 'Warsztat', 'Latarnia', 'Mostek', 'Spokojna ziemia'],
-    motifNames: ['Latarnia', 'Trzciny', 'Liść odpoczynku'], neutralSetting: 'Spokojna polana',
+    motifNames: ['Latarnia', 'Trzciny', 'Liść odpoczynku'], neutralSetting: 'Spokojna polana', caseStudy: 'Gabinet detektywa',
   },
 } as const;
