@@ -124,6 +124,7 @@ the implemented 30.2 contracts for the board, encounters and recruited party.
 ## Classic Detective Mystery
 
 - [45.1](45.1-capybee-detective-catalog-and-case-setup-instruction.md) — Localized detective catalog entry, eligibility, and AI case setup.
+- [45.2](45.2-capybee-detective-ai-case-generation-and-validation-instruction.md) — AI case generation, evidence gates, and preserved detective narration.
 
 ### Roadmap reconciliation
 

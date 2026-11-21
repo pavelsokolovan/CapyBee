@@ -41,6 +41,8 @@ public final class DefaultBlueprintSemanticValidator implements BlueprintSemanti
         private final EffectiveGenerationConstraints limits;
         private final ProfileCapabilities capabilities;
         private final ChallengePreset challenge;
+        private final boolean detective;
+        private final Set<String> decisiveScenes = new LinkedHashSet<>();
         private final Issues issues = new Issues();
         private final Map<String, Actor> actors = new LinkedHashMap<>();
         private final Map<String, Objective> objectives = new LinkedHashMap<>();
@@ -63,6 +65,7 @@ public final class DefaultBlueprintSemanticValidator implements BlueprintSemanti
             this.preferences = preferences;
             this.limits = limits;
             this.capabilities = profile.profile().capabilities();
+            this.detective = DetectiveCaseContract.applies(profile.identity());
             this.challenge = profile.profile().challengePresets().stream()
                     .filter(value -> value.id().equals(preferences.challengePresetId())).findFirst().orElseThrow();
         }
@@ -71,6 +74,10 @@ public final class DefaultBlueprintSemanticValidator implements BlueprintSemanti
             envelopeAndIndexes();
             referencesAndMechanics();
             if (!issues.empty()) return reject();
+            if (detective) {
+                validateDetectiveCase();
+                if (!issues.empty()) return reject();
+            }
             try { mechanicsPlan = new GeneratedMechanicsBinder().bind(blueprint); }
             catch (IllegalStateException ex) {
                 issues.add("BLUEPRINT_MECHANICS_CONTRACT_MISMATCH", "");
@@ -80,6 +87,70 @@ public final class DefaultBlueprintSemanticValidator implements BlueprintSemanti
             coverage();
             if (!issues.empty()) return reject();
             return explore();
+        }
+
+        private void validateDetectiveCase() {
+            List<String> suspectNames = actors.values().stream()
+                    .filter(actor -> actor.id().startsWith(DetectiveCaseContract.SUSPECT_PREFIX))
+                    .map(actor -> actor.name().toLowerCase(Locale.ROOT)).toList();
+            if (suspectNames.size() < 2 || new HashSet<>(suspectNames).size() != suspectNames.size()) {
+                issues.add("BLUEPRINT_DETECTIVE_SUSPECTS_REQUIRED", "/actors");
+            }
+            validateDecisiveClues();
+
+            List<Outcome> solved = blueprint.outcomes().stream().filter(o -> o.resultClass() == ResultClass.SUCCESS).toList();
+            if (solved.size() != 1) {
+                issues.add("BLUEPRINT_DETECTIVE_SOLUTION_REQUIRED", "/outcomes");
+                return;
+            }
+            Outcome solution = solved.getFirst();
+            Set<String> culprits = new LinkedHashSet<>();
+            for (int i = 0; i < blueprint.scenes().size(); i++) {
+                if (!(blueprint.scenes().get(i) instanceof DecisionScene decision)) continue;
+                for (int j = 0; j < decision.choices().size(); j++) {
+                    Choice choice = decision.choices().get(j);
+                    Scene destination = scenes.get(choice.destinationSceneId());
+                    boolean solvesCase = destination instanceof EndingScene ending && ending.outcomeId().equals(solution.id());
+                    String path = "/scenes/" + i + "/choices/" + j;
+                    if (choice.id().startsWith(DetectiveCaseContract.ACCUSE_PREFIX)) {
+                        String suspectId = choice.id().substring(DetectiveCaseContract.ACCUSE_PREFIX.length());
+                        Actor suspect = actors.get(suspectId);
+                        if (decision.phase() != PhaseKind.RESOLUTION || !(destination instanceof EndingScene)
+                                || !suspectId.startsWith(DetectiveCaseContract.SUSPECT_PREFIX) || suspect == null
+                                || !choice.intent().contains(suspect.name())) {
+                            issues.add("BLUEPRINT_DETECTIVE_ACCUSATION_INVALID", path);
+                        } else if (solvesCase) {
+                            culprits.add(suspectId);
+                        }
+                    } else if (solvesCase) {
+                        issues.add("BLUEPRINT_DETECTIVE_ACCUSATION_REQUIRED", path);
+                    }
+                }
+            }
+            String reconstruction = solution.description();
+            if (culprits.size() != 1 || !reconstruction.contains(actors.get(culprits.iterator().next()).name())
+                    || decisiveScenes.stream().map(scenes::get).map(DecisionScene.class::cast)
+                            .map(DecisionScene::intent).anyMatch(observation -> !reconstruction.contains(observation))) {
+                issues.add("BLUEPRINT_DETECTIVE_RECONSTRUCTION_INVALID", "/outcomes/" + blueprint.outcomes().indexOf(solution) + "/description");
+            }
+        }
+
+        private void validateDecisiveClues() {
+            Set<String> observations = new LinkedHashSet<>();
+            for (int i = 0; i < blueprint.objectives().size(); i++) {
+                Objective clue = blueprint.objectives().get(i);
+                if (!clue.id().startsWith(DetectiveCaseContract.CLUE_PREFIX)) continue;
+                if (!(clue.completeWhen() instanceof VisitedSceneCondition visit)
+                        || !(scenes.get(visit.scene()) instanceof DecisionScene scene)
+                        || (scene.phase() != PhaseKind.DEVELOPMENT && scene.phase() != PhaseKind.CHALLENGE)
+                        || !scene.objectiveIds().contains(clue.id())
+                        || !decisiveScenes.add(visit.scene()) || !observations.add(scene.intent())) {
+                    issues.add("BLUEPRINT_DETECTIVE_CLUE_INVALID", "/objectives/" + i);
+                }
+            }
+            if (decisiveScenes.size() < 2 || decisiveScenes.size() > 3) {
+                issues.add("BLUEPRINT_DETECTIVE_CLUES_REQUIRED", "/objectives");
+            }
         }
 
         private void envelopeAndIndexes() {
@@ -370,6 +441,11 @@ public final class DefaultBlueprintSemanticValidator implements BlueprintSemanti
                         && enabled.stream().map(TransitionSignature::new).distinct().count() >= 2) meaningful = true;
                 for (Choice choice : enabled) {
                     int choiceIndex = decision.choices().indexOf(choice);
+                    if (detective && choice.id().startsWith(DetectiveCaseContract.ACCUSE_PREFIX)
+                            && !current.visitedScenes().containsAll(decisiveScenes)) {
+                        issues.add("BLUEPRINT_DETECTIVE_ACCUSATION_BEFORE_CLUES",
+                                "/scenes/" + sceneIndex + "/choices/" + choiceIndex + "/requires");
+                    }
                     Config target = apply(choice, mechanicsPlan.sceneChoices().get(sceneIndex).get(choiceIndex), current, bindings);
                     if (target == null) continue;
                     Integer targetIndex = indexes.get(target);

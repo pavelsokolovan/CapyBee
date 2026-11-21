@@ -23,6 +23,8 @@ import com.capybee.engine.port.StructuredGenerationRequest;
 import com.capybee.engine.port.TextGenerationException;
 import com.capybee.engine.port.TextGenerationResult;
 import com.capybee.engine.port.TextGenerator;
+import com.capybee.engine.rules.Condition;
+import com.capybee.engine.rules.ResultClass;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -54,6 +56,7 @@ public final class DynamicPresentationPipeline {
     private final GenerationQualityProfile qualityProfile;
     private final SceneWordLimits wordLimits;
     private final DynamicPresentationContinuation continuation;
+    private final Map<String, CasePresentation> detectivePresentation;
     private final Map<String, GenerationArtifact.PlannedScenePayload> fallbacks = new LinkedHashMap<>();
     private final Map<String, DynamicPresentationArtifact> cache = new LinkedHashMap<>();
     private final List<GenerationExecutionSummary.StageExecution> executions = new ArrayList<>();
@@ -74,6 +77,7 @@ public final class DynamicPresentationPipeline {
         this.continuation = new DynamicPresentationContinuation(DynamicPresentationContinuation.FORMAT_VERSION,
                 definition.profileIdentity(), definition.locale(), POLICY_VERSION, constraints,
                 Math.min(2, profile.profile().generationBudget().sceneMaxAttempts()), qualityResource, blueprintCalls);
+        this.detectivePresentation = detectivePresentation();
         definition.scenePlans().forEach(plan -> fallbacks.put(plan.id(), validateFallback(plan)));
     }
 
@@ -93,6 +97,7 @@ public final class DynamicPresentationPipeline {
         var policy = readQualityPolicy(definition, continuation.qualityResource());
         this.qualityProfile = policy.fullProfile();
         this.wordLimits = policy.wordLimits();
+        this.detectivePresentation = detectivePresentation();
         definition.scenePlans().forEach(plan -> fallbacks.put(plan.id(), validateFallback(plan)));
         int artifactCalls = 0;
         for (DynamicPresentationArtifact artifact : restoredArtifacts) {
@@ -109,6 +114,50 @@ public final class DynamicPresentationPipeline {
     public synchronized DynamicPresentationContinuation continuation() { return continuation; }
     public synchronized int totalCalls() { return totalCalls; }
 
+    private Map<String, CasePresentation> detectivePresentation() {
+        if (!DetectiveCaseContract.applies(definition.profileIdentity())) return Map.of();
+        var bindings = definition.idBindings();
+        Set<String> clueObjectives = new LinkedHashSet<>();
+        bindings.objectives().forEach((source, runtime) -> {
+            if (source.startsWith(DetectiveCaseContract.CLUE_PREFIX)) clueObjectives.add(runtime);
+        });
+        Set<String> clueScenes = new LinkedHashSet<>();
+        for (var objective : definition.runtimeRules().objectives()) {
+            if (clueObjectives.contains(objective.id()) && objective.completeWhen() instanceof Condition.VisitedScene visit) {
+                clueScenes.add(visit.scene());
+            }
+        }
+        Set<String> accusations = new LinkedHashSet<>();
+        bindings.choices().values().forEach(choices -> choices.forEach((source, runtime) -> {
+            if (source.startsWith(DetectiveCaseContract.ACCUSE_PREFIX)) accusations.add(runtime);
+        }));
+        String solvedOutcome = definition.runtimeRules().outcomes().stream()
+                .filter(outcome -> outcome.resultClass() == ResultClass.SUCCESS).findFirst().orElseThrow().id();
+        Map<String, CasePresentation> required = new LinkedHashMap<>();
+        for (var plan : definition.scenePlans()) {
+            boolean solved = solvedOutcome.equals(canonical(plan.id()).outcome());
+            String narration = solved || clueScenes.contains(plan.id()) ? plan.intent() : null;
+            String reconstruction = solved ? outcomeText(solvedOutcome, "description") : null;
+            Map<String, String> labels = new LinkedHashMap<>();
+            for (var choice : plan.choices()) {
+                if (accusations.contains(choice.id())) labels.put(choice.id(), choice.intent());
+            }
+            if (narration != null || !labels.isEmpty()) {
+                required.put(plan.id(), new CasePresentation(narration, reconstruction, labels));
+            }
+        }
+        return Map.copyOf(required);
+    }
+
+    private record CasePresentation(String narration, String reconstruction, Map<String, String> labels) {
+        boolean matches(GenerationArtifact.PlannedScenePayload payload) {
+            return (narration == null || narration.equals(payload.narration()))
+                    && (reconstruction == null || payload.ending() != null && reconstruction.equals(payload.ending().summary()))
+                    && payload.choices().stream().allMatch(choice ->
+                            labels.getOrDefault(choice.id(), choice.label()).equals(choice.label()));
+        }
+    }
+
     private void validateRestored(DynamicPresentationArtifact artifact) {
         MaterializedGameDefinition.ScenePlan plan = plan(artifact.sceneId());
         if (!artifact.artifactId().equals("presentation:" + artifact.sceneId())
@@ -116,6 +165,8 @@ public final class DynamicPresentationPipeline {
                 || artifact.evidence().providerCalls() < 0
                 || artifact.continuityBasisSceneIds().stream().anyMatch(id -> !fallbacks.containsKey(id)))
             throw new ConfigurationException();
+        CasePresentation required = detectivePresentation.get(plan.id());
+        if (required != null && !required.matches(artifact.payload())) throw new ConfigurationException();
         List<String> expectedChoices = plan.choices().stream().map(MaterializedGameDefinition.ChoicePlan::id).toList();
         List<String> actualChoices = artifact.payload().choices().stream().map(GenerationArtifact.ChoiceLabel::id).toList();
         if (!expectedChoices.equals(actualChoices)) throw new ConfigurationException();
@@ -170,7 +221,9 @@ public final class DynamicPresentationPipeline {
             String headline = outcomeText(canonical.outcome(), "title");
             List<GenerationArtifact.ObjectiveNote> notes = plan.objectiveIds().stream()
                     .map(id -> new GenerationArtifact.ObjectiveNote(id, objectiveText(id, "description"))).toList();
-            ending = new GenerationArtifact.EndingNarrative(headline, plan.intent(), notes, "");
+            var required = detectivePresentation.get(plan.id());
+            String summary = required != null && required.reconstruction() != null ? required.reconstruction() : plan.intent();
+            ending = new GenerationArtifact.EndingNarrative(headline, summary, notes, "");
         }
         GenerationArtifact.PlannedScenePayload payload = new GenerationArtifact.PlannedScenePayload(plan.id(),
                 plan.title(), plan.intent(), List.of(), labels, List.of(), ending);
@@ -235,6 +288,12 @@ public final class DynamicPresentationPipeline {
                     if(generated.finishReason()!=TextGenerationResult.FinishReason.COMPLETE){failure="DYNAMIC_PRESENTATION_OUTPUT_REJECTED";findings=List.of(failure);continue;}
                     var parsed=parser.parsePlannedScene(generated.outputJson(),16_000,context(plan));
                     if(parsed.payload() instanceof GenerationArtifact.PlannedScenePayload payload){
+                        CasePresentation required = detectivePresentation.get(plan.id());
+                        if (required != null && !required.matches(payload)) {
+                            failure = "DYNAMIC_DETECTIVE_EVIDENCE_CHANGED";
+                            findings = List.of(failure);
+                            continue;
+                        }
                         var report=quality(payload,basis,canonical(plan.id()).end());
                         if(report.decision()==GenerationQualityEvaluator.QualityDecision.REJECT){
                             failure="DYNAMIC_PRESENTATION_QUALITY_REJECTED";
@@ -266,6 +325,16 @@ public final class DynamicPresentationPipeline {
         ArrayNode actors=root.putArray("actors");for(String id:plan.actorIds()){var a=actor(id);var n=actors.addObject();n.put("id",id);n.put("name",a.name());n.put("role",a.role());n.put("description",a.description());}
         ArrayNode objectives=root.putArray("objectives");for(String id:plan.objectiveIds()){var n=objectives.addObject();n.put("id",id);n.put("title",objectiveText(id,"title"));n.put("description",objectiveText(id,"description"));}
         ArrayNode choices=root.putArray("choices");plan.choices().forEach(v->{var n=choices.addObject();n.put("id",v.id());n.put("intent",v.intent());});
+        CasePresentation required = detectivePresentation.get(plan.id());
+        if (required != null) {
+            instructions += "\nCopy each required value verbatim to the corresponding output field.";
+            if (required.narration() != null) root.put("requiredNarration", required.narration());
+            if (required.reconstruction() != null) root.put("requiredEndingSummary", required.reconstruction());
+            if (!required.labels().isEmpty()) {
+                ObjectNode labels = root.putObject("requiredChoiceLabels");
+                required.labels().forEach(labels::put);
+            }
+        }
         ArrayNode continuity=root.putArray("continuity");for(String id:basis){DynamicPresentationArtifact a=cache.get(id);if(a!=null)a.payload().continuityFacts().forEach(continuity::add);}
         if(attempt>1){ArrayNode feedback=root.putArray("findings");findings.stream().filter(Objects::nonNull).limit(16).forEach(feedback::add);}
         if (!scopes.isEmpty()) scopes.forEach(root.putArray("scopes")::add);

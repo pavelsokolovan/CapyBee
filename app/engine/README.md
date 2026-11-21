@@ -195,9 +195,11 @@ Spec 27.7 owns richer result and ending behavior.
 ## Dynamic generator profiles
 
 For a substantial, fair-play classic detective mystery, use the bilingual
-`classic-detective` profile. It is tuned to one medium-length preset with 10–12
-meaningful story transitions, 12–18 scenes, clue tracking, contradictions,
-multiple suspects, and standard or expert deduction difficulty:
+`classic-detective` profile. Its medium preset uses 8–12 story transitions and
+12–20 scenes, with standard or expert deduction difficulty. Version 1.2.0
+checks that players see the decisive clues before they can accuse a suspect
+and preserves those observations during scene generation. See
+[Spec 45.2](../../docs/specifications/45.2-capybee-detective-ai-case-generation-and-validation-instruction.md).
 
 ```powershell
 ./dev.ps1 game `
