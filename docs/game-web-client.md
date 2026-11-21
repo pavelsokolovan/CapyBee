@@ -152,6 +152,7 @@ PowerShell static-sync workflow. For browser acceptance, use:
 ```sh
 CI=true \
 CAPYBEE_PREPARATION_BROWSER_CHECK="$PWD/app/ui/scripts/check-adventure-preparation.mjs" \
+CAPYBEE_DETECTIVE_BROWSER_CHECK="$PWD/app/ui/scripts/check-detective-acceptance.mjs" \
 CHROMIUM_EXECUTABLE=/usr/bin/chromium \
 mvn -B -f app/pom.xml -pl server -am verify
 ```

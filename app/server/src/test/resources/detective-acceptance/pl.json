@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "locale": "pl",
+  "title": "Zaginiony list",
+  "premise": "List zniknął z zapieczętowanej koperty.",
+  "setting": "Archiwum",
+  "toneTags": ["cerebral"],
+  "storyPromises": ["Podążaj za dowodami."],
+  "actors": [
+    {"id": "detective","name": "Iga","role": "Śledcza","description": "Śledcza"},
+    {"id": "capybee","name": "CapyBee","role": "Towarzysz","description": "Towarzysz"},
+    {"id": "client","name": "Ada","role": "Klientka","description": "Klientka"},
+    {"id": "suspect-rin","name": "Rin","role": "Archiwistka","description": "Archiwistka"},
+    {"id": "suspect-leon","name": "Leon","role": "Zegarmistrz","description": "Zegarmistrz"}
+  ],
+  "state": {"counters": [],"flags": [],"sets": []},
+  "objectives": [
+    {"id": "clue-wax","title": "Zbadaj pieczęć","description": "Obejrzyj wosk na kopercie.","completeWhen": {"type": "VISITED_SCENE","scene": "wax"}},
+    {"id": "clue-clock","title": "Zbadaj zegar","description": "Sprawdź, kiedy zegar się zatrzymał.","completeWhen": {"type": "VISITED_SCENE","scene": "clock"}}
+  ],
+  "phases": [
+    {"kind": "OPENING","goal": "Odnajdź list.","development": "Podążaj za dowodami.","transition": "Kontynuuj śledztwo.","actorIds": ["detective","capybee","client","suspect-rin","suspect-leon"],"objectiveIds": ["clue-wax","clue-clock"]},
+    {"kind": "DEVELOPMENT","goal": "Odnajdź list.","development": "Podążaj za dowodami.","transition": "Kontynuuj śledztwo.","actorIds": ["detective","capybee","client","suspect-rin","suspect-leon"],"objectiveIds": ["clue-wax","clue-clock"]},
+    {"kind": "CHALLENGE","goal": "Odnajdź list.","development": "Podążaj za dowodami.","transition": "Kontynuuj śledztwo.","actorIds": ["detective","capybee","client","suspect-rin","suspect-leon"],"objectiveIds": ["clue-wax","clue-clock"]},
+    {"kind": "RESOLUTION","goal": "Odnajdź list.","development": "Podążaj za dowodami.","transition": "Kontynuuj śledztwo.","actorIds": ["detective","capybee","client","suspect-rin","suspect-leon"],"objectiveIds": ["clue-wax","clue-clock"]},
+    {"kind": "ENDING","goal": "Odnajdź list.","development": "Podążaj za dowodami.","transition": "Kontynuuj śledztwo.","actorIds": ["detective","capybee","client","suspect-rin","suspect-leon"],"objectiveIds": ["clue-wax","clue-clock"]}
+  ],
+  "startSceneId": "opening",
+  "scenes": [
+    {"id": "opening","kind": "DECISION","phase": "OPENING","title": "Zaginiony list","intent": "Ada przynosi pustą kopertę.","actorIds": ["detective","capybee","client"],"objectiveIds": [],"choices": [{"id": "inspect","intent": "Zbadaj kopertę","destinationSceneId": "wax","requires": null,"effects": []},{"id": "skip","intent": "Zapytaj klientkę","destinationSceneId": "interview","requires": null,"effects": []}]},
+    {"id": "wax","kind": "DECISION","phase": "DEVELOPMENT","title": "Zaginiony list","intent": "Wosk ma dwa odciski.","actorIds": ["detective","capybee","suspect-rin"],"objectiveIds": ["clue-wax"],"choices": [{"id": "continue","intent": "Wejdź do holu","destinationSceneId": "hall","requires": null,"effects": []}]},
+    {"id": "interview","kind": "DECISION","phase": "DEVELOPMENT","title": "Zaginiony list","intent": "Ada wspomina, że znalazła kopertę w archiwum.","actorIds": ["detective","capybee","client"],"objectiveIds": [],"choices": [{"id": "continue","intent": "Wejdź do holu","destinationSceneId": "hall","requires": null,"effects": []}]},
+    {"id": "hall","kind": "DECISION","phase": "DEVELOPMENT","title": "Zaginiony list","intent": "Zegar w holu milczy.","actorIds": ["detective","capybee"],"objectiveIds": [],"choices": [{"id": "continue","intent": "Obejrzyj zegar","destinationSceneId": "clock","requires": null,"effects": []}]},
+    {"id": "clock","kind": "DECISION","phase": "CHALLENGE","title": "Zaginiony list","intent": "Zegar w holu zatrzymał się przed zmrokiem.","actorIds": ["detective","capybee"],"objectiveIds": ["clue-clock"],"choices": [{"id": "continue","intent": "Sprawdź alibi","destinationSceneId": "alibi","requires": null,"effects": []}]},
+    {"id": "alibi","kind": "DECISION","phase": "CHALLENGE","title": "Zaginiony list","intent": "Leon naprawiał zegar.","actorIds": ["detective","capybee","suspect-leon"],"objectiveIds": [],"choices": [{"id": "continue","intent": "Obejrzyj księgę","destinationSceneId": "ledger","requires": null,"effects": []}]},
+    {"id": "ledger","kind": "DECISION","phase": "CHALLENGE","title": "Zaginiony list","intent": "W księdze zapisano listy.","actorIds": ["detective","capybee"],"objectiveIds": [],"choices": [{"id": "continue","intent": "Porównaj zapisy","destinationSceneId": "records","requires": null,"effects": []}]},
+    {"id": "records","kind": "DECISION","phase": "CHALLENGE","title": "Zaginiony list","intent": "Tylko Rin miała kopertę w rękach.","actorIds": ["detective","capybee"],"objectiveIds": [],"choices": [{"id": "continue","intent": "Sprawdź dowody","destinationSceneId": "review","requires": null,"effects": []}]},
+    {"id": "review","kind": "DECISION","phase": "CHALLENGE","title": "Zaginiony list","intent": "Iga rozkłada dowody.","actorIds": ["detective","capybee"],"objectiveIds": [],"choices": [{"id": "continue","intent": "Wyciągnij wniosek","destinationSceneId": "resolution","requires": null,"effects": []}]},
+    {"id": "resolution","kind": "DECISION","phase": "RESOLUTION","title": "Zaginiony list","intent": "Pora zdecydować.","actorIds": ["detective","capybee","client","suspect-rin","suspect-leon"],"objectiveIds": [],"choices": [{"id": "accuse-suspect-rin","intent": "Oskarż Rin","destinationSceneId": "solved","requires": {"type": "ALL","conditions": [{"type": "VISITED_SCENE","scene": "wax"},{"type": "VISITED_SCENE","scene": "clock"}]},"effects": []},{"id": "defer","intent": "Zostaw otwartą sprawę","destinationSceneId": "unresolved","requires": null,"effects": []}]},
+    {"id": "solved","kind": "ENDING","phase": "ENDING","title": "Zaginiony list","intent": "Rin otworzyła kopertę przed zmrokiem, aby odzyskać list.","actorIds": ["detective","capybee","client","suspect-rin","suspect-leon"],"objectiveIds": [],"outcomeId": "solved"},
+    {"id": "unresolved","kind": "ENDING","phase": "ENDING","title": "Zaginiony list","intent": "Śledztwo pozostaje otwarte.","actorIds": ["detective","capybee","client","suspect-rin","suspect-leon"],"objectiveIds": [],"outcomeId": "unresolved"}
+  ],
+  "outcomes": [
+    {"id": "solved","resultClass": "SUCCESS","title": "List odnaleziony","description": "Wosk ma dwa odciski. Zegar w holu zatrzymał się przed zmrokiem. Rin otworzyła kopertę przed zmrokiem, aby odzyskać list."},
+    {"id": "unresolved","resultClass": "PARTIAL_SUCCESS","title": "Trop pozostaje otwarty","description": "Brakuje dowodów."}
+  ]
+}

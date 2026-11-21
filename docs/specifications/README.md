@@ -127,6 +127,7 @@ the implemented 30.2 contracts for the board, encounters and recruited party.
 - [45.2](45.2-capybee-detective-ai-case-generation-and-validation-instruction.md) — AI case generation, evidence gates, and preserved detective narration.
 - [45.3](45.3-capybee-detective-character-art-and-investigation-screens-instruction.md) — Illustrated detective scenes, cast portraits, and discovered case notes.
 - [45.4](45.4-capybee-detective-case-endings-saving-and-recovery-instruction.md) — Detective outcomes, reconstruction, and explicit retry after a failed start.
+- [45.5](45.5-capybee-detective-release-acceptance-instruction.md) — Bilingual browser acceptance and live release verification.
 
 ### Roadmap reconciliation
 

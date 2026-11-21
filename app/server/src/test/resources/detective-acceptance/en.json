@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "locale": "en",
+  "title": "The missing letter",
+  "premise": "A letter disappeared from a sealed envelope.",
+  "setting": "The archive",
+  "toneTags": ["cerebral"],
+  "storyPromises": ["Follow the evidence."],
+  "actors": [
+    {"id": "detective","name": "Iga","role": "Investigator","description": "Investigator"},
+    {"id": "capybee","name": "CapyBee","role": "Companion","description": "Companion"},
+    {"id": "client","name": "Ada","role": "Client","description": "Client"},
+    {"id": "suspect-rin","name": "Rin","role": "Archivist","description": "Archivist"},
+    {"id": "suspect-leon","name": "Leon","role": "Clockmaker","description": "Clockmaker"}
+  ],
+  "state": {"counters": [],"flags": [],"sets": []},
+  "objectives": [
+    {"id": "clue-wax","title": "Examine the seal","description": "Check the wax on the envelope.","completeWhen": {"type": "VISITED_SCENE","scene": "wax"}},
+    {"id": "clue-clock","title": "Examine the clock","description": "Check when the clock stopped.","completeWhen": {"type": "VISITED_SCENE","scene": "clock"}}
+  ],
+  "phases": [
+    {"kind": "OPENING","goal": "Find the letter.","development": "Follow the evidence.","transition": "Continue the investigation.","actorIds": ["detective","capybee","client","suspect-rin","suspect-leon"],"objectiveIds": ["clue-wax","clue-clock"]},
+    {"kind": "DEVELOPMENT","goal": "Find the letter.","development": "Follow the evidence.","transition": "Continue the investigation.","actorIds": ["detective","capybee","client","suspect-rin","suspect-leon"],"objectiveIds": ["clue-wax","clue-clock"]},
+    {"kind": "CHALLENGE","goal": "Find the letter.","development": "Follow the evidence.","transition": "Continue the investigation.","actorIds": ["detective","capybee","client","suspect-rin","suspect-leon"],"objectiveIds": ["clue-wax","clue-clock"]},
+    {"kind": "RESOLUTION","goal": "Find the letter.","development": "Follow the evidence.","transition": "Continue the investigation.","actorIds": ["detective","capybee","client","suspect-rin","suspect-leon"],"objectiveIds": ["clue-wax","clue-clock"]},
+    {"kind": "ENDING","goal": "Find the letter.","development": "Follow the evidence.","transition": "Continue the investigation.","actorIds": ["detective","capybee","client","suspect-rin","suspect-leon"],"objectiveIds": ["clue-wax","clue-clock"]}
+  ],
+  "startSceneId": "opening",
+  "scenes": [
+    {"id": "opening","kind": "DECISION","phase": "OPENING","title": "The missing letter","intent": "Ada brings an empty envelope.","actorIds": ["detective","capybee","client"],"objectiveIds": [],"choices": [{"id": "inspect","intent": "Inspect the envelope","destinationSceneId": "wax","requires": null,"effects": []},{"id": "skip","intent": "Question the client","destinationSceneId": "interview","requires": null,"effects": []}]},
+    {"id": "wax","kind": "DECISION","phase": "DEVELOPMENT","title": "The missing letter","intent": "The wax has two impressions.","actorIds": ["detective","capybee","suspect-rin"],"objectiveIds": ["clue-wax"],"choices": [{"id": "continue","intent": "Enter the hall","destinationSceneId": "hall","requires": null,"effects": []}]},
+    {"id": "interview","kind": "DECISION","phase": "DEVELOPMENT","title": "The missing letter","intent": "Ada recalls finding the envelope in the archive.","actorIds": ["detective","capybee","client"],"objectiveIds": [],"choices": [{"id": "continue","intent": "Enter the hall","destinationSceneId": "hall","requires": null,"effects": []}]},
+    {"id": "hall","kind": "DECISION","phase": "DEVELOPMENT","title": "The missing letter","intent": "The hall clock is quiet.","actorIds": ["detective","capybee"],"objectiveIds": [],"choices": [{"id": "continue","intent": "Inspect the clock","destinationSceneId": "clock","requires": null,"effects": []}]},
+    {"id": "clock","kind": "DECISION","phase": "CHALLENGE","title": "The missing letter","intent": "The hall clock stopped before dusk.","actorIds": ["detective","capybee"],"objectiveIds": ["clue-clock"],"choices": [{"id": "continue","intent": "Check the alibi","destinationSceneId": "alibi","requires": null,"effects": []}]},
+    {"id": "alibi","kind": "DECISION","phase": "CHALLENGE","title": "The missing letter","intent": "Leon was repairing the clock.","actorIds": ["detective","capybee","suspect-leon"],"objectiveIds": [],"choices": [{"id": "continue","intent": "Inspect the ledger","destinationSceneId": "ledger","requires": null,"effects": []}]},
+    {"id": "ledger","kind": "DECISION","phase": "CHALLENGE","title": "The missing letter","intent": "The ledger records the letters.","actorIds": ["detective","capybee"],"objectiveIds": [],"choices": [{"id": "continue","intent": "Compare the records","destinationSceneId": "records","requires": null,"effects": []}]},
+    {"id": "records","kind": "DECISION","phase": "CHALLENGE","title": "The missing letter","intent": "Only Rin handled the envelope.","actorIds": ["detective","capybee"],"objectiveIds": [],"choices": [{"id": "continue","intent": "Review the evidence","destinationSceneId": "review","requires": null,"effects": []}]},
+    {"id": "review","kind": "DECISION","phase": "CHALLENGE","title": "The missing letter","intent": "Iga lays out the evidence.","actorIds": ["detective","capybee"],"objectiveIds": [],"choices": [{"id": "continue","intent": "Make your deduction","destinationSceneId": "resolution","requires": null,"effects": []}]},
+    {"id": "resolution","kind": "DECISION","phase": "RESOLUTION","title": "The missing letter","intent": "It is time to decide.","actorIds": ["detective","capybee","client","suspect-rin","suspect-leon"],"objectiveIds": [],"choices": [{"id": "accuse-suspect-rin","intent": "Accuse Rin","destinationSceneId": "solved","requires": {"type": "ALL","conditions": [{"type": "VISITED_SCENE","scene": "wax"},{"type": "VISITED_SCENE","scene": "clock"}]},"effects": []},{"id": "defer","intent": "Leave case open","destinationSceneId": "unresolved","requires": null,"effects": []}]},
+    {"id": "solved","kind": "ENDING","phase": "ENDING","title": "The missing letter","intent": "Rin opened the envelope before dusk to recover the letter.","actorIds": ["detective","capybee","client","suspect-rin","suspect-leon"],"objectiveIds": [],"outcomeId": "solved"},
+    {"id": "unresolved","kind": "ENDING","phase": "ENDING","title": "The missing letter","intent": "The investigation remains open.","actorIds": ["detective","capybee","client","suspect-rin","suspect-leon"],"objectiveIds": [],"outcomeId": "unresolved"}
+  ],
+  "outcomes": [
+    {"id": "solved","resultClass": "SUCCESS","title": "The letter is found","description": "The wax has two impressions. The hall clock stopped before dusk. Rin opened the envelope before dusk to recover the letter."},
+    {"id": "unresolved","resultClass": "PARTIAL_SUCCESS","title": "The trail remains open","description": "The evidence is incomplete."}
+  ]
+}

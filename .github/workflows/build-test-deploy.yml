@@ -106,6 +106,7 @@ jobs:
       - name: Run backend and integrated browser tests
         env:
           CAPYBEE_PREPARATION_BROWSER_CHECK: ${{ github.workspace }}/app/ui/scripts/check-adventure-preparation.mjs
+          CAPYBEE_DETECTIVE_BROWSER_CHECK: ${{ github.workspace }}/app/ui/scripts/check-detective-acceptance.mjs
         run: mvn -B -f app/pom.xml -pl server -am verify
 
       - name: Build backend JAR
